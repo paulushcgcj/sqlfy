@@ -10,6 +10,7 @@ Subcommands
   chunks   Output LLM vector chunks
   diff     Compare two Schema State Dictionaries
   graph    Generate a graph representation (DOT, Mermaid, ASCII)
+  insights Analyse schema and report structural/referential findings
 
 Legacy mode (no subcommand) is preserved for backward compatibility:
   sqlfy <dir> [--chunks] [--json] [--all] [--json-input FILE] [--out FILE]
@@ -17,11 +18,12 @@ Legacy mode (no subcommand) is preserved for backward compatibility:
 Usage
 -----
   # Subcommand style (preferred)
-  sqlfy dump   <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
-  sqlfy dump   --json-input FILE [--format json|yaml] [--out FILE]
-  sqlfy chunks <migrations-dir> [--format json] [--out FILE] [--at VERSION]
-  sqlfy diff   <state-a> <state-b> [--format json|text] [--out FILE]
-  sqlfy graph  <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--out FILE]
+  sqlfy dump     <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
+  sqlfy dump     --json-input FILE [--format json|yaml] [--out FILE]
+  sqlfy chunks   <migrations-dir> [--format json] [--out FILE] [--at VERSION]
+  sqlfy diff     <state-a> <state-b> [--format json|text] [--out FILE]
+  sqlfy graph    <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--out FILE]
+  sqlfy insights <migrations-dir> [--format text|json] [--severity LEVEL] [--strict]
 
   # Legacy style (still works)
   sqlfy <migrations-dir> --json
@@ -30,17 +32,21 @@ Usage
 
 Examples
 --------
-  sqlfy dump   ./migrations
-  sqlfy dump   ./migrations --format yaml
-  sqlfy dump   ./migrations --format json --out state.json
-  sqlfy dump   ./migrations --at 3
-  sqlfy dump   --json-input /tmp/sqlfy-input.json --format json
-  sqlfy chunks ./migrations --format json --out chunks.json
-  sqlfy diff   state_v2.json state_v5.json
-  sqlfy diff   ./migrations-v1 ./migrations-v2
-  sqlfy graph  ./migrations
-  sqlfy graph  ./migrations --format mermaid --out schema.md
-  sqlfy graph  ./migrations --format dot --out schema.dot
+  sqlfy dump     ./migrations
+  sqlfy dump     ./migrations --format yaml
+  sqlfy dump     ./migrations --format json --out state.json
+  sqlfy dump     ./migrations --at 3
+  sqlfy dump     --json-input /tmp/sqlfy-input.json --format json
+  sqlfy chunks   ./migrations --format json --out chunks.json
+  sqlfy diff     state_v2.json state_v5.json
+  sqlfy diff     ./migrations-v1 ./migrations-v2
+  sqlfy graph    ./migrations
+  sqlfy graph    ./migrations --format mermaid --out schema.md
+  sqlfy graph    ./migrations --format dot --out schema.dot
+  sqlfy insights ./migrations
+  sqlfy insights ./migrations --severity error
+  sqlfy insights ./migrations --format json --out findings.json
+  sqlfy insights ./migrations --strict
 """
 
 import sys
@@ -59,6 +65,7 @@ from .reconstructor import reconstruct, reconstruct_at
 from .schema_state import SchemaStateBuilder
 from .differ import SchemaDiffer, diff_files
 from .grapher import Grapher
+from .insights import InsightsEngine
 
 
 # ─────────────────────────────────────────────
@@ -434,11 +441,48 @@ def cmd_graph(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: insights
+# ─────────────────────────────────────────────
+
+def cmd_insights(args: argparse.Namespace) -> None:
+    """
+    Analyse the schema and report Graphify-style insights.
+
+    Detects: orphan tables, missing PKs, unindexed tables, missing FK
+    candidates, unresolved FK targets, nullable PKs/FKs, circular
+    references, wide tables, orphaned sequences, duplicate indexes,
+    and disconnected islands.
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    state = SchemaStateBuilder.from_graph(graph)
+
+    report = InsightsEngine.analyse(state)
+
+    # Optionally filter by severity
+    if getattr(args, 'severity', None):
+        sev = args.severity.lower()
+        report.findings = [f for f in report.findings if f.severity == sev]
+
+    fmt = (args.format or 'text').lower()
+    if fmt == 'json':
+        output = report.to_json()
+    else:
+        output = report.to_text()
+
+    write_output(output, args.out)
+
+    # Exit with non-zero if errors found (useful in CI)
+    if getattr(args, 'strict', False) and report.errors():
+        sys.exit(1)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
 def _subcommand_parser() -> argparse.ArgumentParser:
-    """Parser for subcommand mode (dump, chunks, diff, graph)."""
+    """Parser for subcommand mode (dump, chunks, diff, graph, insights)."""
     parser = argparse.ArgumentParser(prog='sqlfy')
     sub = parser.add_subparsers(dest='subcommand', required=True)
 
@@ -448,36 +492,45 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         p.add_argument('--at', metavar='VERSION')
         p.add_argument('--out', metavar='FILE')
 
+    # dump
     p_dump = sub.add_parser('dump', help='Output the Schema State Dictionary')
     shared(p_dump)
     p_dump.add_argument('--format', choices=['json', 'yaml', 'summary'], default='json')
     p_dump.set_defaults(func=cmd_dump)
 
+    # chunks
     p_chunks = sub.add_parser('chunks', help='Output LLM vector chunks')
     shared(p_chunks)
     p_chunks.add_argument('--format', choices=['json', 'text'], default='json')
     p_chunks.set_defaults(func=cmd_chunks)
 
+    # diff
     p_diff = sub.add_parser('diff',
         help='Compare two Schema State Dictionaries or migration directories')
-    p_diff.add_argument('state_a',
-        help='State JSON file (from sqlfy dump) or migrations directory')
-    p_diff.add_argument('state_b',
-        help='State JSON file (from sqlfy dump) or migrations directory')
-    p_diff.add_argument('--format', choices=['json', 'text'], default='text',
-        help='Output format (default: text)')
-    p_diff.add_argument('--out', metavar='FILE',
-        help='Write output to FILE instead of stdout')
+    p_diff.add_argument('state_a', help='State JSON file or migrations directory')
+    p_diff.add_argument('state_b', help='State JSON file or migrations directory')
+    p_diff.add_argument('--format', choices=['json', 'text'], default='text')
+    p_diff.add_argument('--out', metavar='FILE')
     p_diff.set_defaults(func=cmd_diff)
 
+    # graph
     p_graph = sub.add_parser('graph',
         help='Output graph representation (DOT, Mermaid, or ASCII summary)')
     shared(p_graph)
-    p_graph.add_argument('--format', choices=['dot', 'mermaid', 'summary'], default='dot',
-        help='Output format (default: dot)')
-    p_graph.add_argument('--title', metavar='TEXT',
-        help='Graph title (default: "Schema V<version>")')
+    p_graph.add_argument('--format', choices=['dot', 'mermaid', 'summary'], default='dot')
+    p_graph.add_argument('--title', metavar='TEXT')
     p_graph.set_defaults(func=cmd_graph)
+
+    # insights
+    p_ins = sub.add_parser('insights',
+        help='Analyse schema and report Graphify-style insights')
+    shared(p_ins)
+    p_ins.add_argument('--format', choices=['text', 'json'], default='text')
+    p_ins.add_argument('--severity', choices=['error', 'warning', 'info'],
+        help='Filter findings by severity')
+    p_ins.add_argument('--strict', action='store_true',
+        help='Exit with code 1 if any errors are found (useful in CI)')
+    p_ins.set_defaults(func=cmd_insights)
 
     return parser
 
@@ -499,7 +552,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights'}
 
 
 def main() -> None:

@@ -11,6 +11,7 @@ from .schema_state import (
 )
 from .differ import SchemaDiffer, DiffResult, diff_files
 from .grapher import Grapher
+from .insights import InsightsEngine, InsightsReport, Finding
 
 __all__ = [
     'apply_migrations', 'build_chunks', 'compute_layout', 'type_str',
@@ -21,4 +22,5 @@ __all__ = [
     'SequenceState', 'RelationshipState', 'MigrationStep',
     'SchemaDiffer', 'DiffResult', 'diff_files',
     'Grapher',
+    'InsightsEngine', 'InsightsReport', 'Finding',
 ]

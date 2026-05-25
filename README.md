@@ -113,6 +113,41 @@ sqlfy graph <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--at
 | `mermaid` | Mermaid ERD — paste into GitHub Markdown or https://mermaid.live |
 | `summary` | Compact ASCII adjacency list — useful for LLM prompts |
 
+#### `sqlfy insights`
+
+```bash
+sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] [--strict] [--at VERSION] [--out FILE]
+```
+
+Analyses the schema and reports categorised findings.
+
+| Flag | Description |
+|---|---|
+| `--format text` _(default)_ | Human-readable report with severity sections |
+| `--format json` | Machine-readable JSON grouped by severity |
+| `--severity LEVEL` | Filter output to `error`, `warning`, or `info` only |
+| `--strict` | Exit with code 1 if any `error`-severity findings exist (useful in CI) |
+
+**Finding codes:**
+
+| Code | Severity | Category |
+|---|---|---|
+| `ORPHAN_TABLE` | warning | structural |
+| `NO_PK` | error | structural |
+| `NO_INDEXES` | info | structural |
+| `WIDE_TABLE` | info | structural |
+| `EMPTY_TABLE_COMMENT` | info | structural |
+| `MISSING_FK_CANDIDATE` | warning | referential |
+| `UNRESOLVED_FK` | error | referential |
+| `NULLABLE_FK` | info | referential |
+| `CIRCULAR_FK` | warning | referential |
+| `NULLABLE_PK` | error | modelling |
+| `VARCHAR_ID` | warning | modelling |
+| `ORPHAN_SEQUENCE` | info | modelling |
+| `DUPLICATE_INDEX` | warning | modelling |
+| `UNIQUE_WITHOUT_INDEX` | info | modelling |
+| `ISLAND` | warning | connectivity |
+
 ### Legacy style (backward compatible)
 
 ```bash
@@ -161,6 +196,12 @@ sqlfy graph ./migrations
 sqlfy graph ./migrations --format mermaid --out schema.md
 sqlfy graph ./migrations --format dot --out schema.dot
 sqlfy graph ./migrations --format summary
+
+# Schema insights
+sqlfy insights ./migrations
+sqlfy insights ./migrations --severity error
+sqlfy insights ./migrations --format json --out findings.json
+sqlfy insights ./migrations --strict
 
 # Combined graph + chunks (Tauri bridge format — legacy)
 sqlfy ./migrations --all
@@ -341,6 +382,7 @@ Paste the **Schema Summary** chunk as system context and individual **table chun
 - [x] Point-in-time reconstruction via `--at`
 - [x] Schema diff command (`sqlfy diff`)
 - [x] Graph output command (`sqlfy graph` — DOT, Mermaid, ASCII summary)
+- [x] Schema insights (`sqlfy insights` — orphan tables, missing PKs, FK candidates, circular refs, islands)
 - [ ] PostgreSQL dialect parity
 
 ---
