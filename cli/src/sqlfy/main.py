@@ -41,20 +41,20 @@ import json
 import argparse
 from pathlib import Path
 
-from core import (
+from .core import (
     apply_migrations,
     build_chunks,
     type_str,
     SchemaGraph,
     VectorChunk,
 )
-from reconstructor import reconstruct, reconstruct_at
-from schema_state import SchemaStateBuilder
-from differ import SchemaDiffer, diff_files
-from grapher import Grapher
-from insights import InsightsEngine
-from asker import Asker, ChatSession
-from exporter import Exporter
+from .reconstructor import reconstruct, reconstruct_at
+from .schema_state import SchemaStateBuilder
+from .differ import SchemaDiffer, diff_files
+from .grapher import Grapher
+from .insights import InsightsEngine
+from .asker import Asker, ChatSession
+from .exporter import Exporter
 
 
 # ─────────────────────────────────────────────
@@ -594,7 +594,6 @@ def cmd_export(args: argparse.Namespace) -> None:
 
     report = None
     if getattr(args, 'insights', False):
-        from insights import InsightsEngine
         report = InsightsEngine.analyse(state)
 
     title  = getattr(args, 'title', '') or f'Schema Documentation — V{state.version}'

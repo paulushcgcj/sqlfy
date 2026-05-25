@@ -31,9 +31,9 @@ from __future__ import annotations
 
 import json
 import html as html_mod
-from schema_state import SchemaState, TableState
-from insights import InsightsReport, Finding
-from grapher import Grapher
+from .schema_state import SchemaState, TableState
+from .insights import InsightsReport, Finding
+from .grapher import Grapher
 
 
 def _e(s: object) -> str:
