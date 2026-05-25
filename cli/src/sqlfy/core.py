@@ -665,10 +665,8 @@ def apply_migrations(files: list[dict]) -> SchemaGraph:
                 if 'INDEX' in raw_up and raw_up.startswith(('CREATE', 'INDEX', 'UNIQUE')):
                     _handle_create_index_command(raw_sql, version, tables, all_actions)
 
-                elif raw_up.startswith('TABLE') and 'MODIFY' in raw_up:
-                    _handle_alter_table_command(
-                        f'ALTER TABLE {stmt.expression}', version, tables, all_actions
-                    )
+                elif raw_up.startswith('ALTER') and 'MODIFY' in raw_up:
+                    _handle_alter_table_command(raw_sql, version, tables, all_actions)
 
     # ── Derive FK edges ──────────────────────────────────────────────────────
     edges: list[Edge] = []
