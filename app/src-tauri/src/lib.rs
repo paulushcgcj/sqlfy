@@ -5,7 +5,8 @@
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())   // spawn python CLI
-        .plugin(tauri_plugin_fs::init())      // write temp input file
+        .plugin(tauri_plugin_fs::init())      // read/write migration files
+        .plugin(tauri_plugin_dialog::init())  // folder picker
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

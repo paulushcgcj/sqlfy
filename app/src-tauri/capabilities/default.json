@@ -10,10 +10,14 @@
     "shell:allow-execute",
     "shell:allow-spawn",
     "shell:allow-kill",
+    "dialog:allow-open",
+    "fs:allow-read-dir",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
+    "fs:allow-create-file",
     "fs:allow-remove-file",
     "fs:scope-temp",
+    "fs:scope-home-recursive",
     "path:default"
   ]
 }

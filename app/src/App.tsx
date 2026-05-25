@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { parse, IS_TAURI } from './bridge/cli';
+import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
 import MigrationsTab from './components/schema/MigrationsTab';
 import GraphTab      from './components/schema/GraphTab';
 import LlmTab        from './components/schema/LlmTab';
@@ -13,10 +14,27 @@ export default function App() {
   const [files, setFiles]             = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
   const [graph, setGraph]             = useState<SchemaGraph | null>(null);
   const [chunks, setChunks]           = useState<VectorChunk[] | null>(null);
+  const [folderHandle, setFolderHandle] = useState<FolderHandle | null>(null);
   const [activeTab, setActiveTab]     = useState<Tab>('migrations');
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [error, setError]             = useState<string | null>(null);
   const [parsing, setParsing]         = useState(false);
+
+  async function handleLoadFolder() {
+    setError(null);
+    try {
+      const handle = await pickFolder();
+      if (!handle) return;
+      const loaded = await readMigrations(handle);
+      setFolderHandle(handle);
+      setFiles(loaded);
+      setGraph(null);
+      setChunks(null);
+      setActiveTab('migrations');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   async function handleParse() {
     setParsing(true);
@@ -104,7 +122,12 @@ export default function App() {
       {/* Content */}
       <div className="content">
         {activeTab === 'migrations' && (
-          <MigrationsTab files={files} onChange={setFiles} />
+          <MigrationsTab
+            files={files}
+            onChange={setFiles}
+            folderHandle={folderHandle}
+            onLoadFolder={handleLoadFolder}
+          />
         )}
         {activeTab === 'graph' && graph && (
           <GraphTab
