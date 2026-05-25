@@ -8,6 +8,8 @@
     "dev": "vite",
     "app": "tauri dev",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint .",
     "preview": "vite preview"
   },

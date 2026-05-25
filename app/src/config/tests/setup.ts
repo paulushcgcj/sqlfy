@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 
-// Mock window.matchMedia (not implemented in jsdom)
-Object.defineProperty(window, 'matchMedia', {
+// Mock globalThis.matchMedia (not implemented in jsdom)
+Object.defineProperty(globalThis, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
@@ -15,8 +15,8 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock navigator.clipboard (not implemented in jsdom)
-Object.defineProperty(navigator, 'clipboard', {
+// Mock globalThis.navigator.clipboard (not implemented in jsdom)
+Object.defineProperty(globalThis.navigator, 'clipboard', {
   writable: true,
   value: { writeText: vi.fn().mockResolvedValue(undefined) },
 });
