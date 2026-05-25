@@ -8,8 +8,8 @@ Subcommands
 -----------
   dump     Output the Schema State Dictionary (JSON or YAML)
   chunks   Output LLM vector chunks
+  diff     Compare two Schema State Dictionaries
   graph    (coming in step 13)
-  diff     (coming in step 12)
 
 Legacy mode (no subcommand) is preserved for backward compatibility:
   sqlfy <dir> [--chunks] [--json] [--all] [--json-input FILE] [--out FILE]
@@ -20,6 +20,10 @@ Usage
   sqlfy dump  <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
   sqlfy dump  --json-input FILE [--format json|yaml] [--out FILE]
   sqlfy chunks <migrations-dir> [--format json] [--out FILE] [--at VERSION]
+
+  sqlfy diff state_a.json state_b.json
+  sqlfy diff state_a.json state_b.json --format json
+  sqlfy diff ./migrations-v1 ./migrations-v2
 
   # Legacy style (still works)
   sqlfy <migrations-dir> --json
@@ -50,6 +54,7 @@ from .core import (
 )
 from .reconstructor import reconstruct, reconstruct_at
 from .schema_state import SchemaStateBuilder
+from .differ import SchemaDiffer, diff_files
 
 
 # ─────────────────────────────────────────────
@@ -300,6 +305,51 @@ def _format_state_summary(state) -> str:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: diff
+# ─────────────────────────────────────────────
+
+def cmd_diff(args: argparse.Namespace) -> None:
+    """
+    Compare two Schema State Dictionaries.
+
+    Accepts either two state JSON files (produced by `sqlfy dump`)
+    or two migration directories (reconstructed on the fly).
+    """
+    import os
+
+    def is_json_file(p: str) -> bool:
+        return os.path.isfile(p) and p.endswith('.json')
+
+    if is_json_file(args.state_a) and is_json_file(args.state_b):
+        # Fast path: diff pre-built state files
+        result = diff_files(args.state_a, args.state_b)
+    else:
+        # Reconstruct on the fly from migration directories
+        def load_dir(path: str):
+            from pathlib import Path
+            p = Path(path)
+            if not p.is_dir():
+                print(f'Error: "{path}" is not a directory or .json state file.', file=sys.stderr)
+                sys.exit(1)
+            sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == '.sql')
+            files = [{'filename': f.name, 'sql': f.read_text(encoding='utf-8')} for f in sql_files]
+            print(f'Loaded {len(files)} migration(s) from {path}', file=sys.stderr)
+            return SchemaStateBuilder.from_graph(reconstruct(files))
+
+        state_a = load_dir(args.state_a)
+        state_b = load_dir(args.state_b)
+        result  = SchemaDiffer.diff(state_a, state_b)
+
+    fmt = (args.format or 'text').lower()
+    if fmt == 'json':
+        output = result.to_json()
+    else:
+        output = result.to_text()
+
+    write_output(output, args.out)
+
+
+# ─────────────────────────────────────────────
 # SUBCOMMAND: chunks
 # ─────────────────────────────────────────────
 
@@ -350,11 +400,6 @@ def legacy_main(args: argparse.Namespace) -> None:
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
-
-# ─────────────────────────────────────────────
-# ARGUMENT PARSER
-# ─────────────────────────────────────────────
-
 def _subcommand_parser() -> argparse.ArgumentParser:
     """Parser for subcommand mode (dump, chunks, diff, graph)."""
     parser = argparse.ArgumentParser(prog='sqlfy')
@@ -376,11 +421,17 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p_chunks.add_argument('--format', choices=['json', 'text'], default='json')
     p_chunks.set_defaults(func=cmd_chunks)
 
-    p_diff = sub.add_parser('diff', help='Compare two Schema State Dictionaries (step 12)')
-    p_diff.add_argument('state_a'); p_diff.add_argument('state_b')
-    p_diff.add_argument('--format', choices=['json', 'text'], default='text')
-    p_diff.add_argument('--out', metavar='FILE')
-    p_diff.set_defaults(func=lambda a: (print('diff coming in step 12', file=sys.stderr), sys.exit(0)))
+    p_diff = sub.add_parser('diff',
+        help='Compare two Schema State Dictionaries or migration directories')
+    p_diff.add_argument('state_a',
+        help='State JSON file (from sqlfy dump) or migrations directory')
+    p_diff.add_argument('state_b',
+        help='State JSON file (from sqlfy dump) or migrations directory')
+    p_diff.add_argument('--format', choices=['json', 'text'], default='text',
+        help='Output format (default: text)')
+    p_diff.add_argument('--out', metavar='FILE',
+        help='Write output to FILE instead of stdout')
+    p_diff.set_defaults(func=cmd_diff)
 
     p_graph = sub.add_parser('graph', help='Output graph representation (step 13)')
     shared(p_graph)

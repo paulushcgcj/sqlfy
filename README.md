@@ -63,65 +63,89 @@ sqlfy ./samples      # human-readable schema summary
 
 ## CLI Reference
 
-All options can be combined unless noted as mutually exclusive.
+### Subcommand style (preferred)
 
-```
-sqlfy [migrations_dir] [--json-input FILE] [OPTIONS]
-```
-
-### Input sources
-
-| Flag | Description |
+| Subcommand | Description |
 |---|---|
-| `migrations_dir` | Directory containing Flyway `V*__*.sql` files |
-| `--json-input FILE` | JSON file `[{ filename, sql }]` (used by Tauri bridge) |
+| `dump` | Output the Schema State Dictionary (JSON, YAML, or human-readable summary) |
+| `chunks` | Output LLM vector chunks |
+| `diff` | Compare two Schema State Dictionaries or migration directories |
+| `graph` | Graph representation _(coming soon)_ |
 
-### Output modes
+#### `sqlfy dump`
+
+```bash
+sqlfy dump <migrations-dir> [--format json|yaml|summary] [--at VERSION] [--out FILE]
+sqlfy dump --json-input FILE  [--format json|yaml|summary] [--out FILE]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `migrations_dir` | — | Directory containing Flyway `V*__*.sql` files |
+| `--json-input FILE` | — | JSON file `[{ filename, sql }]` (Tauri bridge) |
+| `--format` | `json` | `json`, `yaml`, or `summary` (human-readable) |
+| `--at VERSION` | — | Point-in-time snapshot at a specific Flyway version (e.g. `2`) |
+| `--out FILE` | stdout | Write output to file |
+
+#### `sqlfy chunks`
+
+```bash
+sqlfy chunks <migrations-dir> [--format json|text] [--at VERSION] [--out FILE]
+```
+
+#### `sqlfy diff`
+
+```bash
+sqlfy diff <state-a> <state-b> [--format json|text] [--out FILE]
+```
+
+Both arguments accept either a `.json` state file (from `sqlfy dump`) or a migrations directory reconstructed on the fly.
+
+### Legacy style (backward compatible)
+
+```bash
+sqlfy [migrations_dir] [--json-input FILE] [--json] [--chunks] [--all] [--at VERSION] [--out FILE]
+```
 
 | Flag | Output |
 |---|---|
 | _(default)_ | Human-readable schema summary |
 | `--json` | JSON schema graph |
-| `--chunks` | LLM vector chunks (human-readable text) |
+| `--chunks` | LLM vector chunks (human-readable) |
 | `--chunks --json` | LLM vector chunks (JSON array) |
 | `--all` | Combined `{ graph, chunks }` JSON — implies `--json` |
-| `--state` | `SchemaState` dictionary JSON (richer metadata) — implies `--json` |
-
-### Additional flags
-
-| Flag | Description |
-|---|---|
-| `--at-version VERSION` | Reconstruct schema as it was at a specific Flyway version (e.g. `2`) |
-| `--dialect DIALECT` | SQL dialect to use (default: `oracle`; e.g. `postgres`) |
-| `--out FILE` | Write output to `FILE` instead of stdout |
 
 ### Examples
 
 ```bash
-# Human-readable summary
-sqlfy ./migrations
+# Schema State Dictionary (JSON)
+sqlfy dump ./migrations
 
-# Raw JSON schema graph
-sqlfy ./migrations --json
+# YAML output
+sqlfy dump ./migrations --format yaml
+
+# Human-readable summary
+sqlfy dump ./migrations --format summary
 
 # Point-in-time snapshot at V2
-sqlfy ./migrations --at-version 2 --json
-
-# LLM vector chunks
-sqlfy ./migrations --chunks
-sqlfy ./migrations --chunks --json
-
-# Combined graph + chunks (Tauri bridge format)
-sqlfy ./migrations --all
-
-# Rich SchemaState dictionary
-sqlfy ./migrations --state
+sqlfy dump ./migrations --at 2
 
 # Write to file
-sqlfy ./migrations --state --out schema-state.json
+sqlfy dump ./migrations --out state.json
 
-# PostgreSQL dialect
-sqlfy ./migrations --dialect postgres --json
+# LLM vector chunks
+sqlfy chunks ./migrations
+sqlfy chunks ./migrations --out chunks.json
+
+# Diff two pre-built state files
+sqlfy diff state_v2.json state_v5.json
+sqlfy diff state_v2.json state_v5.json --format json
+
+# Diff two migration directories on the fly
+sqlfy diff ./migrations-v1 ./migrations-v2
+
+# Combined graph + chunks (Tauri bridge format — legacy)
+sqlfy ./migrations --all
 
 # From a JSON input file
 sqlfy --json-input /tmp/sqlfy-input.json --all
@@ -295,9 +319,9 @@ Paste the **Schema Summary** chunk as system context and individual **table chun
 - [x] Migrate parser to **sqlglot** for full Oracle AST fidelity
 - [x] `DROP TABLE`, `DROP COLUMN`, `DROP CONSTRAINT`, `MODIFY COLUMN`, `RENAME COLUMN` support
 - [x] `SchemaState` dictionary — versioned, serialisable, fingerprinted snapshot
-- [x] Point-in-time reconstruction via `--at-version`
-- [ ] Schema diff command (`sqlfy diff v1/ v2/`)
-- [ ] YAML export of SchemaState
+- [x] YAML export of SchemaState (`sqlfy dump --format yaml`)
+- [x] Point-in-time reconstruction via `--at`
+- [x] Schema diff command (`sqlfy diff`)
 - [ ] Graph topology insights (orphan tables, missing FK targets, circular references)
 - [ ] PostgreSQL dialect parity
 

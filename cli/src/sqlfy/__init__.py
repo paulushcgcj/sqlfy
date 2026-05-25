@@ -9,15 +9,14 @@ from .schema_state import (
     TableState, ColumnState, ConstraintState, IndexState,
     SequenceState, RelationshipState, MigrationStep,
 )
+from .differ import SchemaDiffer, DiffResult, diff_files
 
 __all__ = [
-    # core
     'apply_migrations', 'build_chunks', 'compute_layout', 'type_str',
     'SchemaGraph', 'VectorChunk', 'Table', 'Column', 'Edge', 'Sequence', 'MigrationAction',
-    # reconstructor
     'Reconstructor', 'reconstruct', 'reconstruct_at', 'MigrationResult',
-    # schema_state
     'SchemaState', 'SchemaStateBuilder',
     'TableState', 'ColumnState', 'ConstraintState', 'IndexState',
     'SequenceState', 'RelationshipState', 'MigrationStep',
+    'SchemaDiffer', 'DiffResult', 'diff_files',
 ]
