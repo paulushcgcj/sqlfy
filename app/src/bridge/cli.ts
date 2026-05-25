@@ -89,6 +89,30 @@ async function parseWithTauri(files: MigrationFile[]): Promise<ParseResult> {
 }
 
 // ─────────────────────────────────────────────
+// DEV-SERVER PATH: proxy through Vite middleware → Python CLI
+// ─────────────────────────────────────────────
+
+async function parseWithDevServer(files: MigrationFile[]): Promise<ParseResult> {
+  const resp = await fetch('/api/sqlfy/parse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(files),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: resp.statusText })) as { error: string };
+    throw new Error(`Dev-server CLI error: ${err.error}`);
+  }
+
+  const result = await resp.json() as { graph: unknown; chunks: unknown[] };
+  return {
+    graph:  deserialiseGraph(result.graph),
+    chunks: deserialiseChunks(result.chunks),
+    source: 'cli',
+  };
+}
+
+// ─────────────────────────────────────────────
 // BROWSER FALLBACK: run TypeScript core in-process
 // ─────────────────────────────────────────────
 
@@ -104,12 +128,15 @@ function parseInBrowser(files: MigrationFile[]): ParseResult {
 
 /**
  * Parse a set of Flyway migration files.
- * Automatically routes to the CLI (inside Tauri) or in-browser core (plain browser).
+ *
+ * Routing:
+ *  1. Tauri desktop  → spawn Python CLI via plugin-shell
+ *  2. Vite dev server → proxy to Python CLI via /api/sqlfy/parse
+ *  3. Pure browser    → TypeScript in-process fallback (core.ts)
  */
 export async function parse(files: MigrationFile[]): Promise<ParseResult> {
-  if (IS_TAURI) {
-    return parseWithTauri(files);
-  }
+  if (IS_TAURI) return parseWithTauri(files);
+  if (import.meta.env.DEV) return parseWithDevServer(files);
   return parseInBrowser(files);
 }
 
