@@ -1,0 +1,73 @@
+import { useState } from 'react';
+import type { VectorChunk } from '../core/types';
+
+interface Props {
+  chunks: VectorChunk[];
+}
+
+export function LlmTab({ chunks }: Props) {
+  const [selected, setSelected] = useState<VectorChunk>(chunks[0]);
+  const [copied, setCopied]     = useState(false);
+
+  function exportJson() {
+    const json = JSON.stringify(
+      chunks.map(c => ({ id: c.id, type: c.type, title: c.title, content: c.content, metadata: c.meta })),
+      null, 2
+    );
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'schema_vector_chunks.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyContent() {
+    navigator.clipboard.writeText(selected.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <div className="split">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <button className="export-btn" onClick={exportJson}>⬇ Export all JSON</button>
+        <div className="sbar-sect">Chunks ({chunks.length})</div>
+        {chunks.map(chunk => (
+          <button
+            key={chunk.id}
+            className={`sbar-item${chunk.id === selected?.id ? ' active' : ''}`}
+            onClick={() => setSelected(chunk)}
+          >
+            {chunk.title}
+            <div className="sub">{chunk.type} · {chunk.content.length} chars</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Main */}
+      <div className="main">
+        {selected && (
+          <>
+            <div className="chunk-hdr">
+              <span className="chunk-title">{selected.title}</span>
+              <span className="chunk-type-badge">{selected.type}</span>
+              <button
+                className={`copy-btn${copied ? ' ok' : ''}`}
+                onClick={copyContent}
+              >
+                {copied ? 'Copied!' : 'Copy content'}
+              </button>
+            </div>
+            <div style={{ padding: '14px 20px' }}>
+              <div className="chunk-hint">💡 {selected.hint}</div>
+              <div className="chunk-content">{selected.content}</div>
+              <div className="chunk-meta-label">Metadata</div>
+              <div className="chunk-meta">{JSON.stringify(selected.meta, null, 2)}</div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
