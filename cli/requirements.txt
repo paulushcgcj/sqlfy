@@ -13,3 +13,5 @@
 # Build a self-contained binary:
 #   pip install pyinstaller
 #   pyinstaller --onefile src/sqlfy/main.py --name sqlfy
+
+sqlglot>=25.0.0

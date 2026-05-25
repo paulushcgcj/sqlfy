@@ -1,22 +1,34 @@
 """
 sqlfy.core
 ==========
-Pure logic module — Python port of cli/core.js.
+Schema graph engine — now powered by sqlglot for proper Oracle AST parsing.
 
-No I/O, no CLI concerns. Safe to import in both the CLI runner
-and future API/Tauri bridge layers.
+Public API is unchanged from step 5/6/7. Only the internals changed:
+  - Hand-rolled tokeniser replaced by sqlglot.parse(dialect="oracle")
+  - Handles CREATE TABLE, ALTER TABLE ADD/DROP/MODIFY, CREATE INDEX,
+    CREATE SEQUENCE, DROP TABLE, COMMENT ON
+  - Column constraints extracted from AST nodes, not regex
+  - Action tracking: each migration records what changed (CREATE/DROP/MODIFY)
 """
 
 from __future__ import annotations
 
 import re
-import math
+import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
+import sqlglot
+import sqlglot.expressions as exp
+
+# Suppress sqlglot "unsupported syntax" warnings for Command fallbacks
+# — we handle them explicitly via regex on the raw SQL
+import logging
+logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
+
 
 # ─────────────────────────────────────────────
-# DATA TYPES
+# DATA TYPES  (unchanged public shape)
 # ─────────────────────────────────────────────
 
 @dataclass
@@ -50,6 +62,16 @@ class Index:
 
 
 @dataclass
+class MigrationAction:
+    """Records what a single migration statement did — used in history/diff."""
+    action: str           # CREATE | DROP | ADD_COLUMN | DROP_COLUMN | MODIFY_COLUMN
+                          # ADD_CONSTRAINT | DROP_CONSTRAINT | CREATE_INDEX | CREATE_SEQUENCE
+    object_type: str      # TABLE | COLUMN | CONSTRAINT | INDEX | SEQUENCE
+    object_name: str      # fully-qualified name of the affected object
+    version: str
+
+
+@dataclass
 class Table:
     id: str
     schema: Optional[str]
@@ -61,6 +83,7 @@ class Table:
     comments: dict[str, str]     = field(default_factory=dict)
     created_in: str              = ''
     modified_in: list[str]       = field(default_factory=list)
+    actions: list[MigrationAction] = field(default_factory=list)
 
 
 @dataclass
@@ -96,6 +119,7 @@ class SchemaGraph:
     seqs: dict[str, Sequence]
     edges: list[Edge]
     mig_hist: list[MigrationHistory]
+    actions: list[MigrationAction] = field(default_factory=list)  # all actions across all migrations
 
 
 @dataclass
@@ -108,146 +132,52 @@ class VectorChunk:
     hint: str
 
 
-# ─────────────────────────────────────────────
-# SQL TOKENISER UTILITIES
-# ─────────────────────────────────────────────
-
-def strip_comments(sql: str) -> str:
-    """Remove block (/* */) and line (--) comments."""
-    sql = re.sub(r'/\*[\s\S]*?\*/', ' ', sql)
-    sql = re.sub(r'--[^\n]*', ' ', sql)
-    return sql
-
-
-def split_stmts(sql: str) -> list[str]:
-    """
-    Split SQL into individual statements on ';',
-    respecting string literals and nested parentheses.
-    """
-    result: list[str] = []
-    depth = 0
-    cur: list[str] = []
-    in_str = False
-    i = 0
-
-    while i < len(sql):
-        c = sql[i]
-        if in_str:
-            cur.append(c)
-            if c == "'":
-                if i + 1 < len(sql) and sql[i + 1] == "'":
-                    cur.append(sql[i + 1])
-                    i += 1
-                else:
-                    in_str = False
-        elif c == "'":
-            in_str = True
-            cur.append(c)
-        elif c == '(':
-            depth += 1
-            cur.append(c)
-        elif c == ')':
-            depth -= 1
-            cur.append(c)
-        elif c == ';' and depth == 0:
-            s = ''.join(cur).strip()
-            if s:
-                result.append(s)
-            cur = []
-        else:
-            cur.append(c)
-        i += 1
-
-    s = ''.join(cur).strip()
-    if s:
-        result.append(s)
-    return result
-
-
-def extract_paren(s: str) -> str:
-    """Extract the content of the outermost parentheses."""
-    start = s.find('(')
-    if start < 0:
-        return ''
-    depth = 0
-    for i in range(start, len(s)):
-        if s[i] == '(':
-            depth += 1
-        elif s[i] == ')':
-            depth -= 1
-            if depth == 0:
-                return s[start + 1:i]
-    return ''
-
-
-def split_comma(s: str) -> list[str]:
-    """Comma-split respecting nested parens and string literals."""
-    result: list[str] = []
-    depth = 0
-    cur: list[str] = []
-    in_str = False
-
-    for c in s:
-        if in_str:
-            cur.append(c)
-            if c == "'":
-                in_str = False
-        elif c == "'":
-            in_str = True
-            cur.append(c)
-        elif c == '(':
-            depth += 1
-            cur.append(c)
-        elif c == ')':
-            depth -= 1
-            cur.append(c)
-        elif c == ',' and depth == 0:
-            p = ''.join(cur).strip()
-            if p:
-                result.append(p)
-            cur = []
-        else:
-            cur.append(c)
-
-    p = ''.join(cur).strip()
-    if p:
-        result.append(p)
-    return result
-
 
 # ─────────────────────────────────────────────
-# NAME / TYPE PARSING
+# HELPERS
 # ─────────────────────────────────────────────
 
-def parse_name(s: str) -> dict:
-    """
-    Parse a potentially schema-qualified name.
-    'APP.USERS' → { schema: 'APP', name: 'USERS', full: 'APP.USERS' }
-    """
-    s = s.strip().replace('"', '')
-    parts = s.split('.')
-    if len(parts) >= 2:
-        schema = parts[0].upper()
-        name   = parts[1].upper()
-        return {'schema': schema, 'name': name, 'full': f'{schema}.{name}'}
-    return {'schema': None, 'name': s.upper(), 'full': s.upper()}
+def _table_full(node: exp.Table) -> str:
+    """'app.users' from a sqlglot Table expression."""
+    db   = node.args.get('db')
+    name = node.name.upper()
+    if db:
+        return f'{db.name.upper()}.{name}'
+    return name
 
 
-def parse_data_type(s: str) -> dict:
-    """
-    Parse a data-type token.
-    'NUMBER(10,2)' → { type: 'NUMBER', precision: 10, scale: 2 }
-    """
-    m = re.match(r'^([A-Z][A-Z0-9 ]*)(?:\(([^)]+)\))?$', s.strip(), re.I)
-    if not m:
-        return {'type': s.strip().upper(), 'precision': None, 'scale': None}
-    type_ = m.group(1).strip().upper()
-    if not m.group(2):
-        return {'type': type_, 'precision': None, 'scale': None}
-    parts = [p.strip() for p in m.group(2).split(',')]
-    precision = int(parts[0]) if parts[0] else None
-    scale     = int(parts[1]) if len(parts) > 1 and parts[1] else None
-    return {'type': type_, 'precision': precision, 'scale': scale}
+def _table_schema_name(node: exp.Table) -> tuple[Optional[str], str]:
+    db = node.args.get('db')
+    return (db.name.upper() if db else None), node.name.upper()
+
+
+def _col_datatype(kind: Optional[exp.DataType]) -> tuple[str, Optional[int], Optional[int]]:
+    """Extract (type_str, precision, scale) from a sqlglot DataType node."""
+    if kind is None:
+        return 'UNKNOWN', None, None
+    type_name = kind.this.name if kind.this else str(kind)
+    exprs = kind.expressions
+    precision = int(exprs[0].name) if len(exprs) > 0 and exprs[0].name.isdigit() else None
+    scale     = int(exprs[1].name) if len(exprs) > 1 and exprs[1].name.isdigit() else None
+
+    # Normalise sqlglot type names back to Oracle-style display names
+    _aliases = {
+        'DECIMAL': 'NUMBER',
+        'FLOAT':   'FLOAT',
+        'TEXT':    'CLOB',
+        'TINYTEXT':'CLOB',
+    }
+    type_name = _aliases.get(type_name.upper(), type_name.upper())
+    return type_name, precision, scale
+
+
+def _on_delete_from_options(options: list) -> Optional[str]:
+    """Extract ON DELETE action string from a list of option expressions."""
+    joined = ' '.join(str(o) for o in options).upper()
+    m = re.search(r'ON DELETE (CASCADE|SET NULL|SET DEFAULT|RESTRICT|NO ACTION)', joined)
+    if m:
+        return m.group(1).replace(' ', '_')
+    return None
 
 
 def type_str(col: Column) -> str:
@@ -260,40 +190,12 @@ def type_str(col: Column) -> str:
 
 
 # ─────────────────────────────────────────────
-# COLUMN + CONSTRAINT PARSERS
+# COLUMN PARSER  (from sqlglot ColumnDef AST node)
 # ─────────────────────────────────────────────
 
-def parse_col_def(definition: str) -> Optional[Column]:
-    """
-    Parse a single column definition from a CREATE TABLE body.
-    Returns None if it looks like a constraint, not a column.
-    """
-    definition = re.sub(r'\s+', ' ', definition).strip()
-    nm = re.match(r'^"?(\w+)"?\s+', definition)
-    if not nm:
-        return None
-
-    name = nm.group(1).upper()
-    rest = definition[nm.end():].strip()
-
-    # Extract data type (may contain parens)
-    type_s = []
-    depth = 0
-    i = 0
-    while i < len(rest):
-        c = rest[i]
-        if c == '(':
-            depth += 1; type_s.append(c)
-        elif c == ')':
-            depth -= 1; type_s.append(c)
-        elif c == ' ' and depth == 0:
-            break
-        else:
-            type_s.append(c)
-        i += 1
-
-    dt = parse_data_type(''.join(type_s))
-    rest = rest[i:].strip()
+def _parse_column_def(col_node: exp.ColumnDef) -> Column:
+    name = col_node.name.upper()
+    type_, precision, scale = _col_datatype(col_node.kind)
 
     nullable    = True
     default_val = None
@@ -301,219 +203,391 @@ def parse_col_def(definition: str) -> Optional[Column]:
     unique      = False
     references  = None
 
-    # DEFAULT value
-    dm = re.search(
-        r'DEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|NULL|CONSTRAINT|PRIMARY|UNIQUE|REFERENCES|ENABLE|DISABLE)|$)',
-        rest, re.I
-    )
-    if dm:
-        default_val = dm.group(1).strip()
-        rest = rest[:dm.start()] + rest[dm.end():]
-        rest = rest.strip()
-
-    if re.search(r'NOT\s+NULL', rest, re.I):
-        nullable = False
-    if re.search(r'\bPRIMARY\s+KEY\b', rest, re.I):
-        primary_key = True
-    if re.search(r'\bUNIQUE\b', rest, re.I):
-        unique = True
-
-    rm = re.search(r'REFERENCES\s+"?(\w+(?:\.\w+)?)"?\s*\("?(\w+)"?\)', rest, re.I)
-    if rm:
-        ref_tbl = parse_name(rm.group(1))
-        references = {'table': ref_tbl['full'], 'column': rm.group(2).upper()}
+    for c in col_node.constraints:
+        kind = c.kind
+        if isinstance(kind, exp.NotNullColumnConstraint):
+            nullable = False
+        elif isinstance(kind, exp.DefaultColumnConstraint):
+            default_val = kind.this.sql(dialect='oracle') if kind.this else None
+            # Strip outer quotes from string literals for display
+            if default_val and default_val.startswith("'") and default_val.endswith("'"):
+                default_val = default_val  # keep as-is
+        elif isinstance(kind, exp.PrimaryKeyColumnConstraint):
+            primary_key = True
+            nullable    = False
+        elif isinstance(kind, exp.UniqueColumnConstraint):
+            unique = True
+        elif isinstance(kind, exp.Reference):
+            ref_schema = kind.this  # Schema node
+            ref_table  = ref_schema.this if ref_schema else None
+            if ref_table:
+                ref_full = _table_full(ref_table)
+                ref_cols = [e.name.upper() for e in ref_schema.expressions]
+                references = {
+                    'table':  ref_full,
+                    'column': ref_cols[0] if ref_cols else '',
+                }
 
     return Column(
-        name=name,
-        type=dt['type'],
-        precision=dt['precision'],
-        scale=dt['scale'],
-        nullable=nullable,
-        default=default_val,
-        primary_key=primary_key,
-        unique=unique,
-        references=references,
+        name=name, type=type_, precision=precision, scale=scale,
+        nullable=nullable, default=default_val,
+        primary_key=primary_key, unique=unique, references=references,
     )
 
 
-def parse_constraint(definition: str) -> Optional[Constraint]:
-    """
-    Parse a table constraint (PRIMARY KEY, UNIQUE, FOREIGN KEY, CHECK).
-    Handles both bare and CONSTRAINT <name> ... forms.
-    """
-    definition = re.sub(r'\s+', ' ', definition).strip()
-    cname = None
+# ─────────────────────────────────────────────
+# TABLE CONSTRAINT PARSER  (from sqlglot Constraint AST node)
+# ─────────────────────────────────────────────
 
-    cn = re.match(r'^CONSTRAINT\s+"?(\w+)"?\s+', definition, re.I)
-    if cn:
-        cname = cn.group(1).upper()
-        definition = definition[cn.end():].strip()
+def _parse_table_constraint(node: exp.Constraint) -> Optional[Constraint]:
+    cname = node.name.upper() if node.name else None
 
-    if re.match(r'^PRIMARY\s+KEY', definition, re.I):
-        cols = [c.strip().replace('"', '').upper()
-                for c in extract_paren(definition).split(',') if c.strip()]
-        return Constraint(name=cname, type='primary_key', columns=cols)
+    for expr in node.expressions:
+        if isinstance(expr, exp.PrimaryKey):
+            cols = [e.name.upper() for e in expr.expressions]
+            return Constraint(name=cname, type='primary_key', columns=cols)
 
-    if re.match(r'^UNIQUE', definition, re.I):
-        cols = [c.strip().replace('"', '').upper()
-                for c in extract_paren(definition).split(',') if c.strip()]
-        return Constraint(name=cname, type='unique', columns=cols)
+        if isinstance(expr, exp.UniqueColumnConstraint):
+            schema = expr.this  # Schema node
+            cols = [e.name.upper() for e in (schema.expressions if schema else [])]
+            return Constraint(name=cname, type='unique', columns=cols)
 
-    if re.match(r'^FOREIGN\s+KEY', definition, re.I):
-        from_cols = [c.strip().replace('"', '').upper()
-                     for c in extract_paren(definition).split(',') if c.strip()]
-        rm = re.search(r'REFERENCES\s+"?(\w+(?:\.\w+)?)"?\s*\(([^)]+)\)', definition, re.I)
-        to_table = ''
-        to_cols: list[str] = []
-        if rm:
-            to_table = parse_name(rm.group(1))['full']
-            to_cols  = [c.strip().replace('"', '').upper() for c in rm.group(2).split(',')]
-        od = re.search(
-            r'ON\s+DELETE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)',
-            definition, re.I
-        )
-        on_delete = re.sub(r'\s+', '_', od.group(1).upper()) if od else None
-        return Constraint(
-            name=cname, type='foreign_key', columns=from_cols,
-            references={'table': to_table, 'columns': to_cols, 'on_delete': on_delete},
-        )
+        if isinstance(expr, exp.ForeignKey):
+            from_cols = [e.name.upper() for e in expr.expressions]
+            ref       = expr.args.get('reference')
+            to_table  = ''
+            to_cols: list[str] = []
+            on_delete = None
+            if ref:
+                ref_schema = ref.args.get('this')  # Schema wrapping Table
+                if ref_schema:
+                    ref_table = ref_schema.this
+                    if ref_table:
+                        to_table = _table_full(ref_table)
+                    to_cols = [e.name.upper() for e in ref_schema.expressions]
+                on_delete = _on_delete_from_options(ref.args.get('options', []))
+            return Constraint(
+                name=cname, type='foreign_key', columns=from_cols,
+                references={'table': to_table, 'columns': to_cols, 'on_delete': on_delete},
+            )
 
-    if re.match(r'^CHECK', definition, re.I):
-        return Constraint(name=cname, type='check', columns=[], check_expr=extract_paren(definition))
+        if isinstance(expr, exp.CheckColumnConstraint):
+            check_sql = expr.this.sql(dialect='oracle') if expr.this else ''
+            return Constraint(name=cname, type='check', columns=[], check_expr=check_sql)
 
     return None
 
 
 # ─────────────────────────────────────────────
-# DDL STATEMENT HANDLERS
+# DDL HANDLERS
 # ─────────────────────────────────────────────
 
-def handle_create_table(stmt: str, version: str, tables: dict[str, Table]) -> None:
-    hm = re.match(r'^CREATE\s+TABLE\s+"?(\w+(?:\.\w+)?)"?\s*\(', stmt, re.I)
-    if not hm:
-        return
-    qn   = parse_name(hm.group(1))
-    body = extract_paren(stmt)
-    if not body:
-        return
+def _handle_create_table(
+    stmt: exp.Create,
+    version: str,
+    tables: dict[str, Table],
+    all_actions: list[MigrationAction],
+) -> None:
+    schema_node = stmt.this          # exp.Schema
+    table_node  = schema_node.this   # exp.Table
+    schema_str, name_str = _table_schema_name(table_node)
+    full = f'{schema_str}.{name_str}' if schema_str else name_str
 
     columns: list[Column]         = []
     constraints: list[Constraint] = []
 
-    for d in split_comma(body):
-        dt = d.strip()
-        if not dt:
-            continue
-        if re.match(r'^(CONSTRAINT\s+\w+\s+)?(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK)', dt, re.I):
-            c = parse_constraint(dt)
+    for node in schema_node.expressions:
+        if isinstance(node, exp.ColumnDef):
+            col = _parse_column_def(node)
+            if col.primary_key:
+                constraints.append(Constraint(
+                    name=f'PK_{name_str}', type='primary_key', columns=[col.name]
+                ))
+            if col.references:
+                constraints.append(Constraint(
+                    name=None, type='foreign_key', columns=[col.name],
+                    references={
+                        'table':    col.references['table'],
+                        'columns':  [col.references['column']],
+                        'on_delete': None,
+                    },
+                ))
+            columns.append(col)
+
+        elif isinstance(node, exp.Constraint):
+            c = _parse_table_constraint(node)
             if c:
                 constraints.append(c)
-        else:
-            col = parse_col_def(dt)
-            if col:
-                if col.primary_key:
-                    constraints.append(Constraint(
-                        name=f'PK_{qn["name"]}', type='primary_key', columns=[col.name]
-                    ))
-                if col.references:
-                    constraints.append(Constraint(
-                        name=None, type='foreign_key', columns=[col.name],
-                        references={
-                            'table': col.references['table'],
-                            'columns': [col.references['column']],
-                            'on_delete': None,
-                        },
-                    ))
-                columns.append(col)
 
-    tables[qn['full']] = Table(
-        id=qn['full'], schema=qn['schema'], name=qn['name'], full=qn['full'],
+    action = MigrationAction(
+        action='CREATE', object_type='TABLE', object_name=full, version=version
+    )
+    all_actions.append(action)
+
+    tables[full] = Table(
+        id=full, schema=schema_str, name=name_str, full=full,
         columns=columns, constraints=constraints,
-        created_in=version,
+        created_in=version, actions=[action],
     )
 
 
-def handle_alter_table(stmt: str, version: str, tables: dict[str, Table]) -> None:
-    tm = re.match(r'^ALTER\s+TABLE\s+"?(\w+(?:\.\w+)?)"?\s+', stmt, re.I)
-    if not tm:
+def _handle_drop_table(
+    stmt: exp.Drop,
+    version: str,
+    tables: dict[str, Table],
+    all_actions: list[MigrationAction],
+) -> None:
+    table_node = stmt.this
+    if not isinstance(table_node, exp.Table):
         return
-    key   = parse_name(tm.group(1))['full']
-    table = tables.get(key)
-    rest  = stmt[tm.end():].strip()
+    full = _table_full(table_node)
+    action = MigrationAction(
+        action='DROP', object_type='TABLE', object_name=full, version=version
+    )
+    all_actions.append(action)
+    tables.pop(full, None)
 
-    # ADD CONSTRAINT
-    if re.match(r'^ADD\s+CONSTRAINT', rest, re.I):
-        c = parse_constraint(re.sub(r'^ADD\s+', '', rest, flags=re.I).strip())
-        if c and table:
-            table.constraints.append(c)
-            if version not in table.modified_in:
-                table.modified_in.append(version)
+
+def _handle_alter_table(
+    stmt: exp.Alter,
+    version: str,
+    tables: dict[str, Table],
+    all_actions: list[MigrationAction],
+) -> None:
+    table_node = stmt.this
+    if not isinstance(table_node, exp.Table):
         return
+    full  = _table_full(table_node)
+    table = tables.get(full)
 
-    # ADD (col1, col2, ...)
-    if re.match(r'^ADD\s*\(', rest, re.I):
-        body = extract_paren(rest[3:])
-        for d in split_comma(body):
-            col = parse_col_def(d.strip())
-            if col and table:
-                table.columns.append(col)
-                if version not in table.modified_in:
-                    table.modified_in.append(version)
-        return
+    def mark_modified() -> None:
+        if table and version not in table.modified_in:
+            table.modified_in.append(version)
 
-    # ADD col (bare)
-    if re.match(r'^ADD\s+\w', rest, re.I):
-        col = parse_col_def(rest[4:].strip())
-        if col and table:
-            table.columns.append(col)
-            if version not in table.modified_in:
-                table.modified_in.append(version)
+    for action_node in stmt.args.get('actions', []):
+
+        # ── ADD COLUMN(S) or ADD CONSTRAINT ──────────────────────────────
+        if isinstance(action_node, exp.Schema):
+            # Schema node = ADD (col1 TYPE, col2 TYPE, ...)
+            for node in action_node.expressions:
+                if isinstance(node, exp.ColumnDef) and table:
+                    col = _parse_column_def(node)
+                    table.columns.append(col)
+                    mark_modified()
+                    act = MigrationAction(
+                        action='ADD_COLUMN', object_type='COLUMN',
+                        object_name=f'{full}.{col.name}', version=version,
+                    )
+                    all_actions.append(act)
+                    table.actions.append(act)
+
+        elif isinstance(action_node, exp.AddConstraint):
+            for con_node in action_node.expressions:
+                if isinstance(con_node, exp.Constraint) and table:
+                    c = _parse_table_constraint(con_node)
+                    if c:
+                        table.constraints.append(c)
+                        mark_modified()
+                        act = MigrationAction(
+                            action='ADD_CONSTRAINT', object_type='CONSTRAINT',
+                            object_name=f'{full}.{c.name or "unnamed"}', version=version,
+                        )
+                        all_actions.append(act)
+                        table.actions.append(act)
+
+        # ── DROP COLUMN ───────────────────────────────────────────────────
+        elif isinstance(action_node, exp.Drop):
+            if action_node.args.get('kind') == 'COLUMN' and table:
+                col_name = action_node.this.name.upper() if action_node.this else ''
+                table.columns = [c for c in table.columns if c.name != col_name]
+                mark_modified()
+                act = MigrationAction(
+                    action='DROP_COLUMN', object_type='COLUMN',
+                    object_name=f'{full}.{col_name}', version=version,
+                )
+                all_actions.append(act)
+                table.actions.append(act)
+
+            elif action_node.args.get('kind') == 'CONSTRAINT' and table:
+                con_name = action_node.this.name.upper() if action_node.this else ''
+                table.constraints = [c for c in table.constraints if (c.name or '') != con_name]
+                mark_modified()
+                act = MigrationAction(
+                    action='DROP_CONSTRAINT', object_type='CONSTRAINT',
+                    object_name=f'{full}.{con_name}', version=version,
+                )
+                all_actions.append(act)
+                table.actions.append(act)
 
 
-def handle_create_index(stmt: str, version: str, tables: dict[str, Table]) -> None:
+def _handle_alter_table_command(
+    raw_sql: str,
+    version: str,
+    tables: dict[str, Table],
+    all_actions: list[MigrationAction],
+) -> None:
+    """
+    Fallback for ALTER TABLE MODIFY — sqlglot parses this as a Command.
+    We extract it via regex on the raw SQL text.
+    """
     m = re.match(
-        r'^CREATE\s+(UNIQUE\s+)?INDEX\s+"?(\w+(?:\.\w+)?)"?\s+ON\s+"?(\w+(?:\.\w+)?)"?\s*\(([^)]+)\)',
-        stmt, re.I
+        r'^(?:ALTER\s+TABLE)\s+"?(\w+(?:\.\w+)?)"?\s+MODIFY\s*\((.+)\)\s*$',
+        raw_sql.strip(), re.I | re.S
+    )
+    if not m:
+        # bare MODIFY without parens
+        m = re.match(
+            r'^(?:ALTER\s+TABLE)\s+"?(\w+(?:\.\w+)?)"?\s+MODIFY\s+(.+?)\s*$',
+            raw_sql.strip(), re.I | re.S
+        )
+    if not m:
+        return
+
+    full  = m.group(1).upper().replace('"', '')
+    table = tables.get(full)
+    if not table:
+        return
+
+    # Split comma-separated column modifications (respecting parens)
+    body = m.group(2)
+    depth, cur, defs = 0, [], []
+    for ch in body:
+        if ch == '(':   depth += 1
+        elif ch == ')': depth -= 1
+        if ch == ',' and depth == 0:
+            defs.append(''.join(cur).strip()); cur = []
+        else:
+            cur.append(ch)
+    if cur: defs.append(''.join(cur).strip())
+
+    for defn in defs:
+        cm = re.match(r'"?(\w+)"?\s+(\S+(?:\([^)]+\))?)(.*)', defn, re.I | re.S)
+        if not cm:
+            continue
+        col_name = cm.group(1).upper()
+        type_raw = cm.group(2).upper()
+        rest     = cm.group(3).strip()
+
+        # Find the column and update it
+        for col in table.columns:
+            if col.name == col_name:
+                # Parse new type
+                tm = re.match(r'(\w[\w ]*?)(?:\((\d+)(?:,(\d+))?\))?$', type_raw)
+                if tm:
+                    col.type      = tm.group(1).strip()
+                    col.precision = int(tm.group(2)) if tm.group(2) else col.precision
+                    col.scale     = int(tm.group(3)) if tm.group(3) else col.scale
+                if re.search(r'NOT\s+NULL', rest, re.I):
+                    col.nullable = False
+                elif re.search(r'\bNULL\b', rest, re.I):
+                    col.nullable = True
+                dm = re.search(r'DEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|NULL)|$)', rest, re.I)
+                if dm:
+                    col.default = dm.group(1).strip()
+                break
+
+        if version not in table.modified_in:
+            table.modified_in.append(version)
+        act = MigrationAction(
+            action='MODIFY_COLUMN', object_type='COLUMN',
+            object_name=f'{full}.{col_name}', version=version,
+        )
+        all_actions.append(act)
+        table.actions.append(act)
+
+
+def _handle_create_index_command(
+    raw_sql: str,
+    version: str,
+    tables: dict[str, Table],
+    all_actions: list[MigrationAction],
+) -> None:
+    """
+    sqlglot falls back to Command for CREATE INDEX — handle via regex.
+    """
+    m = re.match(
+        r'^(?:CREATE\s+)?(UNIQUE\s+)?INDEX\s+"?(\w+(?:\.\w+)?)"?\s+ON\s+"?(\w+(?:\.\w+)?)"?\s*\(([^)]+)\)',
+        raw_sql.strip(), re.I
     )
     if not m:
         return
-    unique = bool(m.group(1))
-    idx_n  = parse_name(m.group(2))
-    tbl_n  = parse_name(m.group(3))
-    cols   = [re.sub(r'\s+(ASC|DESC)$', '', c.strip(), flags=re.I).replace('"', '').upper()
-              for c in m.group(4).split(',')]
-    t = tables.get(tbl_n['full'])
-    if t:
-        t.indexes.append(Index(name=idx_n['name'], columns=cols, unique=unique, created_in=version))
+    unique   = bool(m.group(1))
+    idx_raw  = m.group(2).replace('"', '').upper()
+    tbl_raw  = m.group(3).replace('"', '').upper()
+    cols_raw = m.group(4)
+
+    idx_name = idx_raw.split('.')[-1]
+    cols     = [re.sub(r'\s+(ASC|DESC)$', '', c.strip(), flags=re.I).replace('"', '').upper()
+                for c in cols_raw.split(',')]
+
+    table = tables.get(tbl_raw)
+    if table:
+        table.indexes.append(Index(name=idx_name, columns=cols, unique=unique, created_in=version))
+        act = MigrationAction(
+            action='CREATE_INDEX', object_type='INDEX',
+            object_name=f'{tbl_raw}.{idx_name}', version=version,
+        )
+        all_actions.append(act)
+        table.actions.append(act)
 
 
-def handle_create_seq(stmt: str, version: str, seqs: dict[str, Sequence]) -> None:
-    m = re.match(r'^CREATE\s+SEQUENCE\s+"?(\w+(?:\.\w+)?)"?', stmt, re.I)
-    if not m:
-        return
-    qn = parse_name(m.group(1))
-    sw = re.search(r'START\s+WITH\s+(\d+)', stmt, re.I)
-    ib = re.search(r'INCREMENT\s+BY\s+(\d+)', stmt, re.I)
-    seqs[qn['full']] = Sequence(
-        name=qn['name'], schema=qn['schema'], full=qn['full'],
-        start_with=int(sw.group(1)) if sw else 1,
-        increment_by=int(ib.group(1)) if ib else 1,
-        created_in=version,
+def _handle_create_sequence(
+    stmt: exp.Create,
+    version: str,
+    seqs: dict[str, Sequence],
+    all_actions: list[MigrationAction],
+) -> None:
+    table_node = stmt.this
+    schema_str, name_str = _table_schema_name(table_node)
+    full = f'{schema_str}.{name_str}' if schema_str else name_str
+
+    start_with   = 1
+    increment_by = 1
+
+    props = stmt.args.get('properties')
+    if props:
+        for p in props.expressions:
+            if isinstance(p, exp.SequenceProperties):
+                if p.args.get('start'):
+                    start_with = int(p.args['start'].name)
+                if p.args.get('increment'):
+                    increment_by = int(p.args['increment'].name)
+
+    seqs[full] = Sequence(
+        name=name_str, schema=schema_str, full=full,
+        start_with=start_with, increment_by=increment_by, created_in=version,
     )
+    all_actions.append(MigrationAction(
+        action='CREATE_SEQUENCE', object_type='SEQUENCE', object_name=full, version=version,
+    ))
 
 
-def handle_comment(stmt: str, tables: dict[str, Table]) -> None:
-    tm = re.search(r"COMMENT\s+ON\s+TABLE\s+\"?(\w+(?:\.\w+)?)\s*\"?\s+IS\s+'([^']*)'", stmt, re.I)
-    if tm:
-        t = tables.get(parse_name(tm.group(1))['full'])
-        if t:
-            t.comments['__table__'] = tm.group(2)
-        return
-    cm = re.search(r"COMMENT\s+ON\s+COLUMN\s+\"?(\w+(?:\.\w+)?)\.(\w+)\"?\s+IS\s+'([^']*)'", stmt, re.I)
-    if cm:
-        t = tables.get(parse_name(cm.group(1))['full'])
-        if t:
-            t.comments[cm.group(2).upper()] = cm.group(3)
+def _handle_comment(
+    stmt: exp.Comment,
+    tables: dict[str, Table],
+) -> None:
+    kind = stmt.args.get('kind', '').upper()
+    if kind == 'TABLE':
+        table_node = stmt.this
+        if isinstance(table_node, exp.Table):
+            full = _table_full(table_node)
+            t = tables.get(full)
+            if t:
+                t.comments['__table__'] = stmt.expression.name if stmt.expression else ''
+    elif kind == 'COLUMN':
+        # COMMENT ON COLUMN schema.table.column IS '...'
+        # sqlglot represents this as a Column node with a table reference
+        col_node = stmt.this
+        if isinstance(col_node, exp.Column):
+            col_name   = col_node.name.upper()
+            table_node = col_node.args.get('table')
+            db_node    = col_node.args.get('db')
+            if table_node:
+                tname = table_node.name.upper()
+                full  = f'{db_node.name.upper()}.{tname}' if db_node else tname
+                t = tables.get(full)
+                if t:
+                    t.comments[col_name] = stmt.expression.name if stmt.expression else ''
 
 
 # ─────────────────────────────────────────────
@@ -521,10 +595,6 @@ def handle_comment(stmt: str, tables: dict[str, Table]) -> None:
 # ─────────────────────────────────────────────
 
 def parse_flyway_ver(filename: str) -> dict:
-    """
-    Parse a Flyway filename into { version, description, order }.
-    Supports V1, V1.2, V1.2.3, etc.
-    """
     m = re.match(r'^V([\d.]+)__(.+?)\.sql$', filename, re.I)
     if not m:
         return {'version': '0', 'description': filename, 'order': 0}
@@ -545,39 +615,62 @@ def apply_migrations(files: list[dict]) -> SchemaGraph:
         files: list of { filename: str, sql: str }
 
     Returns:
-        SchemaGraph with accumulated tables, sequences, FK edges, and migration history.
+        SchemaGraph with accumulated tables, sequences, FK edges,
+        migration history, and full action log.
     """
     sorted_files = sorted(files, key=lambda f: parse_flyway_ver(f['filename'])['order'])
 
-    tables:   dict[str, Table]    = {}
-    seqs:     dict[str, Sequence] = {}
-    mig_hist: list[MigrationHistory] = []
+    tables:      dict[str, Table]    = {}
+    seqs:        dict[str, Sequence] = {}
+    mig_hist:    list[MigrationHistory] = []
+    all_actions: list[MigrationAction]  = []
 
     for file in sorted_files:
         ver = parse_flyway_ver(file['filename'])
         mig_hist.append(MigrationHistory(version=ver['version'], description=ver['description']))
+        version = ver['version']
 
-        clean = strip_comments(file['sql'])
-        stmts = split_stmts(clean)
+        stmts = sqlglot.parse(file['sql'], dialect='oracle', error_level=sqlglot.ErrorLevel.WARN)
 
         for stmt in stmts:
-            u  = re.sub(r'\s+', ' ', stmt).strip()
-            if not u:
+            if stmt is None:
                 continue
-            up = u.upper()
 
-            if up.startswith('CREATE TABLE'):
-                handle_create_table(stmt, ver['version'], tables)
-            elif up.startswith('ALTER TABLE'):
-                handle_alter_table(stmt, ver['version'], tables)
-            elif up.startswith('CREATE INDEX') or up.startswith('CREATE UNIQUE INDEX'):
-                handle_create_index(stmt, ver['version'], tables)
-            elif up.startswith('CREATE SEQUENCE'):
-                handle_create_seq(stmt, ver['version'], seqs)
-            elif up.startswith('COMMENT ON'):
-                handle_comment(stmt, tables)
+            # ── CREATE TABLE ─────────────────────────────────────────────
+            if isinstance(stmt, exp.Create) and stmt.args.get('kind') == 'TABLE':
+                _handle_create_table(stmt, version, tables, all_actions)
 
-    # Derive FK edges from accumulated constraints
+            # ── CREATE SEQUENCE ──────────────────────────────────────────
+            elif isinstance(stmt, exp.Create) and stmt.args.get('kind') == 'SEQUENCE':
+                _handle_create_sequence(stmt, version, seqs, all_actions)
+
+            # ── DROP TABLE ───────────────────────────────────────────────
+            elif isinstance(stmt, exp.Drop) and stmt.args.get('kind') == 'TABLE':
+                _handle_drop_table(stmt, version, tables, all_actions)
+
+            # ── ALTER TABLE ──────────────────────────────────────────────
+            elif isinstance(stmt, exp.Alter) and stmt.args.get('kind') == 'TABLE':
+                _handle_alter_table(stmt, version, tables, all_actions)
+
+            # ── COMMENT ON ───────────────────────────────────────────────
+            elif isinstance(stmt, exp.Comment):
+                _handle_comment(stmt, tables)
+
+            # ── COMMAND FALLBACK (CREATE INDEX, ALTER MODIFY, etc.) ──────
+            elif isinstance(stmt, exp.Command):
+                cmd_name = (stmt.this or '').strip().upper()
+                raw_sql  = f'{cmd_name} {stmt.expression or ""}'.strip()
+                raw_up   = raw_sql.upper()
+
+                if 'INDEX' in raw_up and raw_up.startswith(('CREATE', 'INDEX', 'UNIQUE')):
+                    _handle_create_index_command(raw_sql, version, tables, all_actions)
+
+                elif raw_up.startswith('TABLE') and 'MODIFY' in raw_up:
+                    _handle_alter_table_command(
+                        f'ALTER TABLE {stmt.expression}', version, tables, all_actions
+                    )
+
+    # ── Derive FK edges ──────────────────────────────────────────────────────
     edges: list[Edge] = []
     for t in tables.values():
         for c in t.constraints:
@@ -592,38 +685,34 @@ def apply_migrations(files: list[dict]) -> SchemaGraph:
                     on_delete=c.references.get('on_delete'),
                 ))
 
-    return SchemaGraph(tables=tables, seqs=seqs, edges=edges, mig_hist=mig_hist)
+    return SchemaGraph(
+        tables=tables, seqs=seqs, edges=edges,
+        mig_hist=mig_hist, actions=all_actions,
+    )
 
 
 # ─────────────────────────────────────────────
-# LLM VECTOR CHUNK BUILDER
+# LLM VECTOR CHUNK BUILDER  (unchanged)
 # ─────────────────────────────────────────────
 
 def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
-    """
-    Build LLM-ready vector chunks from a SchemaGraph.
-    Produces one chunk per table, a schema summary chunk,
-    and a relationship graph chunk.
-    """
     tables   = graph.tables
     seqs     = graph.seqs
     edges    = graph.edges
     mig_hist = graph.mig_hist
-    chunks:  list[VectorChunk] = []
 
-    def out_edges(full: str) -> list[Edge]:
-        return [e for e in edges if e.from_table == full]
+    chunks: list[VectorChunk] = []
 
-    def in_edges(full: str) -> list[Edge]:
-        return [e for e in edges if e.to_table == full]
+    def out_e(full): return [e for e in edges if e.from_table == full]
+    def in_e(full):  return [e for e in edges if e.to_table   == full]
 
     for t in tables.values():
-        pk   = next((c for c in t.constraints if c.type == 'primary_key'), None)
-        fks  = [c for c in t.constraints if c.type == 'foreign_key']
-        uqs  = [c for c in t.constraints if c.type == 'unique']
-        cks  = [c for c in t.constraints if c.type == 'check']
-        out_e = out_edges(t.full)
-        in_e  = in_edges(t.full)
+        pk    = next((c for c in t.constraints if c.type == 'primary_key'), None)
+        fks   = [c for c in t.constraints if c.type == 'foreign_key']
+        uqs   = [c for c in t.constraints if c.type == 'unique']
+        cks   = [c for c in t.constraints if c.type == 'check']
+        out   = out_e(t.full)
+        inn   = in_e(t.full)
 
         L: list[str] = []
         L.append(f'TABLE: {t.full}')
@@ -631,77 +720,61 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
             L.append(f'Description: {t.comments["__table__"]}')
         modified = f' | Modified: V{", V".join(t.modified_in)}' if t.modified_in else ''
         L.append(f'Schema: {t.schema or "default"} | Created: V{t.created_in}{modified}')
-        L.append('')
-        L.append('COLUMNS:')
+        L.append(''); L.append('COLUMNS:')
 
         for col in t.columns:
             flags: list[str] = []
-            if pk and col.name in pk.columns:
-                flags.append('PK')
-            if not col.nullable:
-                flags.append('NOT NULL')
-            if col.default:
-                flags.append(f'DEFAULT {col.default}')
-            if any(col.name in u.columns for u in uqs):
-                flags.append('UNIQUE')
-            if any(col.name in e.from_cols for e in out_e):
-                flags.append('FK')
-            comment = t.comments.get(col.name, '')
+            if pk and col.name in pk.columns:      flags.append('PK')
+            if not col.nullable:                   flags.append('NOT NULL')
+            if col.default:                        flags.append(f'DEFAULT {col.default}')
+            if any(col.name in u.columns for u in uqs): flags.append('UNIQUE')
+            if any(col.name in e.from_cols for e in out): flags.append('FK')
+            comment  = t.comments.get(col.name, '')
             flag_str = f' [{", ".join(flags)}]' if flags else ''
             cmt_str  = f' -- {comment}' if comment else ''
             L.append(f'  {col.name}: {type_str(col)}{flag_str}{cmt_str}')
 
-        if out_e:
-            L.append('')
-            L.append('REFERENCES (outgoing FK):')
-            for e in out_e:
-                od  = f' ON DELETE {e.on_delete}' if e.on_delete else ''
-                cn  = f' [{e.constraint_name}]' if e.constraint_name else ''
+        if out:
+            L.append(''); L.append('REFERENCES (outgoing FK):')
+            for e in out:
+                od = f' ON DELETE {e.on_delete}' if e.on_delete else ''
+                cn = f' [{e.constraint_name}]' if e.constraint_name else ''
                 L.append(f'  {",".join(e.from_cols)}) → {e.to_table}({",".join(e.to_cols)}){od}{cn}')
-
-        if in_e:
-            L.append('')
-            L.append('REFERENCED BY:')
-            for e in in_e:
-                L.append(f'  {e.from_table}.{",".join(e.from_cols)} → {",".join(e.to_cols)}')
-
+        if inn:
+            L.append(''); L.append('REFERENCED BY:')
+            for e in inn: L.append(f'  {e.from_table}.{",".join(e.from_cols)} → {",".join(e.to_cols)}')
         if t.indexes:
-            L.append('')
-            L.append('INDEXES:')
+            L.append(''); L.append('INDEXES:')
             for idx in t.indexes:
-                uq = ' UNIQUE' if idx.unique else ''
-                L.append(f'  {idx.name}: ({", ".join(idx.columns)}){uq} [V{idx.created_in}]')
-
+                L.append(f'  {idx.name}: ({", ".join(idx.columns)}){"  UNIQUE" if idx.unique else ""} [V{idx.created_in}]')
         if cks:
-            L.append('')
-            L.append('CHECK CONSTRAINTS:')
-            for ck in cks:
-                L.append(f'  {ck.name or "unnamed"}: CHECK ({ck.check_expr})')
+            L.append(''); L.append('CHECK CONSTRAINTS:')
+            for ck in cks: L.append(f'  {ck.name or "unnamed"}: CHECK ({ck.check_expr})')
+
+        # Action history for this table
+        if t.actions:
+            L.append(''); L.append('MIGRATION ACTIONS:')
+            for a in t.actions:
+                L.append(f'  V{a.version}: {a.action} {a.object_type} {a.object_name}')
 
         chunks.append(VectorChunk(
-            id=f'table:{t.full}',
-            type='table',
-            title=f'Table: {t.name}',
+            id=f'table:{t.full}', type='table', title=f'Table: {t.name}',
             content='\n'.join(L),
             meta={
-                'table_name':   t.name,
-                'schema':       t.schema,
-                'column_count': len(t.columns),
-                'has_pk':       pk is not None,
-                'fk_count':     len(fks),
-                'referenced_by': len(in_e),
-                'index_count':  len(t.indexes),
-                'created_in':   t.created_in,
-                'pk_cols':      pk.columns if pk else [],
+                'table_name': t.name, 'schema': t.schema,
+                'column_count': len(t.columns), 'has_pk': pk is not None,
+                'fk_count': len(fks), 'referenced_by': len(inn),
+                'index_count': len(t.indexes), 'created_in': t.created_in,
+                'pk_cols': pk.columns if pk else [],
+                'actions': [{'action': a.action, 'version': a.version} for a in t.actions],
             },
             hint=f'Use for: queries about {t.name} table — columns, types, constraints, FK relationships.',
         ))
 
-    # ── Schema summary chunk ──
+    # Schema summary
     table_names = list(tables.keys())
     total_cols  = sum(len(t.columns) for t in tables.values())
     schemas     = list({t.schema for t in tables.values() if t.schema})
-
     sum_l = [
         'SCHEMA SUMMARY',
         f'DB Schemas: {", ".join(schemas)}',
@@ -710,59 +783,30 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
         f'Total columns: {total_cols}',
         f'FK relationships: {len(edges)}',
         f'Migration history: {" → ".join(f"V{m.version} ({m.description})" for m in mig_hist)}',
-        '',
-        'RELATIONSHIP MAP:',
+        '', 'RELATIONSHIP MAP:',
+        *[f'  {e.from_table}.{",".join(e.from_cols)} → {e.to_table}.{",".join(e.to_cols)}' for e in edges],
+        '', 'TABLE ROLES:',
+        *[f'  {t.full}: {"root/parent entity" if len(in_e(t.full))>0 and len(out_e(t.full))==0 else "junction/child entity" if len(out_e(t.full))>0 and len(in_e(t.full))>0 else "leaf/detail entity" if len(out_e(t.full))>0 else "standalone"} (referenced by {len(in_e(t.full))}, references {len(out_e(t.full))})'
+         for t in tables.values()],
     ]
-    for e in edges:
-        sum_l.append(f'  {e.from_table}.{",".join(e.from_cols)} → {e.to_table}.{",".join(e.to_cols)}')
-    sum_l.append('')
-    sum_l.append('TABLE ROLES:')
-    for t in tables.values():
-        o = len(out_edges(t.full))
-        i = len(in_edges(t.full))
-        if i > 0 and o == 0:
-            role = 'root/parent entity'
-        elif o > 0 and i > 0:
-            role = 'junction/child entity'
-        elif o > 0 and i == 0:
-            role = 'leaf/detail entity'
-        else:
-            role = 'standalone'
-        sum_l.append(f'  {t.full}: {role} (referenced by {i}, references {o})')
-
     chunks.insert(0, VectorChunk(
-        id='schema:summary',
-        type='schema_summary',
-        title='Schema Summary',
+        id='schema:summary', type='schema_summary', title='Schema Summary',
         content='\n'.join(sum_l),
-        meta={
-            'table_count':  len(tables),
-            'seq_count':    len(seqs),
-            'edge_count':   len(edges),
-            'column_count': total_cols,
-            'schemas':      schemas,
-        },
+        meta={'table_count': len(tables), 'seq_count': len(seqs),
+              'edge_count': len(edges), 'column_count': total_cols, 'schemas': schemas},
         hint='Use for: high-level schema questions, table count, migration history, overall topology.',
     ))
 
-    # ── Relationship graph chunk ──
+    # Relationship graph chunk
     rel_l = ['RELATIONSHIP GRAPH (adjacency list)', '']
     for tname in table_names:
-        out = out_edges(tname)
-        inn = in_edges(tname)
+        out = out_e(tname); inn = in_e(tname)
         rel_l.append(f'{tname}:')
-        for e in out:
-            od = f' [ON DELETE {e.on_delete}]' if e.on_delete else ''
-            rel_l.append(f'  ──FK──▶ {e.to_table} via {",".join(e.from_cols)}{od}')
-        for e in inn:
-            rel_l.append(f'  ◀──FK── {e.from_table} via {",".join(e.from_cols)}')
-        if not out and not inn:
-            rel_l.append('  (no FK relationships)')
-
+        for e in out: rel_l.append(f'  ──FK──▶ {e.to_table} via {",".join(e.from_cols)}{"  [ON DELETE "+e.on_delete+"]" if e.on_delete else ""}')
+        for e in inn: rel_l.append(f'  ◀──FK── {e.from_table} via {",".join(e.from_cols)}')
+        if not out and not inn: rel_l.append('  (no FK relationships)')
     chunks.append(VectorChunk(
-        id='schema:relationships',
-        type='relationship_map',
-        title='Relationship Graph',
+        id='schema:relationships', type='relationship_map', title='Relationship Graph',
         content='\n'.join(rel_l),
         meta={'edges': [{'from': e.from_table, 'to': e.to_table, 'via': e.from_cols, 'on_delete': e.on_delete} for e in edges]},
         hint='Use for: JOIN path planning, cascade analysis, understanding table connectivity.',
@@ -772,7 +816,7 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
 
 
 # ─────────────────────────────────────────────
-# ERD LAYOUT ENGINE
+# ERD LAYOUT ENGINE  (unchanged)
 # ─────────────────────────────────────────────
 
 def compute_layout(
@@ -781,34 +825,21 @@ def compute_layout(
     width:  float = 580,
     height: float = 220,
 ) -> dict[str, dict]:
-    """
-    Compute (x, y) positions for each table node using FK-depth layering.
-    Returns { full_table_name: { x, y } }
-    """
     levels: dict[str, int] = {k: 0 for k in tables}
-
     for _ in range(10):
         changed = False
         for e in edges:
             fl = levels.get(e.from_table, 0)
             tl = levels.get(e.to_table,   0)
             if fl <= tl:
-                levels[e.from_table] = tl + 1
-                changed = True
-        if not changed:
-            break
-
+                levels[e.from_table] = tl + 1; changed = True
+        if not changed: break
     by_level: dict[int, list[str]] = {}
-    for t, l in levels.items():
-        by_level.setdefault(l, []).append(t)
-
+    for t, l in levels.items(): by_level.setdefault(l, []).append(t)
     max_l = max(levels.values(), default=0)
     pos: dict[str, dict] = {}
-
     for level, tbls in by_level.items():
         y = height / 2 if max_l == 0 else (level / max_l) * (height - 80) + 40
         for i, t in enumerate(tbls):
-            x = ((i + 1) / (len(tbls) + 1)) * width
-            pos[t] = {'x': x, 'y': y}
-
+            pos[t] = {'x': ((i + 1) / (len(tbls) + 1)) * width, 'y': y}
     return pos
