@@ -20,6 +20,170 @@ Primary target dialect is **OracleDB**. PostgreSQL support is planned.
 
 ---
 
+## Repository Structure
+
+```
+sqlfy/
+├── app/          React + Vite + Tauri desktop UI
+├── cli/          Python CLI (pip-installable, binary-distributable via PyInstaller)
+│   ├── src/
+│   │   └── sqlfy/    Python package
+│   │       ├── core.py   Pure-logic parser (no I/O)
+│   │       └── main.py   argparse CLI runner
+│   ├── tests/        pytest test suite
+│   └── pyproject.toml
+└── samples/      Shared Flyway .sql fixtures (used by the app and the test suite)
+```
+
+---
+
+## Quick Start
+
+### Desktop app
+
+```bash
+cd app
+npm install
+npm run dev          # Vite dev server (browser)
+npx tauri dev        # Tauri desktop window
+```
+
+The app is pre-loaded with the sample Oracle schema from `samples/`. Replace the SQL with your own Flyway files, or add files with **+ Add Migration File**, then click **▶ Parse →**.
+
+### CLI
+
+```bash
+cd cli
+pip install .                        # install
+sqlfy ./samples                      # human-readable schema summary
+sqlfy ./samples --json               # raw JSON schema graph
+sqlfy ./samples --chunks             # LLM vector chunks (text)
+sqlfy ./samples --chunks --json      # LLM vector chunks (JSON)
+sqlfy ./samples --chunks --json --out chunks.json  # write to file
+```
+
+---
+
+## Development
+
+### App
+
+```bash
+cd app
+npm install
+npm run dev     # start dev server
+npm run build   # production build
+npm run lint    # ESLint
+```
+
+### CLI
+
+```bash
+cd cli
+pip install -e ".[dev]"   # editable install + pytest
+python -m pytest -v       # run all tests (32 tests)
+```
+
+Tests read real `.sql` files from `samples/` and validate `apply_migrations` and `build_chunks` end-to-end.
+
+---
+
+## Features
+
+### ① Migrations tab
+- Add, edit, or remove SQL migration files directly in the browser
+- Files are parsed in Flyway version order (`V1__`, `V2__`, …)
+- Supports multi-file sequences with incremental schema changes
+
+### ② Schema Graph tab
+- **ERD canvas** — topology-aware layout showing table nodes and FK edges
+- **Table detail panel** — per-table view of:
+  - Columns with data type, precision/scale, nullability, default value, and inline comment
+  - Constraint badges: `PK`, `NOT NULL`, `UNIQUE`, `FK`
+  - Outgoing and incoming FK relationships with `ON DELETE` action
+  - Indexes (including unique indexes) with version provenance
+  - Check constraints
+- **Sequence list** — `START WITH` / `INCREMENT BY` metadata per sequence
+
+### ③ LLM Chunks tab
+- **Schema Summary** chunk — table count, column count, FK edge count, migration history, table role classification (root / junction / leaf / standalone)
+- **Per-table** chunks — full column inventory + constraint + relationship text in a structured, embedding-friendly format
+- **Relationship Graph** chunk — adjacency list of all FK edges for JOIN-path planning
+- One-click copy per chunk
+
+---
+
+## Supported DDL
+
+| Statement | Support |
+|---|---|
+| `CREATE TABLE` | ✅ columns, PK, FK, UNIQUE, CHECK |
+| `ALTER TABLE … ADD` | ✅ columns and constraints |
+| `CREATE [UNIQUE] INDEX` | ✅ |
+| `CREATE SEQUENCE` | ✅ |
+| `COMMENT ON TABLE / COLUMN` | ✅ |
+| `DROP TABLE` | planned |
+| `ALTER TABLE … MODIFY / DROP COLUMN` | planned |
+
+---
+
+## LLM Usage
+
+Each chunk is self-contained and human-readable. Example table chunk:
+
+```
+TABLE: APP.ORDERS
+Schema: APP | Created: V2
+
+COLUMNS:
+  ORDER_ID: NUMBER(10) [PK, NOT NULL]
+  USER_ID: NUMBER(10) [NOT NULL, FK]
+  TOTAL_AMOUNT: NUMBER(12,2) [NOT NULL]
+  STATUS: VARCHAR2(20) [NOT NULL, DEFAULT PENDING]
+  CREATED_AT: TIMESTAMP [NOT NULL, DEFAULT SYSTIMESTAMP]
+
+REFERENCES (outgoing FK):
+  USER_ID) → APP.USERS(USER_ID) ON DELETE CASCADE [FK_ORDERS_USER]
+
+REFERENCED BY:
+  APP.ORDER_ITEMS.ORDER_ID → ORDER_ID
+
+INDEXES:
+  IDX_ORDERS_USER: (USER_ID) [V2]
+  IDX_ORDERS_STATUS: (STATUS, CREATED_AT) [V2]
+
+CHECK CONSTRAINTS:
+  CK_ORDERS_STATUS: CHECK (status IN ('PENDING','PROCESSING','SHIPPED','DELIVERED','CANCELLED'))
+```
+
+Paste the **Schema Summary** chunk as system context and individual **table chunks** as retrieval results for precise, grounded SQL generation.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Desktop UI | React 19 + Vite + Tauri |
+| CLI | Python 3.11+ (stdlib only; sqlglot coming in step 8) |
+| Distribution | PyInstaller binary + Tauri desktop bundle |
+| Tests | pytest 8 |
+
+---
+
+## Roadmap
+
+- [x] Split into `app/` (React/Vite/Tauri) and `cli/` (Python)
+- [x] Shared `samples/` fixtures used by both the app and the test suite
+- [ ] Migrate parser to **sqlglot** for full Oracle/PostgreSQL AST fidelity
+- [ ] `DROP TABLE` and `ALTER TABLE … MODIFY/DROP COLUMN` support
+- [ ] Schema diff command
+- [ ] JSON / YAML export of the Schema State Dictionary
+- [ ] Graph topology insights (orphan tables, missing FK targets, circular references)
+
+
+---
+
 ## Features
 
 ### ① Migrations tab

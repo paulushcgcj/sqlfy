@@ -1,0 +1,15 @@
+# sqlfy CLI — Python dependencies
+# Currently stdlib-only. sqlglot will be added in step 8.
+
+# Install runtime only:
+#   pip install .
+#
+# Install in editable mode with dev tools (pytest):
+#   pip install -e ".[dev]"
+#
+# Run tests:
+#   python -m pytest -v
+#
+# Build a self-contained binary:
+#   pip install pyinstaller
+#   pyinstaller --onefile src/sqlfy/main.py --name sqlfy

@@ -1,0 +1,25 @@
+[build-system]
+requires      = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name        = "sqlfy"
+version     = "0.5.0"
+description = "Flyway SQL migration parser — schema graph engine and LLM vector chunk builder"
+readme      = "README.md"
+requires-python = ">=3.11"
+dependencies = []   # stdlib only for now; sqlglot added in step 8
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+sqlfy = "sqlfy.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sqlfy", "sqlfy.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
