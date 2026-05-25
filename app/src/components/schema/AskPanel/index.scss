@@ -1,4 +1,4 @@
-/* ── Ask Panel ─────────────────────────────────────────────────── */
+/* Component-scoped styles for AskPanel. */
 .ask-panel {
   display: flex; flex-direction: column; height: 100%; overflow: hidden;
   background: var(--color-bg-tertiary);
@@ -66,12 +66,8 @@
 }
 
 /* Source chips */
-.ask-sources-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-}
-.ask-sources-label {
-  font-size: 10px; color: var(--color-text-tertiary); flex-shrink: 0;
-}
+.ask-sources-row  { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ask-sources-label { font-size: 10px; color: var(--color-text-tertiary); flex-shrink: 0; }
 .ask-source-tag {
   font-size: 9px; padding: 2px 7px; border-radius: 3px;
   background: rgba(124,58,237,.08); color: var(--accent);
@@ -91,23 +87,18 @@
   border-bottom: 0.5px solid var(--color-border-tertiary);
   flex-shrink: 0;
 }
-.ask-prompt-label  { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); }
+.ask-prompt-label   { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); }
 .ask-prompt-actions { display: flex; gap: 6px; }
 
 .ask-copy-btn, .ask-reset-btn {
   padding: 3px 10px; font-size: 11px; border-radius: 4px;
   cursor: pointer; font-family: inherit;
 }
-.ask-copy-btn {
-  background: var(--accent); color: #fff; border: none;
-}
-.ask-copy-btn:hover { background: #6d28d9; }
-.ask-copy-btn.ok    { background: #059669; }
-.ask-reset-btn {
-  background: none; color: var(--color-text-tertiary);
-  border: 0.5px solid var(--color-border-secondary);
-}
-.ask-reset-btn:hover { color: var(--color-text-secondary); }
+.ask-copy-btn           { background: var(--accent); color: #fff; border: none; }
+.ask-copy-btn:hover     { background: #6d28d9; }
+.ask-copy-btn.ok        { background: #059669; }
+.ask-reset-btn          { background: none; color: var(--color-text-tertiary); border: 0.5px solid var(--color-border-secondary); }
+.ask-reset-btn:hover    { color: var(--color-text-secondary); }
 
 .ask-prompt-preview {
   flex: 1; overflow-y: auto; margin: 0;

@@ -1,5 +1,5 @@
 /**
- * sqlfy — src/components/AskPanel.tsx
+ * sqlfy — src/components/schema/AskPanel/index.tsx
  *
  * Schema context assembler for AI assistants.
  *
@@ -19,9 +19,11 @@
  *  - Keyboard shortcut: Enter to assemble, Shift+Enter for newline
  */
 
-import { useState, useRef, KeyboardEvent } from 'react';
-import type { SchemaGraph } from '../core/types';
-import { buildChunks } from '../core/core';
+import { useState, useRef } from 'react';
+import type { FC, KeyboardEvent } from 'react';
+import type { SchemaGraph } from '../../../core/types';
+import { buildChunks } from '../../../core/core';
+import './index.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,8 +41,13 @@ interface Hit {
   hint:    string;
 }
 
-interface Props {
-  graph: SchemaGraph | null;
+/** Props for the {@link AskPanel} component. */
+export interface AskPanelProps {
+  /**
+   * The parsed schema graph used to build retrieval chunks.
+   * When `null` the panel renders an empty-state prompt to parse first.
+   */
+  readonly graph: SchemaGraph | null;
 }
 
 // ─── BM25 retrieval ───────────────────────────────────────────────────────────
@@ -65,7 +72,6 @@ function retrieve(
   const N       = chunks.length;
 
   const docs = chunks.map(c => {
-    // Title and hint are boosted 3x by repeating them in the scored text
     const text   = `${c.title} ${c.hint} ${c.title} ${c.hint} ${c.content}`;
     const tokens = _tokenise(text);
     const tf: Record<string, number> = {};
@@ -141,7 +147,21 @@ const EXAMPLES = [
   'How are orders and products related?',
 ];
 
-export function AskPanel({ graph }: Props) {
+/**
+ * Schema Q&A panel that assembles a ready-to-paste AI prompt.
+ *
+ * Runs BM25 retrieval over schema chunks to select relevant context, then
+ * formats a structured prompt for any AI assistant. Fully offline — no API calls.
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <AskPanel graph={graph} />
+ * ```
+ * @param props - {@link AskPanelProps}
+ * @returns The Q&A panel, or an empty-state prompt if `graph` is `null`.
+ */
+const AskPanel: FC<AskPanelProps> = ({ graph }) => {
   const [input,   setInput]   = useState('');
   const [sources, setSources] = useState<Source[]>([]);
   const [prompt,  setPrompt]  = useState<string | null>(null);
@@ -295,4 +315,6 @@ export function AskPanel({ graph }: Props) {
 
     </div>
   );
-}
+};
+
+export default AskPanel;

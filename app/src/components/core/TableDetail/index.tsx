@@ -1,12 +1,31 @@
-import { typeStr } from '../core/core';
-import type { SchemaGraph } from '../core/types';
+import type { FC } from 'react';
+import { typeStr } from '../../../core/core';
+import type { SchemaGraph } from '../../../core/types';
+import './index.scss';
 
-interface Props {
-  tableKey: string;
-  graph: SchemaGraph;
+/** Props for the {@link TableDetail} component. */
+export interface TableDetailProps {
+  /** The fully-qualified table key (e.g. `"APP.USERS"`). */
+  readonly tableKey: string;
+  /** The parsed schema graph containing tables and edges. */
+  readonly graph: SchemaGraph;
 }
 
-export function TableDetail({ tableKey, graph }: Props) {
+/**
+ * Detailed view for a single database table.
+ *
+ * Renders column definitions (type, flags, defaults, comments), FK relationships
+ * (outbound and inbound), indexes, and check constraints.
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <TableDetail tableKey="APP.USERS" graph={graph} />
+ * ```
+ * @param props - {@link TableDetailProps}
+ * @returns A structured detail panel for the selected table, or a fallback prompt.
+ */
+const TableDetail: FC<TableDetailProps> = ({ tableKey, graph }) => {
   const { tables, edges } = graph;
   const t = tables.get(tableKey);
   if (!t) return <div className="no-data">Select a table to view details</div>;
@@ -118,4 +137,6 @@ export function TableDetail({ tableKey, graph }: Props) {
       )}
     </div>
   );
-}
+};
+
+export default TableDetail;

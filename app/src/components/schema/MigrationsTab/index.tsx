@@ -1,11 +1,30 @@
-import type { MigrationFile } from '../core/types';
+import type { FC } from 'react';
+import type { MigrationFile } from '../../../core/types';
+import './index.scss';
 
-interface Props {
-  files: MigrationFile[];
-  onChange: (files: MigrationFile[]) => void;
+/** Props for the {@link MigrationsTab} component. */
+export interface MigrationsTabProps {
+  /** The list of SQL migration files currently loaded. */
+  readonly files: MigrationFile[];
+  /** Callback to update the migration file list (add, edit, or remove). */
+  readonly onChange: (files: MigrationFile[]) => void;
 }
 
-export function MigrationsTab({ files, onChange }: Props) {
+/**
+ * Migration files editor panel.
+ *
+ * Renders a list of editable SQL file blocks with filename inputs and SQL textareas.
+ * Supports adding and removing files.
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <MigrationsTab files={files} onChange={setFiles} />
+ * ```
+ * @param props - {@link MigrationsTabProps}
+ * @returns An editable list of SQL migration file blocks.
+ */
+const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange }) => {
   function updateFile(index: number, field: keyof MigrationFile, value: string) {
     const next = files.map((f, i) => i === index ? { ...f, [field]: value } : f);
     onChange(next);
@@ -45,4 +64,6 @@ export function MigrationsTab({ files, onChange }: Props) {
       <button className="add-btn" onClick={addFile}>+ Add Migration File</button>
     </div>
   );
-}
+};
+
+export default MigrationsTab;

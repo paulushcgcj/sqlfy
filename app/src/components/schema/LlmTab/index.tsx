@@ -1,11 +1,29 @@
 import { useState } from 'react';
-import type { VectorChunk } from '../core/types';
+import type { FC } from 'react';
+import type { VectorChunk } from '../../../core/types';
+import './index.scss';
 
-interface Props {
-  chunks: VectorChunk[];
+/** Props for the {@link LlmTab} component. */
+export interface LlmTabProps {
+  /** The vector chunks generated from the parsed schema. */
+  readonly chunks: VectorChunk[];
 }
 
-export function LlmTab({ chunks }: Props) {
+/**
+ * LLM context tab for browsing and exporting vector chunks.
+ *
+ * Presents a sidebar list of schema chunks and a detail panel with copyable content.
+ * Supports bulk JSON export for external embedding pipelines.
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <LlmTab chunks={chunks} />
+ * ```
+ * @param props - {@link LlmTabProps}
+ * @returns A split-panel layout with chunk list and detail view.
+ */
+const LlmTab: FC<LlmTabProps> = ({ chunks }) => {
   const [selected, setSelected] = useState<VectorChunk>(chunks[0]);
   const [copied, setCopied]     = useState(false);
 
@@ -70,4 +88,6 @@ export function LlmTab({ chunks }: Props) {
       </div>
     </div>
   );
-}
+};
+
+export default LlmTab;

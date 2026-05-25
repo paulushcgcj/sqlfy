@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { parse, IS_TAURI } from './bridge/cli';
-import { MigrationsTab } from './components/MigrationsTab';
-import { GraphTab }      from './components/GraphTab';
-import { LlmTab }        from './components/LlmTab';
-import { AskPanel }      from './components/AskPanel';
+import MigrationsTab from './components/schema/MigrationsTab';
+import GraphTab      from './components/schema/GraphTab';
+import LlmTab        from './components/schema/LlmTab';
+import AskPanel      from './components/schema/AskPanel';
 import { SAMPLE_MIGRATIONS } from './data/samples';
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
-import './ask-panel.css';
 
 type Tab = 'migrations' | 'graph' | 'llm' | 'ask';
 

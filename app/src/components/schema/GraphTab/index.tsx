@@ -1,14 +1,30 @@
-import { ErdCanvas } from './ErdCanvas';
-import { TableDetail } from './TableDetail';
-import type { SchemaGraph } from '../core/types';
+import type { FC } from 'react';
+import ErdCanvas from '../../core/ErdCanvas';
+import TableDetail from '../../core/TableDetail';
+import type { SchemaGraph } from '../../../core/types';
 
-interface Props {
-  graph: SchemaGraph;
-  selectedTable: string | null;
-  onSelectTable: (key: string) => void;
+/** Props for the {@link GraphTab} component. */
+export interface GraphTabProps {
+  /** The parsed schema graph. */
+  readonly graph: SchemaGraph;
+  /** The key of the currently selected table, or `null`. */
+  readonly selectedTable: string | null;
+  /** Callback invoked when the user selects a table. */
+  readonly onSelectTable: (key: string) => void;
 }
 
-export function GraphTab({ graph, selectedTable, onSelectTable }: Props) {
+/**
+ * Schema graph tab combining a sidebar table/sequence list with an ERD canvas and detail panel.
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <GraphTab graph={graph} selectedTable={selected} onSelectTable={setSelected} />
+ * ```
+ * @param props - {@link GraphTabProps}
+ * @returns A split-panel layout with a sidebar and an ERD canvas + detail panel.
+ */
+const GraphTab: FC<GraphTabProps> = ({ graph, selectedTable, onSelectTable }) => {
   const { tables, seqs, edges } = graph;
 
   return (
@@ -54,4 +70,6 @@ export function GraphTab({ graph, selectedTable, onSelectTable }: Props) {
       </div>
     </div>
   );
-}
+};
+
+export default GraphTab;

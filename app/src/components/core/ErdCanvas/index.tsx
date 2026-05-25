@@ -1,16 +1,36 @@
 import { useMemo } from 'react';
-import { computeLayout } from '../core/core';
-import type { SchemaGraph } from '../core/types';
+import type { FC } from 'react';
+import { computeLayout } from '../../../core/core';
+import type { SchemaGraph } from '../../../core/types';
+import './index.scss';
+
+/** Props for the {@link ErdCanvas} component. */
+export interface ErdCanvasProps {
+  /** The parsed schema graph containing tables, sequences, and edges. */
+  readonly graph: SchemaGraph;
+  /** The key of the currently selected table, or `null` when none is selected. */
+  readonly selectedTable: string | null;
+  /** Callback invoked when the user clicks a table node. */
+  readonly onSelectTable: (key: string) => void;
+}
 
 const BW = 130, BH = 48, SVW = 580, SVH = 240;
 
-interface Props {
-  graph: SchemaGraph;
-  selectedTable: string | null;
-  onSelectTable: (key: string) => void;
-}
-
-export function ErdCanvas({ graph, selectedTable, onSelectTable }: Props) {
+/**
+ * SVG entity-relationship diagram canvas.
+ *
+ * Renders all schema tables as labelled boxes and FK edges as curved arrows.
+ * Layout is computed via a force-directed algorithm on first render.
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <ErdCanvas graph={graph} selectedTable={selected} onSelectTable={setSelected} />
+ * ```
+ * @param props - {@link ErdCanvasProps}
+ * @returns A scrollable SVG canvas rendering all schema tables and FK edges.
+ */
+const ErdCanvas: FC<ErdCanvasProps> = ({ graph, selectedTable, onSelectTable }) => {
   const { tables, edges } = graph;
   const pos = useMemo(() => computeLayout(tables, edges), [tables, edges]);
   const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
@@ -74,4 +94,6 @@ export function ErdCanvas({ graph, selectedTable, onSelectTable }: Props) {
       </svg>
     </div>
   );
-}
+};
+
+export default ErdCanvas;
