@@ -1,10 +1,12 @@
 {
-  "name": "app",
+  "name": "sqlfy",
+  "description": "A schema graph engine that parses Flyway migrations into an AST, reconstructs your database schema state, and exports LLM-ready vector context.",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "app": "tauri dev",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
