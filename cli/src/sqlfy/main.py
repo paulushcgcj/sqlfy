@@ -14,16 +14,27 @@ Usage:
     python -m sqlfy --json-input FILE [options]
 
 Options:
-    --chunks        Output LLM vector chunks instead of schema graph
-    --json          Output raw JSON (default: human-readable text)
-    --all           Output both graph AND chunks as combined JSON { graph, chunks }
-    --json-input F  Read migrations from JSON file: [{ filename, sql }]
-    --out FILE      Write output to FILE instead of stdout
+    --chunks              Output LLM vector chunks instead of schema graph
+    --json                Output raw JSON (default: human-readable text)
+    --all                 Output both graph AND chunks as combined JSON { graph, chunks }
+    --state               Output SchemaState dictionary JSON (richer metadata)
+    --at-version VERSION  Reconstruct schema at a specific Flyway version (e.g. 2)
+    --dialect DIALECT     SQL dialect to use (default: oracle)
+    --json-input FILE     Read migrations from JSON file: [{ filename, sql }]
+    --out FILE            Write output to FILE instead of stdout
 
 Examples:
     sqlfy ./migrations
+    sqlfy ./migrations --json
+    sqlfy ./migrations --chunks
     sqlfy ./migrations --chunks --json
-    sqlfy --json-input /tmp/sqlfy-input.json --all --json
+    sqlfy ./migrations --all
+    sqlfy ./migrations --state
+    sqlfy ./migrations --at-version 2 --json
+    sqlfy ./migrations --at-version 2 --state
+    sqlfy ./migrations --dialect postgres --json
+    sqlfy --json-input /tmp/sqlfy-input.json --all
+    sqlfy ./migrations --json --out schema.json
 """
 
 import sys
@@ -192,12 +203,17 @@ def main() -> None:
     )
     parser.add_argument('--chunks', action='store_true', help='Output LLM vector chunks')
     parser.add_argument('--all',    action='store_true', help='Output { graph, chunks } combined JSON (implies --json)')
+    parser.add_argument('--state',  action='store_true', help='Output SchemaState dictionary JSON (implies --json)')
     parser.add_argument('--json',   action='store_true', help='Output raw JSON')
+    parser.add_argument('--at-version', metavar='VERSION',
+                        help='Reconstruct schema at a specific Flyway version number (e.g. 2)')
+    parser.add_argument('--dialect', default='oracle', metavar='DIALECT',
+                        help='SQL dialect (default: oracle; e.g. postgres)')
     parser.add_argument('--out',    metavar='FILE',      help='Write output to FILE')
     args = parser.parse_args()
 
-    # --all implies --json
-    if args.all:
+    # --all and --state both imply --json
+    if args.all or args.state:
         args.json = True
 
     # ── Load files ──
@@ -229,11 +245,19 @@ def main() -> None:
         parser.error('Provide either migrations_dir or --json-input FILE')
 
     # ── Run ──
-    graph  = apply_migrations(files)
+    if args.at_version:
+        from .reconstructor import reconstruct_at
+        graph = reconstruct_at(files, version=args.at_version, dialect=args.dialect)
+    else:
+        graph  = apply_migrations(files, dialect=args.dialect)
     chunks = build_chunks(graph) if (args.chunks or args.all) else None
 
     # ── Format output ──
-    if args.all:
+    if args.state:
+        from .schema_state import SchemaStateBuilder
+        state_obj = SchemaStateBuilder.from_graph(graph, dialect=args.dialect)
+        output = state_obj.to_json()
+    elif args.all:
         # Combined mode for Tauri bridge: one call, everything
         output = json.dumps(
             {'graph': graph_to_dict(graph), 'chunks': chunks_to_list(chunks)},  # type: ignore[arg-type]

@@ -607,86 +607,22 @@ def parse_flyway_ver(filename: str) -> dict:
     }
 
 
-def apply_migrations(files: list[dict]) -> SchemaGraph:
+def apply_migrations(files: list[dict], dialect: str = 'oracle') -> SchemaGraph:
     """
-    Main orchestrator.
+    Reconstruct the final schema state from a list of { filename, sql } dicts.
+    Delegates to Reconstructor — kept for backward compatibility.
 
     Args:
-        files: list of { filename: str, sql: str }
+        files:   list of { filename: str, sql: str }
+        dialect: SQL dialect to use (default: 'oracle')
 
     Returns:
         SchemaGraph with accumulated tables, sequences, FK edges,
         migration history, and full action log.
     """
-    sorted_files = sorted(files, key=lambda f: parse_flyway_ver(f['filename'])['order'])
-
-    tables:      dict[str, Table]    = {}
-    seqs:        dict[str, Sequence] = {}
-    mig_hist:    list[MigrationHistory] = []
-    all_actions: list[MigrationAction]  = []
-
-    for file in sorted_files:
-        ver = parse_flyway_ver(file['filename'])
-        mig_hist.append(MigrationHistory(version=ver['version'], description=ver['description']))
-        version = ver['version']
-
-        stmts = sqlglot.parse(file['sql'], dialect='oracle', error_level=sqlglot.ErrorLevel.WARN)
-
-        for stmt in stmts:
-            if stmt is None:
-                continue
-
-            # ── CREATE TABLE ─────────────────────────────────────────────
-            if isinstance(stmt, exp.Create) and stmt.args.get('kind') == 'TABLE':
-                _handle_create_table(stmt, version, tables, all_actions)
-
-            # ── CREATE SEQUENCE ──────────────────────────────────────────
-            elif isinstance(stmt, exp.Create) and stmt.args.get('kind') == 'SEQUENCE':
-                _handle_create_sequence(stmt, version, seqs, all_actions)
-
-            # ── DROP TABLE ───────────────────────────────────────────────
-            elif isinstance(stmt, exp.Drop) and stmt.args.get('kind') == 'TABLE':
-                _handle_drop_table(stmt, version, tables, all_actions)
-
-            # ── ALTER TABLE ──────────────────────────────────────────────
-            elif isinstance(stmt, exp.Alter) and stmt.args.get('kind') == 'TABLE':
-                _handle_alter_table(stmt, version, tables, all_actions)
-
-            # ── COMMENT ON ───────────────────────────────────────────────
-            elif isinstance(stmt, exp.Comment):
-                _handle_comment(stmt, tables)
-
-            # ── COMMAND FALLBACK (CREATE INDEX, ALTER MODIFY, etc.) ──────
-            elif isinstance(stmt, exp.Command):
-                cmd_name = (stmt.this or '').strip().upper()
-                raw_sql  = f'{cmd_name} {stmt.expression or ""}'.strip()
-                raw_up   = raw_sql.upper()
-
-                if 'INDEX' in raw_up and raw_up.startswith(('CREATE', 'INDEX', 'UNIQUE')):
-                    _handle_create_index_command(raw_sql, version, tables, all_actions)
-
-                elif raw_up.startswith('ALTER') and 'MODIFY' in raw_up:
-                    _handle_alter_table_command(raw_sql, version, tables, all_actions)
-
-    # ── Derive FK edges ──────────────────────────────────────────────────────
-    edges: list[Edge] = []
-    for t in tables.values():
-        for c in t.constraints:
-            if c.type == 'foreign_key' and c.references:
-                edges.append(Edge(
-                    id=f'{t.full}→{c.references["table"]}:{c.name}',
-                    from_table=t.full,
-                    from_cols=c.columns,
-                    to_table=c.references['table'],
-                    to_cols=c.references['columns'],
-                    constraint_name=c.name,
-                    on_delete=c.references.get('on_delete'),
-                ))
-
-    return SchemaGraph(
-        tables=tables, seqs=seqs, edges=edges,
-        mig_hist=mig_hist, actions=all_actions,
-    )
+    # Import here to avoid circular dependency (reconstructor imports from core)
+    from .reconstructor import reconstruct
+    return reconstruct(files, dialect=dialect)
 
 
 # ─────────────────────────────────────────────
