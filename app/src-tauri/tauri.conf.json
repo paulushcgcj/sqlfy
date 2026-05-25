@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "sqlfy",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "io.github.paulushcgcj.sqlfy",
   "build": {
     "frontendDist": "../../build",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "sqlfy",
+        "title": "SQLfy - Schema Graph Engine",
         "width": 800,
         "height": 600,
         "resizable": true,
@@ -33,8 +33,27 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
+    "externalBin": [
+      "binaries/sqlfy"
+    ]
+  },
+  "plugins": {
+    "shell": {
+      "open": true,
+      "commands": [
+        {
+          "name": "python3",
+          "cmd": "python3",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "binaries/sqlfy",
+          "cmd": "binaries/sqlfy",
+          "args": true,
+          "sidecar": true
+        }
+      ]
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyMigrations, buildChunks } from './core/core';
+import { parse, IS_TAURI } from './bridge/cli';
 import { MigrationsTab } from './components/MigrationsTab';
 import { GraphTab }      from './components/GraphTab';
 import { LlmTab }        from './components/LlmTab';
@@ -15,23 +15,26 @@ export default function App() {
   const [activeTab, setActiveTab]     = useState<Tab>('migrations');
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [error, setError]             = useState<string | null>(null);
+  const [parsing, setParsing]         = useState(false);
 
-  function parse() {
+  async function handleParse() {
+    setParsing(true);
+    setError(null);
     try {
-      const g  = applyMigrations(files);
-      const ch = buildChunks(g);
-      setGraph(g);
-      setChunks(ch);
-      setSelectedTable([...g.tables.keys()][0] ?? null);
-      setError(null);
+      const result = await parse(files);
+      setGraph(result.graph);
+      setChunks(result.chunks);
+      setSelectedTable([...result.graph.tables.keys()][0] ?? null);
       setActiveTab('graph');
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setParsing(false);
     }
   }
 
   function switchTab(tab: Tab) {
-    if (tab === 'graph' && !graph) return;
+    if (tab === 'graph' && !graph)  return;
     if (tab === 'llm'   && !chunks) return;
     setActiveTab(tab);
   }
@@ -47,6 +50,10 @@ export default function App() {
         </svg>
         <span className="topbar-title">Schema Graph Engine</span>
         <span className="topbar-sub">Flyway → AST → Vector Context</span>
+        {/* Show mode badge so it's obvious which runtime is active */}
+        <span className="mode-badge" data-mode={IS_TAURI ? 'tauri' : 'browser'}>
+          {IS_TAURI ? '⚡ CLI' : '🌐 Browser'}
+        </span>
       </div>
 
       {/* Tab bar */}
@@ -69,11 +76,22 @@ export default function App() {
         >
           ③ LLM Chunks
         </button>
-        <button className="parse-btn" onClick={parse}>▶ Parse →</button>
+        <button className="parse-btn" onClick={handleParse} disabled={parsing}>
+          {parsing ? '⏳ Parsing…' : '▶ Parse →'}
+        </button>
       </div>
 
       {/* Error bar */}
-      {error && <div className="err-bar">⚠ Parse error: {error}</div>}
+      {error && (
+        <div className="err-bar">
+          ⚠ {error}
+          {IS_TAURI && (
+            <span style={{ marginLeft: 8, opacity: 0.7 }}>
+              (Tauri/CLI mode — check that python3 is on PATH and cli/main.py is reachable)
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       <div className="content">
