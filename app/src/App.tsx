@@ -3,10 +3,12 @@ import { parse, IS_TAURI } from './bridge/cli';
 import { MigrationsTab } from './components/MigrationsTab';
 import { GraphTab }      from './components/GraphTab';
 import { LlmTab }        from './components/LlmTab';
+import { AskPanel }      from './components/AskPanel';
 import { SAMPLE_MIGRATIONS } from './data/samples';
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
+import './ask-panel.css';
 
-type Tab = 'migrations' | 'graph' | 'llm';
+type Tab = 'migrations' | 'graph' | 'llm' | 'ask';
 
 export default function App() {
   const [files, setFiles]             = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
@@ -36,6 +38,7 @@ export default function App() {
   function switchTab(tab: Tab) {
     if (tab === 'graph' && !graph)  return;
     if (tab === 'llm'   && !chunks) return;
+    if (tab === 'ask'   && !graph)  return;
     setActiveTab(tab);
   }
 
@@ -76,6 +79,12 @@ export default function App() {
         >
           ③ LLM Chunks
         </button>
+        <button
+          className={`tab${activeTab === 'ask' ? ' active' : ''}${!graph ? ' disabled' : ''}`}
+          onClick={() => switchTab('ask')}
+        >
+          ④ Ask
+        </button>
         <button className="parse-btn" onClick={handleParse} disabled={parsing}>
           {parsing ? '⏳ Parsing…' : '▶ Parse →'}
         </button>
@@ -107,6 +116,9 @@ export default function App() {
         )}
         {activeTab === 'llm' && chunks && (
           <LlmTab chunks={chunks} />
+        )}
+        {activeTab === 'ask' && graph && (
+          <AskPanel graph={graph} files={files} />
         )}
       </div>
     </div>

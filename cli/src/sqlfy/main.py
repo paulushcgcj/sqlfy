@@ -6,11 +6,13 @@ CLI entry point with subcommand architecture.
 
 Subcommands
 -----------
-  dump     Output the Schema State Dictionary (JSON or YAML)
+  dump     Output the Schema State Dictionary (JSON, YAML, or summary)
   chunks   Output LLM vector chunks
-  diff     Compare two Schema State Dictionaries
-  graph    Generate a graph representation (DOT, Mermaid, ASCII)
-  insights Analyse schema and report structural/referential findings
+  diff     Compare two Schema State Dictionaries or migration directories
+  graph    Output graph representation (DOT, Mermaid, or ASCII summary)
+  insights Analyse schema and report findings (orphan tables, missing PKs, etc.)
+  ask      Ask a natural language question about the schema (RAG + Claude)
+  chat     Interactive multi-turn chat session about the schema
 
 Legacy mode (no subcommand) is preserved for backward compatibility:
   sqlfy <dir> [--chunks] [--json] [--all] [--json-input FILE] [--out FILE]
@@ -18,12 +20,14 @@ Legacy mode (no subcommand) is preserved for backward compatibility:
 Usage
 -----
   # Subcommand style (preferred)
-  sqlfy dump     <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
+  sqlfy dump     <migrations-dir> [--format json|yaml|summary] [--out FILE] [--at VERSION]
   sqlfy dump     --json-input FILE [--format json|yaml] [--out FILE]
   sqlfy chunks   <migrations-dir> [--format json] [--out FILE] [--at VERSION]
-  sqlfy diff     <state-a> <state-b> [--format json|text] [--out FILE]
-  sqlfy graph    <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--out FILE]
-  sqlfy insights <migrations-dir> [--format text|json] [--severity LEVEL] [--strict]
+  sqlfy diff     <state-a> <state-b> [--format text|json] [--out FILE]
+  sqlfy graph    <migrations-dir> [--format dot|mermaid|summary] [--title TEXT]
+  sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] [--strict]
+  sqlfy ask      <migrations-dir> <question...> [--format text|json] [--no-sources]
+  sqlfy chat     <migrations-dir>
 
   # Legacy style (still works)
   sqlfy <migrations-dir> --json
@@ -32,21 +36,16 @@ Usage
 
 Examples
 --------
-  sqlfy dump     ./migrations
-  sqlfy dump     ./migrations --format yaml
-  sqlfy dump     ./migrations --format json --out state.json
-  sqlfy dump     ./migrations --at 3
-  sqlfy dump     --json-input /tmp/sqlfy-input.json --format json
-  sqlfy chunks   ./migrations --format json --out chunks.json
-  sqlfy diff     state_v2.json state_v5.json
-  sqlfy diff     ./migrations-v1 ./migrations-v2
-  sqlfy graph    ./migrations
-  sqlfy graph    ./migrations --format mermaid --out schema.md
-  sqlfy graph    ./migrations --format dot --out schema.dot
-  sqlfy insights ./migrations
-  sqlfy insights ./migrations --severity error
-  sqlfy insights ./migrations --format json --out findings.json
-  sqlfy insights ./migrations --strict
+  sqlfy dump  ./migrations
+  sqlfy dump  ./migrations --format yaml
+  sqlfy dump  ./migrations --format json --out state.json
+  sqlfy dump  ./migrations --at 3
+  sqlfy chunks ./migrations --format json --out chunks.json
+  sqlfy diff  state_v1.json state_v2.json
+  sqlfy graph ./migrations --format mermaid
+  sqlfy insights ./migrations --severity error --strict
+  sqlfy ask ./migrations Which tables have cascade deletes?
+  sqlfy chat ./migrations
 """
 
 import sys
@@ -66,6 +65,7 @@ from .schema_state import SchemaStateBuilder
 from .differ import SchemaDiffer, diff_files
 from .grapher import Grapher
 from .insights import InsightsEngine
+from .asker import Asker, ChatSession
 
 
 # ─────────────────────────────────────────────
@@ -478,11 +478,112 @@ def cmd_insights(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: ask
+# ─────────────────────────────────────────────
+
+def cmd_ask(args: argparse.Namespace) -> None:
+    """
+    Ask a natural language question about the schema (single question).
+
+    Uses RAG: retrieves the most relevant schema chunks, then passes them
+    as context to Claude for a grounded, accurate answer.
+
+    Requires: ANTHROPIC_API_KEY environment variable.
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+
+    try:
+        asker = Asker(
+            graph,
+            api_key=getattr(args, 'api_key', None),
+            use_embeddings=getattr(args, 'embed', False),
+            k=getattr(args, 'k', 6),
+        )
+    except ValueError as e:
+        print(f'Error: {e}', file=sys.stderr)
+        sys.exit(1)
+
+    question = ' '.join(args.question) if isinstance(args.question, list) else args.question
+    fmt = getattr(args, 'format', 'text')
+
+    if fmt == 'json':
+        result = asker.ask(question)
+        write_output(result.to_json(), args.out)
+    else:
+        show_src = not getattr(args, 'no_sources', False)
+        result = asker.ask_print(question, show_sources=show_src, stream=True)
+        if args.out:
+            write_output(result.to_json(), args.out)
+
+
+# ─────────────────────────────────────────────
+# SUBCOMMAND: chat
+# ─────────────────────────────────────────────
+
+def cmd_chat(args: argparse.Namespace) -> None:
+    """
+    Start an interactive multi-turn chat session about the schema.
+
+    Follow-up questions maintain context from previous turns.
+    Type 'exit', 'quit', or Ctrl-C to end.
+
+    Requires: ANTHROPIC_API_KEY environment variable.
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+
+    try:
+        asker = Asker(
+            graph,
+            api_key=getattr(args, 'api_key', None),
+            use_embeddings=getattr(args, 'embed', False),
+            k=getattr(args, 'k', 6),
+        )
+    except ValueError as e:
+        print(f'Error: {e}', file=sys.stderr)
+        sys.exit(1)
+
+    session = ChatSession(asker)
+
+    n_tables = len(graph.tables)
+    n_edges  = len(graph.edges)
+    print(f'\n\033[1msqlfy chat\033[0m — schema V{graph.mig_hist[-1].version if graph.mig_hist else "?"} '
+          f'({n_tables} tables, {n_edges} FK edges)')
+    print('\033[2mType your question. "reset" clears history. "exit" quits.\033[0m\n')
+
+    while True:
+        try:
+            question = input('\033[1m?\033[0m  ').strip()
+        except (EOFError, KeyboardInterrupt):
+            print('\nBye!')
+            break
+
+        if not question:
+            continue
+        if question.lower() in ('exit', 'quit', 'q', 'bye'):
+            print('Bye!')
+            break
+        if question.lower() == 'reset':
+            session.reset()
+            print('\033[2mConversation history cleared.\033[0m\n')
+            continue
+
+        print()
+        try:
+            session.ask(question, stream=True)
+        except Exception as e:
+            print(f'\n\033[31mError: {e}\033[0m\n')
+
+        print()
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
 def _subcommand_parser() -> argparse.ArgumentParser:
-    """Parser for subcommand mode (dump, chunks, diff, graph, insights)."""
+    """Parser for subcommand mode."""
     parser = argparse.ArgumentParser(prog='sqlfy')
     sub = parser.add_subparsers(dest='subcommand', required=True)
 
@@ -491,6 +592,15 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         p.add_argument('--json-input', metavar='FILE')
         p.add_argument('--at', metavar='VERSION')
         p.add_argument('--out', metavar='FILE')
+
+    def rag_shared(p):
+        shared(p)
+        p.add_argument('--embed', action='store_true',
+            help='Use vector embeddings for retrieval (requires Voyage API key)')
+        p.add_argument('--api-key', metavar='KEY',
+            help='Anthropic API key (default: $ANTHROPIC_API_KEY)')
+        p.add_argument('-k', type=int, default=6,
+            help='Number of chunks to retrieve (default: 6)')
 
     # dump
     p_dump = sub.add_parser('dump', help='Output the Schema State Dictionary')
@@ -526,13 +636,30 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         help='Analyse schema and report Graphify-style insights')
     shared(p_ins)
     p_ins.add_argument('--format', choices=['text', 'json'], default='text')
-    p_ins.add_argument('--severity', choices=['error', 'warning', 'info'],
-        help='Filter findings by severity')
+    p_ins.add_argument('--severity', choices=['error', 'warning', 'info'])
     p_ins.add_argument('--strict', action='store_true',
-        help='Exit with code 1 if any errors are found (useful in CI)')
+        help='Exit 1 if any errors found (CI mode)')
     p_ins.set_defaults(func=cmd_insights)
 
+    # ask
+    p_ask = sub.add_parser('ask',
+        help='Ask a natural language question about the schema (RAG)')
+    rag_shared(p_ask)
+    p_ask.add_argument('question', nargs='+',
+        help='Question to ask (can be multiple words without quotes)')
+    p_ask.add_argument('--format', choices=['text', 'json'], default='text')
+    p_ask.add_argument('--no-sources', action='store_true',
+        help='Hide retrieved context sources in output')
+    p_ask.set_defaults(func=cmd_ask)
+
+    # chat
+    p_chat = sub.add_parser('chat',
+        help='Interactive multi-turn chat about the schema')
+    rag_shared(p_chat)
+    p_chat.set_defaults(func=cmd_chat)
+
     return parser
+
 
 
 def _legacy_parser() -> argparse.ArgumentParser:
@@ -552,7 +679,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'ask', 'chat'}
 
 
 def main() -> None:
