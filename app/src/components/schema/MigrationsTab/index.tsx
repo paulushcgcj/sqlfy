@@ -61,8 +61,9 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
 
       {/* Toolbar */}
       <div className="migrations-toolbar">
+        <button className="migraton-btn add-btn" onClick={addFile}>+ Add Migration File</button>
         {onLoadFolder && (
-          <button className="load-folder-btn" onClick={onLoadFolder}>
+          <button className="migraton-btn load-folder-btn" onClick={onLoadFolder}>
             📁 Load from folder
           </button>
         )}
@@ -72,6 +73,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
             <span className="folder-count">{files.length} file{files.length !== 1 ? 's' : ''}</span>
           </span>
         )}
+        
       </div>
 
       {files.map((file, i) => (
@@ -92,7 +94,6 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
           />
         </div>
       ))}
-      <button className="add-btn" onClick={addFile}>+ Add Migration File</button>
     </div>
   );
 };
