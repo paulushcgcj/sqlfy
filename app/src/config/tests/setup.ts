@@ -1,5 +1,3 @@
-import '@testing-library/jest-dom/vitest';
-
 // Mock globalThis.matchMedia (not implemented in jsdom)
 Object.defineProperty(globalThis, 'matchMedia', {
   writable: true,
