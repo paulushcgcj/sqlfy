@@ -6,13 +6,10 @@ CLI entry point with subcommand architecture.
 
 Subcommands
 -----------
-  dump     Output the Schema State Dictionary (JSON, YAML, or summary)
+  dump     Output the Schema State Dictionary (JSON or YAML)
   chunks   Output LLM vector chunks
-  diff     Compare two Schema State Dictionaries or migration directories
-  graph    Output graph representation (DOT, Mermaid, or ASCII summary)
-  insights Analyse schema and report findings (orphan tables, missing PKs, etc.)
-  ask      Ask a natural language question about the schema (RAG + Claude)
-  chat     Interactive multi-turn chat session about the schema
+  graph    (coming in step 13)
+  diff     (coming in step 12)
 
 Legacy mode (no subcommand) is preserved for backward compatibility:
   sqlfy <dir> [--chunks] [--json] [--all] [--json-input FILE] [--out FILE]
@@ -20,14 +17,9 @@ Legacy mode (no subcommand) is preserved for backward compatibility:
 Usage
 -----
   # Subcommand style (preferred)
-  sqlfy dump     <migrations-dir> [--format json|yaml|summary] [--out FILE] [--at VERSION]
-  sqlfy dump     --json-input FILE [--format json|yaml] [--out FILE]
-  sqlfy chunks   <migrations-dir> [--format json] [--out FILE] [--at VERSION]
-  sqlfy diff     <state-a> <state-b> [--format text|json] [--out FILE]
-  sqlfy graph    <migrations-dir> [--format dot|mermaid|summary] [--title TEXT]
-  sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] [--strict]
-  sqlfy ask      <migrations-dir> <question...> [--format text|json] [--no-sources]
-  sqlfy chat     <migrations-dir>
+  sqlfy dump  <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
+  sqlfy dump  --json-input FILE [--format json|yaml] [--out FILE]
+  sqlfy chunks <migrations-dir> [--format json] [--out FILE] [--at VERSION]
 
   # Legacy style (still works)
   sqlfy <migrations-dir> --json
@@ -40,12 +32,8 @@ Examples
   sqlfy dump  ./migrations --format yaml
   sqlfy dump  ./migrations --format json --out state.json
   sqlfy dump  ./migrations --at 3
+  sqlfy dump  --json-input /tmp/sqlfy-input.json --format json
   sqlfy chunks ./migrations --format json --out chunks.json
-  sqlfy diff  state_v1.json state_v2.json
-  sqlfy graph ./migrations --format mermaid
-  sqlfy insights ./migrations --severity error --strict
-  sqlfy ask ./migrations Which tables have cascade deletes?
-  sqlfy chat ./migrations
 """
 
 import sys
@@ -53,19 +41,20 @@ import json
 import argparse
 from pathlib import Path
 
-from .core import (
+from core import (
     apply_migrations,
     build_chunks,
     type_str,
     SchemaGraph,
     VectorChunk,
 )
-from .reconstructor import reconstruct, reconstruct_at
-from .schema_state import SchemaStateBuilder
-from .differ import SchemaDiffer, diff_files
-from .grapher import Grapher
-from .insights import InsightsEngine
-from .asker import Asker, ChatSession
+from reconstructor import reconstruct, reconstruct_at
+from schema_state import SchemaStateBuilder
+from differ import SchemaDiffer, diff_files
+from grapher import Grapher
+from insights import InsightsEngine
+from asker import Asker, ChatSession
+from exporter import Exporter
 
 
 # ─────────────────────────────────────────────
@@ -331,6 +320,9 @@ def cmd_diff(args: argparse.Namespace) -> None:
     def is_json_file(p: str) -> bool:
         return os.path.isfile(p) and p.endswith('.json')
 
+    from schema_state import SchemaStateBuilder
+    from reconstructor import reconstruct
+
     if is_json_file(args.state_a) and is_json_file(args.state_b):
         # Fast path: diff pre-built state files
         result = diff_files(args.state_a, args.state_b)
@@ -579,11 +571,48 @@ def cmd_chat(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: export
+# ─────────────────────────────────────────────
+
+def cmd_export(args: argparse.Namespace) -> None:
+    """
+    Export schema as a self-contained HTML documentation file.
+
+    Produces a single .html file with no external dependencies:
+      - Searchable, filterable table list with column details
+      - Inline Mermaid ERD diagram
+      - Schema insights panel (if --insights flag set)
+      - Migration history timeline
+      - Dark/light mode toggle
+
+    The file can be opened in any browser, emailed, or committed
+    to the repo as living documentation.
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    state = SchemaStateBuilder.from_graph(graph)
+
+    report = None
+    if getattr(args, 'insights', False):
+        from insights import InsightsEngine
+        report = InsightsEngine.analyse(state)
+
+    title  = getattr(args, 'title', '') or f'Schema Documentation — V{state.version}'
+    html   = Exporter.to_html(state, report=report, title=title)
+
+    out = args.out or 'schema_docs.html'
+    write_output(html, out)
+    print(f'HTML documentation written to {out}', file=sys.stderr)
+    print(f'  Tables   : {state.stats["table_count"]}', file=sys.stderr)
+    print(f'  Columns  : {state.stats["column_count"]}', file=sys.stderr)
+    print(f'  Size     : {len(html):,} chars', file=sys.stderr)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
 def _subcommand_parser() -> argparse.ArgumentParser:
-    """Parser for subcommand mode."""
     parser = argparse.ArgumentParser(prog='sqlfy')
     sub = parser.add_subparsers(dest='subcommand', required=True)
 
@@ -595,71 +624,62 @@ def _subcommand_parser() -> argparse.ArgumentParser:
 
     def rag_shared(p):
         shared(p)
-        p.add_argument('--embed', action='store_true',
-            help='Use vector embeddings for retrieval (requires Voyage API key)')
-        p.add_argument('--api-key', metavar='KEY',
-            help='Anthropic API key (default: $ANTHROPIC_API_KEY)')
-        p.add_argument('-k', type=int, default=6,
-            help='Number of chunks to retrieve (default: 6)')
+        p.add_argument('--embed', action='store_true')
+        p.add_argument('--api-key', metavar='KEY')
+        p.add_argument('-k', type=int, default=6)
 
     # dump
-    p_dump = sub.add_parser('dump', help='Output the Schema State Dictionary')
-    shared(p_dump)
-    p_dump.add_argument('--format', choices=['json', 'yaml', 'summary'], default='json')
-    p_dump.set_defaults(func=cmd_dump)
+    p = sub.add_parser('dump', help='Output the Schema State Dictionary')
+    shared(p); p.add_argument('--format', choices=['json','yaml','summary'], default='json')
+    p.set_defaults(func=cmd_dump)
 
     # chunks
-    p_chunks = sub.add_parser('chunks', help='Output LLM vector chunks')
-    shared(p_chunks)
-    p_chunks.add_argument('--format', choices=['json', 'text'], default='json')
-    p_chunks.set_defaults(func=cmd_chunks)
+    p = sub.add_parser('chunks', help='Output LLM vector chunks')
+    shared(p); p.add_argument('--format', choices=['json','text'], default='json')
+    p.set_defaults(func=cmd_chunks)
 
     # diff
-    p_diff = sub.add_parser('diff',
-        help='Compare two Schema State Dictionaries or migration directories')
-    p_diff.add_argument('state_a', help='State JSON file or migrations directory')
-    p_diff.add_argument('state_b', help='State JSON file or migrations directory')
-    p_diff.add_argument('--format', choices=['json', 'text'], default='text')
-    p_diff.add_argument('--out', metavar='FILE')
-    p_diff.set_defaults(func=cmd_diff)
+    p = sub.add_parser('diff', help='Compare two Schema State Dictionaries or dirs')
+    p.add_argument('state_a'); p.add_argument('state_b')
+    p.add_argument('--format', choices=['json','text'], default='text')
+    p.add_argument('--out', metavar='FILE')
+    p.set_defaults(func=cmd_diff)
 
     # graph
-    p_graph = sub.add_parser('graph',
-        help='Output graph representation (DOT, Mermaid, or ASCII summary)')
-    shared(p_graph)
-    p_graph.add_argument('--format', choices=['dot', 'mermaid', 'summary'], default='dot')
-    p_graph.add_argument('--title', metavar='TEXT')
-    p_graph.set_defaults(func=cmd_graph)
+    p = sub.add_parser('graph', help='Output graph (DOT, Mermaid, or summary)')
+    shared(p); p.add_argument('--format', choices=['dot','mermaid','summary'], default='dot')
+    p.add_argument('--title', metavar='TEXT')
+    p.set_defaults(func=cmd_graph)
 
     # insights
-    p_ins = sub.add_parser('insights',
-        help='Analyse schema and report Graphify-style insights')
-    shared(p_ins)
-    p_ins.add_argument('--format', choices=['text', 'json'], default='text')
-    p_ins.add_argument('--severity', choices=['error', 'warning', 'info'])
-    p_ins.add_argument('--strict', action='store_true',
-        help='Exit 1 if any errors found (CI mode)')
-    p_ins.set_defaults(func=cmd_insights)
+    p = sub.add_parser('insights', help='Analyse schema and report insights')
+    shared(p); p.add_argument('--format', choices=['text','json'], default='text')
+    p.add_argument('--severity', choices=['error','warning','info'])
+    p.add_argument('--strict', action='store_true')
+    p.set_defaults(func=cmd_insights)
 
     # ask
-    p_ask = sub.add_parser('ask',
-        help='Ask a natural language question about the schema (RAG)')
-    rag_shared(p_ask)
-    p_ask.add_argument('question', nargs='+',
-        help='Question to ask (can be multiple words without quotes)')
-    p_ask.add_argument('--format', choices=['text', 'json'], default='text')
-    p_ask.add_argument('--no-sources', action='store_true',
-        help='Hide retrieved context sources in output')
-    p_ask.set_defaults(func=cmd_ask)
+    p = sub.add_parser('ask', help='Ask a natural language question (RAG)')
+    rag_shared(p)
+    p.add_argument('question', nargs='+')
+    p.add_argument('--format', choices=['text','json'], default='text')
+    p.add_argument('--no-sources', action='store_true')
+    p.set_defaults(func=cmd_ask)
 
     # chat
-    p_chat = sub.add_parser('chat',
-        help='Interactive multi-turn chat about the schema')
-    rag_shared(p_chat)
-    p_chat.set_defaults(func=cmd_chat)
+    p = sub.add_parser('chat', help='Interactive multi-turn schema chat')
+    rag_shared(p)
+    p.set_defaults(func=cmd_chat)
+
+    # export  ← new
+    p = sub.add_parser('export', help='Export schema as self-contained HTML docs')
+    shared(p)
+    p.add_argument('--title', metavar='TEXT', help='Document title')
+    p.add_argument('--insights', action='store_true',
+                   help='Include insights panel in the HTML')
+    p.set_defaults(func=cmd_export)
 
     return parser
-
 
 
 def _legacy_parser() -> argparse.ArgumentParser:
@@ -679,7 +699,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'ask', 'chat'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'ask', 'chat', 'export'}
 
 
 def main() -> None:
