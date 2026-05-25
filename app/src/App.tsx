@@ -68,7 +68,7 @@ export default function App() {
           <circle cx="9" cy="9" r="4" fill="#7c3aed" opacity=".4"/>
           <circle cx="9" cy="9" r="1.5" fill="#7c3aed"/>
         </svg>
-        <span className="topbar-title">Schema Graph Engine</span>
+        <span className="topbar-title">SQLfy - Schema Graph Engine</span>
         <span className="topbar-sub">Flyway → AST → Vector Context</span>
         {/* Show mode badge so it's obvious which runtime is active */}
         <span className="mode-badge" data-mode={IS_TAURI ? 'tauri' : 'browser'}>
