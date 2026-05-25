@@ -358,3 +358,7 @@ Cargo.lock
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,node,rust,python,react
+
+# Keeping graphify out of the repo for now
+graphify-out
+.github/copilot-instructions.md
