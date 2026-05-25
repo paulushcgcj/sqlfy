@@ -136,9 +136,11 @@ sqlfy --json-input /tmp/sqlfy-input.json --all
 ```bash
 cd app
 npm install
-npm run dev     # start dev server
-npm run build   # production build
-npm run lint    # ESLint
+npm run dev          # Vite dev server (browser, no Tauri)
+npm run build        # production Vite build
+npm run lint         # ESLint
+npx tauri dev        # Tauri desktop window (requires Rust + cargo)
+npx tauri build      # Tauri production bundle (.app / .exe / .deb)
 ```
 
 ### CLI
@@ -147,9 +149,52 @@ npm run lint    # ESLint
 cd cli
 pip install -e ".[dev]"   # editable install + pytest
 python -m pytest -v       # run all tests
+python -m sqlfy ./samples # run directly without installing
 ```
 
 Tests read real `.sql` files from `samples/` and validate the parser, Reconstructor, and SchemaState builder end-to-end.
+
+### PyInstaller binary (for bundling with Tauri)
+
+```bash
+cd cli
+pip install pyinstaller
+pyinstaller --onefile src/sqlfy/main.py --name sqlfy
+# Output: dist/sqlfy  — copy to app/src-tauri/binaries/sqlfy-<target-triple>
+```
+
+---
+
+## How the App Uses the CLI
+
+The desktop app (Tauri) and the browser dev mode use the CLI differently:
+
+```
+Browser dev mode:
+  App (TypeScript) ──▶ app/src/core/core.ts  (in-process parser, no CLI)
+
+Tauri desktop:
+  App (TypeScript) ──▶ app/src/bridge/cli.ts
+       │
+       ├─ writes migrations to a temp JSON file: [{ filename, sql }]
+       ├─ spawns CLI sidecar:  sqlfy --json-input <tmp> --all
+       └─ parses response JSON: { graph: {...}, chunks: [...] }
+```
+
+**Detection** — `app/src/bridge/cli.ts` checks `'__TAURI_INTERNALS__' in window` to decide which path to use.
+
+**CLI sidecar** — configured in `app/src-tauri/tauri.conf.json` under `externalBin`. The binary must be placed at `app/src-tauri/binaries/sqlfy-<target-triple>` before `npx tauri build`.
+
+**Output contract** — the CLI's `--all` flag produces:
+
+```json
+{
+  "graph":  { "tables": {}, "sequences": {}, "edges": [], "migration_history": [] },
+  "chunks": [{ "id": "", "type": "", "title": "", "content": "", "metadata": {}, "hint": "" }]
+}
+```
+
+The TypeScript deserialiser in `cli.ts` maps `snake_case` keys to `camelCase` for the React component layer.
 
 ---
 

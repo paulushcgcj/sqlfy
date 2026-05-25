@@ -412,4 +412,3 @@ def _deep_asdict(obj) -> object:
     if isinstance(obj, list):
         return [_deep_asdict(i) for i in obj]
     return obj
-    return obj

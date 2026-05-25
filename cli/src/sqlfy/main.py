@@ -2,39 +2,38 @@
 """
 sqlfy — cli/main.py
 
-CLI entry point. Reads Flyway migration .sql files from a directory
-OR from a JSON input file (used by the Tauri frontend bridge),
-applies migrations via core.py, and outputs the result.
+CLI entry point with subcommand architecture.
 
-Usage:
-    # From a directory of .sql files
-    python -m sqlfy <migrations-dir> [options]
+Subcommands
+-----------
+  dump     Output the Schema State Dictionary (JSON or YAML)
+  chunks   Output LLM vector chunks
+  graph    (coming in step 13)
+  diff     (coming in step 12)
 
-    # From a JSON input file (used by Tauri bridge)
-    python -m sqlfy --json-input FILE [options]
+Legacy mode (no subcommand) is preserved for backward compatibility:
+  sqlfy <dir> [--chunks] [--json] [--all] [--json-input FILE] [--out FILE]
 
-Options:
-    --chunks              Output LLM vector chunks instead of schema graph
-    --json                Output raw JSON (default: human-readable text)
-    --all                 Output both graph AND chunks as combined JSON { graph, chunks }
-    --state               Output SchemaState dictionary JSON (richer metadata)
-    --at-version VERSION  Reconstruct schema at a specific Flyway version (e.g. 2)
-    --dialect DIALECT     SQL dialect to use (default: oracle)
-    --json-input FILE     Read migrations from JSON file: [{ filename, sql }]
-    --out FILE            Write output to FILE instead of stdout
+Usage
+-----
+  # Subcommand style (preferred)
+  sqlfy dump  <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
+  sqlfy dump  --json-input FILE [--format json|yaml] [--out FILE]
+  sqlfy chunks <migrations-dir> [--format json] [--out FILE] [--at VERSION]
 
-Examples:
-    sqlfy ./migrations
-    sqlfy ./migrations --json
-    sqlfy ./migrations --chunks
-    sqlfy ./migrations --chunks --json
-    sqlfy ./migrations --all
-    sqlfy ./migrations --state
-    sqlfy ./migrations --at-version 2 --json
-    sqlfy ./migrations --at-version 2 --state
-    sqlfy ./migrations --dialect postgres --json
-    sqlfy --json-input /tmp/sqlfy-input.json --all
-    sqlfy ./migrations --json --out schema.json
+  # Legacy style (still works)
+  sqlfy <migrations-dir> --json
+  sqlfy <migrations-dir> --chunks --json
+  sqlfy --json-input FILE --all --json
+
+Examples
+--------
+  sqlfy dump  ./migrations
+  sqlfy dump  ./migrations --format yaml
+  sqlfy dump  ./migrations --format json --out state.json
+  sqlfy dump  ./migrations --at 3
+  sqlfy dump  --json-input /tmp/sqlfy-input.json --format json
+  sqlfy chunks ./migrations --format json --out chunks.json
 """
 
 import sys
@@ -49,65 +48,91 @@ from .core import (
     SchemaGraph,
     VectorChunk,
 )
+from .reconstructor import reconstruct, reconstruct_at
+from .schema_state import SchemaStateBuilder
 
 
 # ─────────────────────────────────────────────
-# HUMAN-READABLE FORMATTERS
+# FILE LOADING
 # ─────────────────────────────────────────────
 
-def print_human_graph(graph: SchemaGraph) -> str:
+def load_files(migrations_dir: str | None, json_input: str | None) -> list[dict]:
+    """Load migration files from a directory or a JSON input file."""
+    if json_input:
+        p = Path(json_input)
+        if not p.is_file():
+            print(f'Error: --json-input file not found: {p}', file=sys.stderr)
+            sys.exit(1)
+        files = json.loads(p.read_text(encoding='utf-8'))
+        print(f'Loaded {len(files)} migration(s) from JSON input', file=sys.stderr)
+        return files
+
+    if migrations_dir:
+        p = Path(migrations_dir)
+        if not p.is_dir():
+            print(f'Error: "{p}" is not a directory.', file=sys.stderr)
+            sys.exit(1)
+        sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == '.sql')
+        if not sql_files:
+            print(f'No .sql files found in {p}', file=sys.stderr)
+            sys.exit(1)
+        files = [{'filename': f.name, 'sql': f.read_text(encoding='utf-8')} for f in sql_files]
+        print(f'Loaded {len(files)} migration file(s) from {p}', file=sys.stderr)
+        return files
+
+    print('Error: provide either migrations_dir or --json-input FILE', file=sys.stderr)
+    sys.exit(1)
+
+
+def write_output(content: str, out: str | None) -> None:
+    if out:
+        Path(out).write_text(content, encoding='utf-8')
+        print(f'Output written to {out}', file=sys.stderr)
+    else:
+        print(content)
+
+
+# ─────────────────────────────────────────────
+# FORMATTERS  (used by legacy mode)
+# ─────────────────────────────────────────────
+
+def format_human_graph(graph: SchemaGraph) -> str:
     lines: list[str] = []
     a = lines.append
-
-    a('')
-    a('╔══════════════════════════════════════════╗')
+    a('\n╔══════════════════════════════════════════╗')
     a('║          SCHEMA GRAPH — SUMMARY          ║')
-    a('╚══════════════════════════════════════════╝')
-    a('')
+    a('╚══════════════════════════════════════════╝\n')
     a('Migration history:')
     for m in graph.mig_hist:
         a(f'  V{m.version}  {m.description}')
-
     a(f'\nTables ({len(graph.tables)}):')
     for t in graph.tables.values():
         pk    = next((c for c in t.constraints if c.type == 'primary_key'), None)
         out_e = [e for e in graph.edges if e.from_table == t.full]
         in_e  = [e for e in graph.edges if e.to_table   == t.full]
-        modified = f'  Modified: V{", ".join(t.modified_in)}' if t.modified_in else ''
+        mod   = f'  Modified: V{", ".join(t.modified_in)}' if t.modified_in else ''
         a(f'\n  ┌─ {t.full} {"─" * max(0, 42 - len(t.full))}')
-        if t.comments.get('__table__'):
-            a(f'  │  {t.comments["__table__"]}')
-        a(f'  │  Created: V{t.created_in}{modified}')
+        if t.comments.get('__table__'): a(f'  │  {t.comments["__table__"]}')
+        a(f'  │  Created: V{t.created_in}{mod}')
         a(f'  │  Columns:')
         for col in t.columns:
-            flags: list[str] = []
+            flags = []
             if pk and col.name in pk.columns: flags.append('PK')
             if not col.nullable:              flags.append('NN')
             if col.default:                   flags.append(f'DEFAULT {col.default}')
-            comment  = t.comments.get(col.name, '')
-            flag_str = f'  {" ".join(flags)}' if flags else ''
-            cmt_str  = f'  -- {comment}' if comment else ''
-            a(f'  │    {col.name:<24} {type_str(col):<18}{flag_str}{cmt_str}')
+            a(f'  │    {col.name:<24} {type_str(col):<18}  {" ".join(flags)}')
         if out_e:
-            a(f'  │  References:')
+            a('  │  References:')
             for e in out_e:
-                od = f' ON DELETE {e.on_delete}' if e.on_delete else ''
-                a(f'  │    {",".join(e.from_cols)} → {e.to_table}({",".join(e.to_cols)}){od}')
+                a(f'  │    {",".join(e.from_cols)} → {e.to_table}({",".join(e.to_cols)})')
         if in_e:
-            a(f'  │  Referenced by:')
-            for e in in_e:
-                a(f'  │    {e.from_table}.{",".join(e.from_cols)}')
-        if t.indexes:
-            a(f'  │  Indexes:')
-            for idx in t.indexes:
-                a(f'  │    {idx.name}  ({", ".join(idx.columns)}){"  UNIQUE" if idx.unique else ""}')
+            a('  │  Referenced by:')
+            for e in in_e: a(f'  │    {e.from_table}')
         a(f'  └{"─" * 44}')
-
     if graph.seqs:
         a(f'\nSequences ({len(graph.seqs)}):')
         for s in graph.seqs.values():
-            a(f'  {s.full:<30} START {s.start_with}  INCREMENT {s.increment_by}  [V{s.created_in}]')
-
+            a(f'  {s.full:<30} START {s.start_with}  INCREMENT {s.increment_by}')
     a(f'\nRelationships ({len(graph.edges)}):')
     for e in graph.edges:
         od = f'  [ON DELETE {e.on_delete}]' if e.on_delete else ''
@@ -116,64 +141,50 @@ def print_human_graph(graph: SchemaGraph) -> str:
     return '\n'.join(lines)
 
 
-def print_human_chunks(chunks: list[VectorChunk]) -> str:
+def format_human_chunks(chunks: list[VectorChunk]) -> str:
     lines: list[str] = []
     a = lines.append
-    a('')
-    a('╔══════════════════════════════════════════╗')
+    a('\n╔══════════════════════════════════════════╗')
     a('║         LLM VECTOR CHUNKS                ║')
-    a('╚══════════════════════════════════════════╝')
-    a('')
+    a('╚══════════════════════════════════════════╝\n')
     for chunk in chunks:
         sep = '─' * max(0, 50 - len(chunk.title))
         a(f'━━━ [{chunk.type}] {chunk.title} {sep}')
-        a(f'Hint: {chunk.hint}')
-        a('')
+        a(f'Hint: {chunk.hint}\n')
         a(chunk.content)
-        a('')
-        a('Metadata:')
+        a('\nMetadata:')
         a(json.dumps(chunk.meta, indent=2))
         a('')
     return '\n'.join(lines)
 
 
-# ─────────────────────────────────────────────
-# JSON SERIALISERS
-# ─────────────────────────────────────────────
-
 def graph_to_dict(graph: SchemaGraph) -> dict:
-    def col_d(col):
-        return {'name': col.name, 'type': col.type, 'precision': col.precision,
-                'scale': col.scale, 'nullable': col.nullable, 'default': col.default,
-                'primary_key': col.primary_key, 'unique': col.unique, 'references': col.references}
-
+    def col_d(c):
+        return {'name': c.name, 'type': c.type, 'precision': c.precision,
+                'scale': c.scale, 'nullable': c.nullable, 'default': c.default,
+                'primary_key': c.primary_key, 'unique': c.unique, 'references': c.references}
     def con_d(c):
         d = {'name': c.name, 'type': c.type, 'columns': c.columns}
         if c.references:  d['references'] = c.references
         if c.check_expr:  d['check_expr'] = c.check_expr
         return d
-
     return {
         'migration_history': [{'version': m.version, 'description': m.description} for m in graph.mig_hist],
-        'tables': {
-            k: {'id': t.id, 'schema': t.schema, 'name': t.name, 'full': t.full,
-                'columns': [col_d(c) for c in t.columns],
-                'constraints': [con_d(c) for c in t.constraints],
-                'indexes': [{'name': i.name, 'columns': i.columns, 'unique': i.unique, 'created_in': i.created_in} for i in t.indexes],
-                'comments': t.comments, 'created_in': t.created_in, 'modified_in': t.modified_in}
-            for k, t in graph.tables.items()
-        },
-        'sequences': {
-            k: {'name': s.name, 'schema': s.schema, 'full': s.full,
-                'start_with': s.start_with, 'increment_by': s.increment_by, 'created_in': s.created_in}
-            for k, s in graph.seqs.items()
-        },
-        'edges': [
-            {'id': e.id, 'from_table': e.from_table, 'from_cols': e.from_cols,
-             'to_table': e.to_table, 'to_cols': e.to_cols,
-             'constraint_name': e.constraint_name, 'on_delete': e.on_delete}
-            for e in graph.edges
-        ],
+        'tables': {k: {'id': t.id, 'schema': t.schema, 'name': t.name, 'full': t.full,
+                       'columns': [col_d(c) for c in t.columns],
+                       'constraints': [con_d(c) for c in t.constraints],
+                       'indexes': [{'name': i.name, 'columns': i.columns,
+                                    'unique': i.unique, 'created_in': i.created_in} for i in t.indexes],
+                       'comments': t.comments, 'created_in': t.created_in, 'modified_in': t.modified_in}
+                   for k, t in graph.tables.items()},
+        'sequences': {k: {'name': s.name, 'schema': s.schema, 'full': s.full,
+                          'start_with': s.start_with, 'increment_by': s.increment_by,
+                          'created_in': s.created_in}
+                      for k, s in graph.seqs.items()},
+        'edges': [{'id': e.id, 'from_table': e.from_table, 'from_cols': e.from_cols,
+                   'to_table': e.to_table, 'to_cols': e.to_cols,
+                   'constraint_name': e.constraint_name, 'on_delete': e.on_delete}
+                  for e in graph.edges],
     }
 
 
@@ -184,96 +195,235 @@ def chunks_to_list(chunks: list[VectorChunk]) -> list[dict]:
 
 
 # ─────────────────────────────────────────────
-# MAIN
+# SUBCOMMAND: dump
 # ─────────────────────────────────────────────
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog='sqlfy',
-        description='Parse Flyway SQL migrations → schema graph / LLM vector chunks.',
+def cmd_dump(args: argparse.Namespace) -> None:
+    """
+    Output the Schema State Dictionary.
+
+    The Schema State Dictionary is a clean, versioned, serialisable
+    snapshot of the final DB state — tables, columns, constraints,
+    indexes, sequences, relationships, and migration history.
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+
+    graph = (
+        reconstruct_at(files, version=args.at)
+        if args.at
+        else reconstruct(files)
     )
-    # migrations_dir is now optional — can use --json-input instead
-    parser.add_argument(
-        'migrations_dir', nargs='?',
-        help='Directory containing Flyway .sql files'
-    )
-    parser.add_argument(
-        '--json-input', metavar='FILE',
-        help='Read migrations from a JSON file containing [{filename, sql}] (used by Tauri bridge)'
-    )
-    parser.add_argument('--chunks', action='store_true', help='Output LLM vector chunks')
-    parser.add_argument('--all',    action='store_true', help='Output { graph, chunks } combined JSON (implies --json)')
-    parser.add_argument('--state',  action='store_true', help='Output SchemaState dictionary JSON (implies --json)')
-    parser.add_argument('--json',   action='store_true', help='Output raw JSON')
-    parser.add_argument('--at-version', metavar='VERSION',
-                        help='Reconstruct schema at a specific Flyway version number (e.g. 2)')
-    parser.add_argument('--dialect', default='oracle', metavar='DIALECT',
-                        help='SQL dialect (default: oracle; e.g. postgres)')
-    parser.add_argument('--out',    metavar='FILE',      help='Write output to FILE')
-    args = parser.parse_args()
 
-    # --all and --state both imply --json
-    if args.all or args.state:
-        args.json = True
+    state = SchemaStateBuilder.from_graph(graph)
 
-    # ── Load files ──
-    files: list[dict]
+    fmt = (args.format or 'json').lower()
 
-    if args.json_input:
-        # Tauri bridge mode: read from a JSON file
-        input_path = Path(args.json_input)
-        if not input_path.is_file():
-            print(f'Error: --json-input file not found: {input_path}', file=sys.stderr)
-            sys.exit(1)
-        files = json.loads(input_path.read_text(encoding='utf-8'))
-        print(f'Loaded {len(files)} migration(s) from JSON input', file=sys.stderr)
-
-    elif args.migrations_dir:
-        # Directory mode: read .sql files from disk
-        migrations_path = Path(args.migrations_dir)
-        if not migrations_path.is_dir():
-            print(f'Error: "{migrations_path}" is not a directory.', file=sys.stderr)
-            sys.exit(1)
-        sql_files = sorted(p for p in migrations_path.iterdir() if p.suffix.lower() == '.sql')
-        if not sql_files:
-            print(f'No .sql files found in {migrations_path}', file=sys.stderr)
-            sys.exit(1)
-        files = [{'filename': p.name, 'sql': p.read_text(encoding='utf-8')} for p in sql_files]
-        print(f'Loaded {len(files)} migration file(s) from {migrations_path}', file=sys.stderr)
-
+    if fmt == 'yaml':
+        output = state.to_yaml()
+    elif fmt == 'json':
+        output = state.to_json()
+    elif fmt == 'summary':
+        output = _format_state_summary(state)
     else:
-        parser.error('Provide either migrations_dir or --json-input FILE')
+        print(f'Error: unknown format "{fmt}". Choose json, yaml, or summary.', file=sys.stderr)
+        sys.exit(1)
 
-    # ── Run ──
-    if args.at_version:
-        from .reconstructor import reconstruct_at
-        graph = reconstruct_at(files, version=args.at_version, dialect=args.dialect)
+    write_output(output, args.out)
+
+
+def _format_state_summary(state) -> str:
+    """Human-readable summary of the Schema State Dictionary."""
+    lines: list[str] = []
+    a = lines.append
+
+    a('\n╔══════════════════════════════════════════╗')
+    a('║        SCHEMA STATE DICTIONARY           ║')
+    a('╚══════════════════════════════════════════╝\n')
+
+    a(f'  Version     : {state.version}')
+    a(f'  Fingerprint : {state.fingerprint}')
+    a(f'  Generated   : {state.generated_at}')
+    a(f'  Dialect     : {state.dialect}')
+    a('')
+    a('  Stats:')
+    for k, v in state.stats.items():
+        a(f'    {k:<25} {v}')
+
+    a('\n  Migration history:')
+    for m in state.migration_history:
+        a(f'    V{m.version:<8} {m.description}')
+
+    a(f'\n  Tables ({len(state.tables)}):')
+    for t in state.tables.values():
+        mod = f'  modified V{", ".join(t.modified_in)}' if t.modified_in else ''
+        a(f'\n    ┌─ {t.full_name}  [created V{t.created_in}{mod}]')
+        if t.comment:
+            a(f'    │  "{t.comment}"')
+        a(f'    │  PK: {t.pk_columns or "none"}')
+        for col in t.columns:
+            badges = []
+            if col.is_pk:     badges.append('PK')
+            if col.is_fk:     badges.append('FK')
+            if col.is_unique: badges.append('UQ')
+            if not col.nullable: badges.append('NN')
+            if col.default:   badges.append(f'DEFAULT {col.default}')
+            badge_str = f'  [{", ".join(badges)}]' if badges else ''
+            cmt_str   = f'  -- {col.comment}' if col.comment else ''
+            a(f'    │  {col.name:<22} {col.data_type:<20}{badge_str}{cmt_str}')
+        if t.indexes:
+            for idx in t.indexes:
+                uq = ' UNIQUE' if idx.unique else ''
+                a(f'    │  INDEX {idx.name} ({", ".join(idx.columns)}){uq}')
+        a(f'    └{"─" * 46}')
+
+    if state.sequences:
+        a(f'\n  Sequences ({len(state.sequences)}):')
+        for s in state.sequences.values():
+            a(f'    {s.full_name:<30} START {s.start_with}  INCREMENT {s.increment_by}')
+
+    a(f'\n  Relationships ({len(state.relationships)}):')
+    for r in state.relationships:
+        od  = f'  ON DELETE {r.on_delete}' if r.on_delete else ''
+        a(f'    {r.from_table}.{r.from_columns} → {r.to_table}.{r.to_columns}  [{r.cardinality}]{od}')
+
+    orphans = state.orphan_tables()
+    no_pk   = state.tables_without_pk()
+    if orphans or no_pk:
+        a('\n  ⚠ Insights:')
+        if orphans:
+            a(f'    Orphan tables (no FK in/out) : {[t.name for t in orphans]}')
+        if no_pk:
+            a(f'    Tables without PK            : {[t.name for t in no_pk]}')
+
+    a('')
+    return '\n'.join(lines)
+
+
+# ─────────────────────────────────────────────
+# SUBCOMMAND: chunks
+# ─────────────────────────────────────────────
+
+def cmd_chunks(args: argparse.Namespace) -> None:
+    """Output LLM vector chunks from the schema."""
+    files  = load_files(args.migrations_dir, args.json_input)
+    graph  = reconstruct_at(files, args.at) if args.at else reconstruct(files)
+    chunks = build_chunks(graph)
+
+    fmt = (args.format or 'json').lower()
+    if fmt == 'json':
+        output = json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False)
     else:
-        graph  = apply_migrations(files, dialect=args.dialect)
-    chunks = build_chunks(graph) if (args.chunks or args.all) else None
+        output = format_human_chunks(chunks)
 
-    # ── Format output ──
-    if args.state:
-        from .schema_state import SchemaStateBuilder
-        state_obj = SchemaStateBuilder.from_graph(graph, dialect=args.dialect)
-        output = state_obj.to_json()
-    elif args.all:
-        # Combined mode for Tauri bridge: one call, everything
+    write_output(output, args.out)
+
+
+# ─────────────────────────────────────────────
+# LEGACY MODE  (no subcommand)
+# ─────────────────────────────────────────────
+
+def legacy_main(args: argparse.Namespace) -> None:
+    """Backward-compatible mode — original flag-based interface."""
+    files = load_files(args.migrations_dir, getattr(args, 'json_input', None))
+
+    if getattr(args, 'all', False):
+        graph  = reconstruct(files)
+        chunks = build_chunks(graph)
         output = json.dumps(
-            {'graph': graph_to_dict(graph), 'chunks': chunks_to_list(chunks)},  # type: ignore[arg-type]
+            {'graph': graph_to_dict(graph), 'chunks': chunks_to_list(chunks)},
             indent=2, ensure_ascii=False
         )
-    elif args.chunks:
-        output = json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False) if args.json else print_human_chunks(chunks)  # type: ignore[arg-type]
+    elif getattr(args, 'chunks', False):
+        graph  = reconstruct(files)
+        chunks = build_chunks(graph)
+        output = (json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False)
+                  if getattr(args, 'json', False) else format_human_chunks(chunks))
     else:
-        output = json.dumps(graph_to_dict(graph), indent=2, ensure_ascii=False) if args.json else print_human_graph(graph)
+        graph  = reconstruct(files)
+        output = (json.dumps(graph_to_dict(graph), indent=2, ensure_ascii=False)
+                  if getattr(args, 'json', False) else format_human_graph(graph))
 
-    # ── Write ──
-    if args.out:
-        Path(args.out).write_text(output, encoding='utf-8')
-        print(f'Output written to {args.out}', file=sys.stderr)
+    write_output(output, getattr(args, 'out', None))
+
+
+# ─────────────────────────────────────────────
+# ARGUMENT PARSER
+# ─────────────────────────────────────────────
+
+
+# ─────────────────────────────────────────────
+# ARGUMENT PARSER
+# ─────────────────────────────────────────────
+
+def _subcommand_parser() -> argparse.ArgumentParser:
+    """Parser for subcommand mode (dump, chunks, diff, graph)."""
+    parser = argparse.ArgumentParser(prog='sqlfy')
+    sub = parser.add_subparsers(dest='subcommand', required=True)
+
+    def shared(p):
+        p.add_argument('migrations_dir', nargs='?')
+        p.add_argument('--json-input', metavar='FILE')
+        p.add_argument('--at', metavar='VERSION')
+        p.add_argument('--out', metavar='FILE')
+
+    p_dump = sub.add_parser('dump', help='Output the Schema State Dictionary')
+    shared(p_dump)
+    p_dump.add_argument('--format', choices=['json', 'yaml', 'summary'], default='json')
+    p_dump.set_defaults(func=cmd_dump)
+
+    p_chunks = sub.add_parser('chunks', help='Output LLM vector chunks')
+    shared(p_chunks)
+    p_chunks.add_argument('--format', choices=['json', 'text'], default='json')
+    p_chunks.set_defaults(func=cmd_chunks)
+
+    p_diff = sub.add_parser('diff', help='Compare two Schema State Dictionaries (step 12)')
+    p_diff.add_argument('state_a'); p_diff.add_argument('state_b')
+    p_diff.add_argument('--format', choices=['json', 'text'], default='text')
+    p_diff.add_argument('--out', metavar='FILE')
+    p_diff.set_defaults(func=lambda a: (print('diff coming in step 12', file=sys.stderr), sys.exit(0)))
+
+    p_graph = sub.add_parser('graph', help='Output graph representation (step 13)')
+    shared(p_graph)
+    p_graph.add_argument('--format', choices=['dot', 'mermaid'], default='dot')
+    p_graph.set_defaults(func=lambda a: (print('graph coming in step 13', file=sys.stderr), sys.exit(0)))
+
+    return parser
+
+
+def _legacy_parser() -> argparse.ArgumentParser:
+    """Parser for legacy flag-based mode."""
+    parser = argparse.ArgumentParser(prog='sqlfy', add_help=False)
+    parser.add_argument('migrations_dir', nargs='?')
+    parser.add_argument('--json-input', metavar='FILE')
+    parser.add_argument('--chunks', action='store_true')
+    parser.add_argument('--all',    action='store_true')
+    parser.add_argument('--json',   action='store_true')
+    parser.add_argument('--out',    metavar='FILE')
+    parser.add_argument('--at',     metavar='VERSION')
+    return parser
+
+
+# ─────────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────────
+
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph'}
+
+
+def main() -> None:
+    argv = sys.argv[1:]
+    first_positional = next((a for a in argv if not a.startswith('-')), None)
+
+    if first_positional in KNOWN_SUBCOMMANDS:
+        # Subcommand mode
+        args = _subcommand_parser().parse_args(argv)
+        args.func(args)
     else:
-        print(output)
+        # Legacy mode
+        args = _legacy_parser().parse_args(argv)
+        if args.all:
+            args.json = True
+        legacy_main(args)
 
 
 if __name__ == '__main__':
