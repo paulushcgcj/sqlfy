@@ -1,23 +1,26 @@
 /**
  * sqlfy — src/components/AskPanel.tsx
  *
- * Natural language schema query panel.
+ * Schema context assembler for AI assistants.
  *
- * In Tauri mode:   spawns the Python CLI  `sqlfy ask --json-input … <question> --format json`
- * In browser mode: calls the Anthropic API directly (same RAG pipeline in TypeScript)
+ * Runs client-side BM25 retrieval to find the most relevant schema chunks
+ * for a question, formats a ready-to-paste prompt, and copies it to the
+ * clipboard. No API keys, no external calls, works fully offline.
+ *
+ * Paste the result into VS Code Copilot Chat, Claude.ai, ChatGPT, or any
+ * other AI assistant.
  *
  * Features
  * --------
- *  - Single-question mode with source attribution
- *  - Multi-turn chat with history context
- *  - Streaming responses token by token
- *  - Copy answer to clipboard
- *  - Keyboard shortcut: Enter to send, Shift+Enter for newline
+ *  - BM25 keyword retrieval (title/hint 3× boosted) over schema chunks
+ *  - Prompt preview with scrollable formatted output
+ *  - Copy-to-clipboard with confirmation
+ *  - Example question prompts
+ *  - Keyboard shortcut: Enter to assemble, Shift+Enter for newline
  */
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { IS_TAURI } from '../bridge/cli';
-import type { SchemaGraph, MigrationFile } from '../core/types';
+import { useState, useRef, KeyboardEvent } from 'react';
+import type { SchemaGraph } from '../core/types';
 import { buildChunks } from '../core/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,63 +31,43 @@ interface Source {
   score: number;
 }
 
-interface Message {
-  id:       string;
-  role:     'user' | 'assistant';
-  text:     string;
-  sources?: Source[];
-  loading?: boolean;
+interface Hit {
+  id:      string;
+  title:   string;
+  score:   number;
+  content: string;
+  hint:    string;
 }
 
 interface Props {
-  graph:  SchemaGraph | null;
-  files:  MigrationFile[];
+  graph: SchemaGraph | null;
 }
 
-// ─── Anthropic API (browser mode) ────────────────────────────────────────────
+// ─── BM25 retrieval ───────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a database schema expert assistant called sqlfy.
+const _STOP = new Set([
+  'a','an','the','is','are','was','be','have','has','do','does',
+  'to','of','in','on','at','by','for','with','from','and','or',
+  'not','this','that','what','which','how','table','column',
+]);
 
-You have been given schema context chunks extracted from Flyway SQL migration files.
+function _tokenise(text: string): string[] {
+  return text.toLowerCase().match(/[a-z][a-z0-9_]*/g)
+    ?.filter(t => !_STOP.has(t) && t.length > 1) ?? [];
+}
 
-Rules:
-- Answer ONLY based on the provided schema context. Do not invent tables, columns, or relationships.
-- Be precise about column types, constraints (PK, FK, NOT NULL, UNIQUE), and FK relationships.
-- If the answer cannot be determined from the context, say so clearly.
-- Use backticks for table/column names. Use the fully-qualified name (e.g. \`APP.USERS\`).
-- Keep answers concise — one to three paragraphs unless a detailed breakdown is requested.`;
-
-async function* streamAsk(
-  question:  string,
-  chunks:    ReturnType<typeof buildChunks>,
-  history:   { role: string; content: string }[],
+function retrieve(
+  question: string,
+  chunks:   ReturnType<typeof buildChunks>,
   k = 6,
-): AsyncGenerator<{ token?: string; sources?: Source[] }> {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
-  if (!apiKey) {
-    throw new Error(
-      'VITE_ANTHROPIC_API_KEY is not set. ' +
-      'Add it to your .env file: VITE_ANTHROPIC_API_KEY=sk-ant-…'
-    );
-  }
-  // ── Client-side BM25 retrieval ──────────────────────────────────────
-  const stop = new Set([
-    'a','an','the','is','are','was','be','have','has','do','does',
-    'to','of','in','on','at','by','for','with','from','and','or',
-    'not','this','that','what','which','how','table','column',
-  ]);
-
-  function tokenise(text: string): string[] {
-    return text.toLowerCase().match(/[a-z][a-z0-9_]*/g)
-      ?.filter(t => !stop.has(t) && t.length > 1) ?? [];
-  }
-
-  const qTokens = tokenise(question);
-  const N = chunks.length;
+): Hit[] {
+  const qTokens = _tokenise(question);
+  const N       = chunks.length;
 
   const docs = chunks.map(c => {
-    const text = `${c.title} ${c.hint} ${c.title} ${c.hint} ${c.content}`;
-    const tokens = tokenise(text);
+    // Title and hint are boosted 3x by repeating them in the scored text
+    const text   = `${c.title} ${c.hint} ${c.title} ${c.hint} ${c.content}`;
+    const tokens = _tokenise(text);
     const tf: Record<string, number> = {};
     tokens.forEach(t => { tf[t] = (tf[t] ?? 0) + 1; });
     return { tf, length: Math.max(tokens.length, 1) };
@@ -102,131 +85,68 @@ async function* streamAsk(
       if (!doc.tf[t]) return;
       const tf  = doc.tf[t];
       const idf = Math.log((N - (df[t] ?? 0) + 0.5) / ((df[t] ?? 0) + 0.5) + 1);
-      const num = tf * (K1 + 1);
-      const den = tf + K1 * (1 - B + B * doc.length / avgLen);
-      score    += idf * num / den;
+      score    += idf * (tf * (K1 + 1)) / (tf + K1 * (1 - B + B * doc.length / avgLen));
     });
     return { score, i };
   });
 
-  const hits = scores
+  return scores
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, k)
     .map(s => ({
-      id:    chunks[s.i].id,
-      title: chunks[s.i].title,
-      score: Math.round(s.score * 1000) / 1000,
+      id:      chunks[s.i].id,
+      title:   chunks[s.i].title,
+      score:   Math.round(s.score * 1000) / 1000,
       content: chunks[s.i].content,
       hint:    chunks[s.i].hint,
     }));
-
-  yield { sources: hits.map(h => ({ id: h.id, title: h.title, score: h.score })) };
-
-  // ── Build context prompt ────────────────────────────────────────────
-  const ctxParts = hits.map((h, i) =>
-    `### Context ${i + 1}: ${h.title}\n*${h.hint}*\n\`\`\`\n${h.content}\n\`\`\``
-  );
-  const userContent = `## Schema Context\n\n${ctxParts.join('\n\n')}\n\n---\n## Question\n\n${question}`;
-
-  const messages = [
-    ...history,
-    { role: 'user', content: userContent },
-  ];
-
-  // ── Stream from Anthropic ───────────────────────────────────────────
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model:      'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system:     SYSTEM_PROMPT,
-      messages,
-      stream:     true,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`API error ${response.status}: ${err}`);
-  }
-
-  const reader  = response.body!.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const lines = decoder.decode(value).split('\n');
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
-      if (data === '[DONE]') return;
-      try {
-        const event = JSON.parse(data);
-        if (event.type === 'content_block_delta' &&
-            event.delta?.type === 'text_delta') {
-          yield { token: event.delta.text };
-        }
-      } catch { /* ignore malformed SSE lines */ }
-    }
-  }
 }
 
-// ─── Tauri mode: delegate to Python CLI ───────────────────────────────────────
+// ─── Prompt builder ───────────────────────────────────────────────────────────
 
-async function askViaCli(
-  question: string,
-  files:    MigrationFile[],
-): Promise<{ answer: string; sources: Source[] }> {
-  const { Command }           = await import('@tauri-apps/plugin-shell');
-  const { writeTextFile, remove } = await import('@tauri-apps/plugin-fs');
-  const { tempDir, join }     = await import('@tauri-apps/api/path');
+const _INSTRUCTIONS = `You are a database schema expert. \
+Answer the question based only on the schema context provided below. \
+Do not invent tables, columns, or relationships that are not in the context. \
+Use backticks for table/column names and always use the fully-qualified name \
+(e.g. \`APP.USERS\`). If the answer cannot be determined from the context, say so.`;
 
-  const tmp = await join(await tempDir(), `sqlfy-input-${Date.now()}.json`);
-  await writeTextFile(tmp, JSON.stringify(files));
+function buildPrompt(question: string, hits: Hit[]): string {
+  const ctx = hits.map((h, i) =>
+    `### Context ${i + 1}: ${h.title}\n*${h.hint}*\n\`\`\`\n${h.content}\n\`\`\``
+  ).join('\n\n');
 
-  try {
-    const output = await Command.create('python3', [
-      '../cli/main.py', 'ask',
-      '--json-input', tmp,
-      '--format', 'json',
-      '--no-sources',
-      question,
-    ]).execute();
-
-    if (output.code !== 0) throw new Error(output.stderr);
-    const result = JSON.parse(output.stdout);
-    return {
-      answer:  result.answer,
-      sources: result.sources ?? [],
-    };
-  } finally {
-    await remove(tmp).catch(() => {});
-  }
+  return [
+    _INSTRUCTIONS,
+    '',
+    '## Schema Context',
+    '',
+    ctx,
+    '',
+    '---',
+    '',
+    '## Question',
+    '',
+    question,
+  ].join('\n');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AskPanel({ graph, files }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput]       = useState('');
-  const [busy, setBusy]         = useState(false);
-  const [copied, setCopied]     = useState<string | null>(null);
-  const bottomRef               = useRef<HTMLDivElement>(null);
-  const textareaRef             = useRef<HTMLTextAreaElement>(null);
+const EXAMPLES = [
+  'Which tables cascade delete from users?',
+  'What indexes exist on the orders table?',
+  'Which columns are nullable foreign keys?',
+  'What tables have no primary key?',
+  'How are orders and products related?',
+];
 
-  // History for multi-turn (browser mode)
-  const historyRef = useRef<{ role: string; content: string }[]>([]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+export function AskPanel({ graph }: Props) {
+  const [input,   setInput]   = useState('');
+  const [sources, setSources] = useState<Source[]>([]);
+  const [prompt,  setPrompt]  = useState<string | null>(null);
+  const [copied,  setCopied]  = useState(false);
+  const textareaRef           = useRef<HTMLTextAreaElement>(null);
 
   if (!graph) {
     return (
@@ -240,167 +160,49 @@ export function AskPanel({ graph, files }: Props) {
     );
   }
 
-  async function send() {
+  function assemble() {
     const question = input.trim();
-    if (!question || busy) return;
+    if (!question) return;
 
-    setInput('');
-    setBusy(true);
+    const chunks = buildChunks(graph!);
+    const hits   = retrieve(question, chunks);
+    const built  = buildPrompt(question, hits);
 
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text: question };
-    const asstMsg: Message = { id: crypto.randomUUID(), role: 'assistant', text: '', loading: true };
+    setSources(hits.map(h => ({ id: h.id, title: h.title, score: h.score })));
+    setPrompt(built);
+    setCopied(false);
+  }
 
-    setMessages(prev => [...prev, userMsg, asstMsg]);
-
-    try {
-      if (IS_TAURI) {
-        // Tauri: delegate to Python CLI
-        const { answer, sources } = await askViaCli(question, files);
-        setMessages(prev => prev.map(m =>
-          m.id === asstMsg.id ? { ...m, text: answer, sources, loading: false } : m
-        ));
-      } else {
-        // Browser: stream directly from Anthropic API
-        let sources: Source[] | undefined;
-        let text = '';
-
-        const chunks = buildChunks(graph);
-        for await (const chunk of streamAsk(question, chunks, historyRef.current)) {
-          if (chunk.sources) {
-            sources = chunk.sources;
-            setMessages(prev => prev.map(m =>
-              m.id === asstMsg.id ? { ...m, sources, loading: true } : m
-            ));
-          }
-          if (chunk.token) {
-            text += chunk.token;
-            setMessages(prev => prev.map(m =>
-              m.id === asstMsg.id ? { ...m, text, loading: true } : m
-            ));
-          }
-        }
-
-        setMessages(prev => prev.map(m =>
-          m.id === asstMsg.id ? { ...m, text, sources, loading: false } : m
-        ));
-
-        // Append to multi-turn history
-        historyRef.current = [
-          ...historyRef.current,
-          { role: 'user',      content: question },
-          { role: 'assistant', content: text },
-        ].slice(-20); // keep last 10 turns
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setMessages(prev => prev.map(m =>
-        m.id === asstMsg.id ? { ...m, text: `⚠ Error: ${msg}`, loading: false } : m
-      ));
-    } finally {
-      setBusy(false);
-      textareaRef.current?.focus();
-    }
+  function copy() {
+    if (!prompt) return;
+    navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      send();
+      assemble();
     }
   }
 
-  function copyMessage(text: string, id: string) {
-    navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 1800);
-  }
-
-  function clearHistory() {
-    setMessages([]);
-    historyRef.current = [];
+  function reset() {
+    setPrompt(null);
+    setSources([]);
+    setInput('');
+    textareaRef.current?.focus();
   }
 
   return (
     <div className="ask-panel">
+
       {/* Header */}
       <div className="ask-header">
         <span className="ask-title">Schema Q&amp;A</span>
         <span className="ask-subtitle">
-          {IS_TAURI ? '⚡ CLI mode' : '🌐 Browser mode'} ·{' '}
-          {graph.tables.size} tables · {graph.edges.length} FK edges
+          Assembles a schema context prompt for any AI assistant
         </span>
-        {messages.length > 0 && (
-          <button className="ask-clear" onClick={clearHistory}>Clear</button>
-        )}
-      </div>
-
-      {/* Message list */}
-      <div className="ask-messages">
-        {messages.length === 0 && (
-          <div className="ask-empty">
-            <div className="ask-empty-icon">◆</div>
-            <div className="ask-empty-title">Ask anything about your schema</div>
-            <div className="ask-empty-examples">
-              {[
-                'Which tables cascade delete from users?',
-                'What indexes exist on the orders table?',
-                'Which columns are nullable foreign keys?',
-                'What tables have no primary key?',
-                'How are orders and products related?',
-              ].map(ex => (
-                <button
-                  key={ex}
-                  className="ask-example"
-                  onClick={() => { setInput(ex); textareaRef.current?.focus(); }}
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {messages.map(msg => (
-          <div key={msg.id} className={`ask-msg ask-msg--${msg.role}`}>
-            <div className="ask-msg-role">
-              {msg.role === 'user' ? '?' : '◆'}
-            </div>
-            <div className="ask-msg-body">
-              {/* Sources */}
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="ask-sources">
-                  {msg.sources.map(s => (
-                    <span key={s.id} className="ask-source-tag" title={`score: ${s.score}`}>
-                      {s.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Text — preserve line breaks */}
-              <div className="ask-msg-text">
-                {msg.loading && !msg.text
-                  ? <span className="ask-cursor">▋</span>
-                  : msg.text.split('\n').map((line, i) => (
-                      <span key={i}>{line}{i < msg.text.split('\n').length - 1 ? <br/> : null}</span>
-                    ))
-                }
-                {msg.loading && msg.text && <span className="ask-cursor">▋</span>}
-              </div>
-
-              {/* Copy button */}
-              {!msg.loading && msg.role === 'assistant' && msg.text && (
-                <button
-                  className={`ask-copy${copied === msg.id ? ' ok' : ''}`}
-                  onClick={() => copyMessage(msg.text, msg.id)}
-                >
-                  {copied === msg.id ? 'Copied!' : 'Copy'}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
       </div>
 
       {/* Input */}
@@ -408,21 +210,89 @@ export function AskPanel({ graph, files }: Props) {
         <textarea
           ref={textareaRef}
           className="ask-textarea"
-          placeholder="Ask a question about your schema… (Enter to send, Shift+Enter for newline)"
+          placeholder="Ask a question about your schema… (Enter to assemble, Shift+Enter for newline)"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={onKeyDown}
           rows={2}
-          disabled={busy}
         />
         <button
           className="ask-send"
-          onClick={send}
-          disabled={busy || !input.trim()}
+          onClick={assemble}
+          disabled={!input.trim()}
+          title="Assemble context prompt"
         >
-          {busy ? '⏳' : '▶'}
+          ▶
         </button>
       </div>
+
+      {/* Empty state */}
+      {!prompt && (
+        <div className="ask-empty">
+          <div className="ask-empty-icon">◆</div>
+          <div className="ask-empty-title">Ask anything about your schema</div>
+          <div className="ask-empty-hint">
+            Retrieves the most relevant schema chunks and formats a prompt
+            ready to paste into VS Code Copilot Chat, Claude.ai, or any AI assistant.
+          </div>
+          <div className="ask-empty-examples">
+            {EXAMPLES.map(ex => (
+              <button
+                key={ex}
+                className="ask-example"
+                onClick={() => { setInput(ex); textareaRef.current?.focus(); }}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Result */}
+      {prompt && (
+        <div className="ask-result">
+
+          {/* Source chips */}
+          {sources.length > 0 && (
+            <div className="ask-sources-row">
+              <span className="ask-sources-label">
+                Retrieved {sources.length} chunk{sources.length !== 1 ? 's' : ''}:
+              </span>
+              {sources.map(s => (
+                <span key={s.id} className="ask-source-tag" title={`relevance: ${s.score}`}>
+                  {s.title}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Prompt preview + actions */}
+          <div className="ask-prompt-box">
+            <div className="ask-prompt-header">
+              <span className="ask-prompt-label">Ready-to-paste prompt</span>
+              <div className="ask-prompt-actions">
+                <button
+                  className={`ask-copy-btn${copied ? ' ok' : ''}`}
+                  onClick={copy}
+                >
+                  {copied ? '✓ Copied!' : 'Copy for AI'}
+                </button>
+                <button className="ask-reset-btn" onClick={reset}>
+                  New question
+                </button>
+              </div>
+            </div>
+            <pre className="ask-prompt-preview">{prompt}</pre>
+          </div>
+
+          <div className="ask-hint">
+            Paste into VS Code Copilot Chat, Claude.ai, ChatGPT, or any AI assistant.
+          </div>
+
+        </div>
+      )}
+
     </div>
   );
 }

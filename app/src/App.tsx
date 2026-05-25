@@ -118,7 +118,7 @@ export default function App() {
           <LlmTab chunks={chunks} />
         )}
         {activeTab === 'ask' && graph && (
-          <AskPanel graph={graph} files={files} />
+          <AskPanel graph={graph} />
         )}
       </div>
     </div>
