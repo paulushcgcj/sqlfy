@@ -9,7 +9,7 @@ Subcommands
   dump     Output the Schema State Dictionary (JSON or YAML)
   chunks   Output LLM vector chunks
   diff     Compare two Schema State Dictionaries
-  graph    (coming in step 13)
+  graph    Generate a graph representation (DOT, Mermaid, ASCII)
 
 Legacy mode (no subcommand) is preserved for backward compatibility:
   sqlfy <dir> [--chunks] [--json] [--all] [--json-input FILE] [--out FILE]
@@ -17,13 +17,11 @@ Legacy mode (no subcommand) is preserved for backward compatibility:
 Usage
 -----
   # Subcommand style (preferred)
-  sqlfy dump  <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
-  sqlfy dump  --json-input FILE [--format json|yaml] [--out FILE]
+  sqlfy dump   <migrations-dir> [--format json|yaml] [--out FILE] [--at VERSION]
+  sqlfy dump   --json-input FILE [--format json|yaml] [--out FILE]
   sqlfy chunks <migrations-dir> [--format json] [--out FILE] [--at VERSION]
-
-  sqlfy diff state_a.json state_b.json
-  sqlfy diff state_a.json state_b.json --format json
-  sqlfy diff ./migrations-v1 ./migrations-v2
+  sqlfy diff   <state-a> <state-b> [--format json|text] [--out FILE]
+  sqlfy graph  <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--out FILE]
 
   # Legacy style (still works)
   sqlfy <migrations-dir> --json
@@ -32,12 +30,17 @@ Usage
 
 Examples
 --------
-  sqlfy dump  ./migrations
-  sqlfy dump  ./migrations --format yaml
-  sqlfy dump  ./migrations --format json --out state.json
-  sqlfy dump  ./migrations --at 3
-  sqlfy dump  --json-input /tmp/sqlfy-input.json --format json
+  sqlfy dump   ./migrations
+  sqlfy dump   ./migrations --format yaml
+  sqlfy dump   ./migrations --format json --out state.json
+  sqlfy dump   ./migrations --at 3
+  sqlfy dump   --json-input /tmp/sqlfy-input.json --format json
   sqlfy chunks ./migrations --format json --out chunks.json
+  sqlfy diff   state_v2.json state_v5.json
+  sqlfy diff   ./migrations-v1 ./migrations-v2
+  sqlfy graph  ./migrations
+  sqlfy graph  ./migrations --format mermaid --out schema.md
+  sqlfy graph  ./migrations --format dot --out schema.dot
 """
 
 import sys
@@ -55,6 +58,7 @@ from .core import (
 from .reconstructor import reconstruct, reconstruct_at
 from .schema_state import SchemaStateBuilder
 from .differ import SchemaDiffer, diff_files
+from .grapher import Grapher
 
 
 # ─────────────────────────────────────────────
@@ -397,6 +401,39 @@ def legacy_main(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: graph
+# ─────────────────────────────────────────────
+
+def cmd_graph(args: argparse.Namespace) -> None:
+    """
+    Output a graph representation of the schema.
+
+    Formats:
+      dot      — Graphviz DOT  (render with `dot -Tsvg schema.dot -o schema.svg`)
+      mermaid  — Mermaid ERD   (paste into GitHub Markdown or https://mermaid.live)
+      summary  — Compact ASCII adjacency list (good for LLM prompts)
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    state = SchemaStateBuilder.from_graph(graph)
+
+    fmt   = (args.format or 'dot').lower()
+    title = getattr(args, 'title', '') or f'Schema V{state.version}'
+
+    if fmt == 'dot':
+        output = Grapher.to_dot(state, title=title)
+    elif fmt == 'mermaid':
+        output = Grapher.to_mermaid(state, title=title)
+    elif fmt == 'summary':
+        output = Grapher.to_summary(state)
+    else:
+        print(f'Error: unknown format "{fmt}". Choose dot, mermaid, or summary.', file=sys.stderr)
+        sys.exit(1)
+
+    write_output(output, args.out)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -433,10 +470,14 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         help='Write output to FILE instead of stdout')
     p_diff.set_defaults(func=cmd_diff)
 
-    p_graph = sub.add_parser('graph', help='Output graph representation (step 13)')
+    p_graph = sub.add_parser('graph',
+        help='Output graph representation (DOT, Mermaid, or ASCII summary)')
     shared(p_graph)
-    p_graph.add_argument('--format', choices=['dot', 'mermaid'], default='dot')
-    p_graph.set_defaults(func=lambda a: (print('graph coming in step 13', file=sys.stderr), sys.exit(0)))
+    p_graph.add_argument('--format', choices=['dot', 'mermaid', 'summary'], default='dot',
+        help='Output format (default: dot)')
+    p_graph.add_argument('--title', metavar='TEXT',
+        help='Graph title (default: "Schema V<version>")')
+    p_graph.set_defaults(func=cmd_graph)
 
     return parser
 

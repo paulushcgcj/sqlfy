@@ -10,6 +10,7 @@ from .schema_state import (
     SequenceState, RelationshipState, MigrationStep,
 )
 from .differ import SchemaDiffer, DiffResult, diff_files
+from .grapher import Grapher
 
 __all__ = [
     'apply_migrations', 'build_chunks', 'compute_layout', 'type_str',
@@ -19,4 +20,5 @@ __all__ = [
     'TableState', 'ColumnState', 'ConstraintState', 'IndexState',
     'SequenceState', 'RelationshipState', 'MigrationStep',
     'SchemaDiffer', 'DiffResult', 'diff_files',
+    'Grapher',
 ]

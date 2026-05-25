@@ -101,6 +101,18 @@ sqlfy diff <state-a> <state-b> [--format json|text] [--out FILE]
 
 Both arguments accept either a `.json` state file (from `sqlfy dump`) or a migrations directory reconstructed on the fly.
 
+#### `sqlfy graph`
+
+```bash
+sqlfy graph <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--at VERSION] [--out FILE]
+```
+
+| Format | Description |
+|---|---|
+| `dot` _(default)_ | Graphviz DOT — render with `dot -Tsvg schema.dot -o schema.svg` |
+| `mermaid` | Mermaid ERD — paste into GitHub Markdown or https://mermaid.live |
+| `summary` | Compact ASCII adjacency list — useful for LLM prompts |
+
 ### Legacy style (backward compatible)
 
 ```bash
@@ -143,6 +155,12 @@ sqlfy diff state_v2.json state_v5.json --format json
 
 # Diff two migration directories on the fly
 sqlfy diff ./migrations-v1 ./migrations-v2
+
+# Graph output
+sqlfy graph ./migrations
+sqlfy graph ./migrations --format mermaid --out schema.md
+sqlfy graph ./migrations --format dot --out schema.dot
+sqlfy graph ./migrations --format summary
 
 # Combined graph + chunks (Tauri bridge format — legacy)
 sqlfy ./migrations --all
@@ -322,7 +340,7 @@ Paste the **Schema Summary** chunk as system context and individual **table chun
 - [x] YAML export of SchemaState (`sqlfy dump --format yaml`)
 - [x] Point-in-time reconstruction via `--at`
 - [x] Schema diff command (`sqlfy diff`)
-- [ ] Graph topology insights (orphan tables, missing FK targets, circular references)
+- [x] Graph output command (`sqlfy graph` — DOT, Mermaid, ASCII summary)
 - [ ] PostgreSQL dialect parity
 
 ---
