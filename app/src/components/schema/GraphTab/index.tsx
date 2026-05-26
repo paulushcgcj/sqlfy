@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import ErdCanvas from '../../core/ErdCanvas';
+import ForceErd from '../../core/ForceErd';
 import TableDetail from '../../core/TableDetail';
 import type { SchemaGraph } from '../../../core/types';
 
@@ -62,7 +62,14 @@ const GraphTab: FC<GraphTabProps> = ({ graph, selectedTable, onSelectTable }) =>
 
       {/* Main */}
       <div className="main">
-        <ErdCanvas graph={graph} selectedTable={selectedTable} onSelectTable={onSelectTable} />
+        <div style={{ borderBottom: '0.5px solid var(--border-sub)' }}>
+          <ForceErd
+            graph={graph}
+            selectedTable={selectedTable}
+            onSelectTable={onSelectTable}
+            height={340}
+          />
+        </div>
         {selectedTable
           ? <TableDetail tableKey={selectedTable} graph={graph} />
           : <div className="no-data">Select a table to view details</div>
