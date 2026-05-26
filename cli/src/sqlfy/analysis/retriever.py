@@ -194,7 +194,8 @@ class EmbeddingRetriever:
 
     _MODEL = 'voyage-3'
 
-    def __init__(self, chunks: list[VectorChunk], api_key: Optional[str] = None) -> None:
+    def __init__(self, chunks: list[VectorChunk], api_key: Optional[str] = None, 
+                 cached_embeddings: Optional[any] = None) -> None:
         self._chunks = chunks
         self._key    = api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         if not self._key:
@@ -203,7 +204,12 @@ class EmbeddingRetriever:
                 'Export it or pass api_key= to EmbeddingRetriever(). '
                 'Alternatively use KeywordRetriever (no API key needed).'
             )
-        self._embeddings = self._embed_chunks()
+        
+        # Use cached embeddings if available
+        if cached_embeddings is not None:
+            self._embeddings = [list(row) for row in cached_embeddings]
+        else:
+            self._embeddings = self._embed_chunks()
 
     def retrieve(self, question: str, k: int = 5) -> list[RetrievedChunk]:
         q_vec = self._embed([question])[0]
@@ -255,18 +261,19 @@ class EmbeddingRetriever:
 # ─────────────────────────────────────────────
 
 def make_retriever(chunks: list[VectorChunk], use_embeddings: bool = False,
-                   api_key: Optional[str] = None) -> Retriever:
+                   api_key: Optional[str] = None, cached_embeddings: Optional[any] = None) -> Retriever:
     """
     Return the best available retriever.
 
     Args:
-        chunks:         List of VectorChunk objects from build_chunks().
-        use_embeddings: If True, attempt EmbeddingRetriever first.
-        api_key:        Anthropic/Voyage API key (falls back to env var).
+        chunks:            List of VectorChunk objects from build_chunks().
+        use_embeddings:    If True, attempt EmbeddingRetriever first.
+        api_key:           Anthropic/Voyage API key (falls back to env var).
+        cached_embeddings: Pre-computed embeddings (numpy array) to avoid recomputation.
     """
     if use_embeddings:
         try:
-            return EmbeddingRetriever(chunks, api_key=api_key)
+            return EmbeddingRetriever(chunks, api_key=api_key, cached_embeddings=cached_embeddings)
         except Exception as e:
             import warnings
             warnings.warn(f'EmbeddingRetriever failed ({e}), falling back to KeywordRetriever.')

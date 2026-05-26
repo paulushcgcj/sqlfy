@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
@@ -39,6 +40,7 @@ from typing import Iterator, Optional
 from ..output.chunker import build_chunks
 from ..domain.models import SchemaGraph
 from .retriever import make_retriever, RetrievedChunk
+from .chunk_cache import ChunkCache, compute_schema_fingerprint
 
 
 # ─────────────────────────────────────────────
@@ -121,6 +123,8 @@ class Asker:
         use_embeddings: Use vector embeddings for retrieval (requires Voyage API key).
         k:              Number of chunks to retrieve per question (default 6).
         model:          Claude model to use.
+        use_cache:      Enable chunk caching (default True).
+        files:          Migration files for fingerprint computation (required for caching).
     """
 
     _API_URL = 'https://api.anthropic.com/v1/messages'
@@ -133,15 +137,48 @@ class Asker:
         use_embeddings: bool = False,
         k:              int  = 6,
         model:          Optional[str] = None,
+        use_cache:      bool = True,
+        files:          Optional[list[dict]] = None,
     ) -> None:
         self._api_key  = api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         self._k        = k
         self._model    = model or self._MODEL
-        self._chunks   = build_chunks(graph)
+        
+        # Try to load from cache if enabled
+        chunks_from_cache = None
+        embeddings_from_cache = None
+        cache_hit = False
+        
+        if use_cache and files:
+            fingerprint = compute_schema_fingerprint(files)
+            chunk_cache = ChunkCache()
+            cached = chunk_cache.get(fingerprint)
+            
+            if cached:
+                chunks_from_cache, embeddings_from_cache = cached
+                cache_hit = True
+                if chunks_from_cache:
+                    print(f"✓ Loaded {len(chunks_from_cache)} chunks from cache", file=sys.stderr)
+        
+        # Build chunks if not cached
+        if chunks_from_cache:
+            self._chunks = chunks_from_cache
+        else:
+            self._chunks = build_chunks(graph)
+            
+            # Cache chunks if enabled
+            if use_cache and files:
+                fingerprint = compute_schema_fingerprint(files)
+                chunk_cache = ChunkCache()
+                # We'll cache embeddings later if using EmbeddingRetriever
+                chunk_cache.put(fingerprint, self._chunks, metadata={"dialect": graph.dialect})
+        
+        # Build retriever (may use cached embeddings if available)
         self._retriever = make_retriever(
             self._chunks,
             use_embeddings=use_embeddings,
             api_key=self._api_key,
+            cached_embeddings=embeddings_from_cache if cache_hit else None,
         )
 
         if not self._api_key:

@@ -837,6 +837,8 @@ def cmd_ask(args: argparse.Namespace) -> None:
             api_key=getattr(args, 'api_key', None),
             use_embeddings=getattr(args, 'embed', False),
             k=getattr(args, 'k', 6),
+            use_cache=not getattr(args, 'no_cache', False),
+            files=files,
         )
     except ValueError as e:
         print(f'Error: {e}', file=sys.stderr)
@@ -1219,6 +1221,8 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument('question', nargs='+')
     p.add_argument('--format', choices=['text','json'], default='text')
     p.add_argument('--no-sources', action='store_true')
+    p.add_argument('--no-cache', action='store_true', 
+                   help='Skip chunk cache (rebuild chunks from scratch)')
     p.set_defaults(func=cmd_ask)
 
     # chat
