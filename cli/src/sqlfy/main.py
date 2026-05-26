@@ -1167,6 +1167,49 @@ def cmd_graph_migrations(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: rollback-analysis
+# ─────────────────────────────────────────────
+
+def cmd_rollback_analysis(args: argparse.Namespace) -> None:
+    """
+    Analyze migration rollback feasibility.
+    
+    Determines whether each migration can be safely rolled back:
+      - Reversible: Can be undone without data loss
+      - Partially reversible: Can be undone with caveats
+      - Irreversible: Cannot be undone
+    
+    Provides:
+      - Rollback difficulty score (0-100)
+      - Suggested rollback script (reverse migration)
+      - Warnings about data loss and risks
+    """
+    files = load_files(args.migrations_dir, args.json_input, use_cache=False)
+    
+    from .analysis.rollback import analyze_migrations, format_rollback_text, format_rollback_json
+    
+    # Analyze all migrations
+    results = analyze_migrations(files)
+    
+    # Format output
+    fmt = getattr(args, 'format', 'text')
+    if fmt == 'json':
+        output = format_rollback_json(results)
+    else:
+        output = format_rollback_text(results)
+    
+    write_output(output, args.out)
+    
+    # Summary to stderr
+    reversible = sum(1 for r in results if r.feasibility == 'reversible')
+    partial = sum(1 for r in results if r.feasibility == 'partial')
+    irreversible = sum(1 for r in results if r.feasibility == 'irreversible')
+    
+    print(f'  {len(results)} migrations analyzed', file=sys.stderr)
+    print(f'  ✓ {reversible} reversible, ⚠️  {partial} partial, ✗ {irreversible} irreversible', file=sys.stderr)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -1333,6 +1376,15 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Output format: dot (Graphviz), html (interactive), timeline (text), json (default: timeline)')
     p.set_defaults(func=cmd_graph_migrations)
 
+    # rollback-analysis
+    p = sub.add_parser('rollback-analysis', help='Analyze migration rollback feasibility')
+    shared(p)
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--generate', action='store_true',
+                   help='Generate rollback scripts for reversible migrations')
+    p.set_defaults(func=cmd_rollback_analysis)
+
     return parser
 
 
@@ -1353,7 +1405,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
 
 
 def main() -> None:

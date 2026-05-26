@@ -73,6 +73,7 @@ sqlfy ./samples      # human-readable schema summary
 | `diff` | Compare two Schema State Dictionaries or migration directories |
 | `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report) |
 | `graph-migrations` | Visualize migration timeline and dependency graph |
+| `rollback-analysis` | Analyze migration rollback feasibility and generate rollback scripts |
 | `insights` | Analyse schema and report findings (orphan tables, missing PKs, etc.) |
 | `health` | Generate migration folder health report with quality score |
 | `simulate` | Simulate schema evolution with hypothetical migrations |
@@ -217,6 +218,41 @@ sqlfy graph-migrations ./migrations                   # Timeline view
 sqlfy graph-migrations ./migrations --format dot      # Graphviz format
 sqlfy graph-migrations ./migrations --format html --out migrations.html
 sqlfy graph-migrations ./migrations --format json --out graph.json
+```
+
+#### `sqlfy rollback-analysis`
+
+```bash
+sqlfy rollback-analysis <migrations-dir> [--format text|json] [--generate] [--at VERSION] [--out FILE]
+```
+
+Analyze migration rollback feasibility. Determines whether each migration can be safely rolled back and generates rollback scripts where possible.
+
+**Classifications:**
+- **Reversible** — Can be undone without data loss (rare)
+- **Partially reversible** — Can be undone with caveats (CREATE TABLE, ADD COLUMN)
+- **Irreversible** — Cannot be undone (DROP, DELETE, UPDATE, MODIFY)
+
+**Analysis includes:**
+- Rollback difficulty score (0-100)
+- Generated rollback script (for reversible operations)
+- Data loss warnings
+- Backup and testing recommendations
+
+| Format | Description |
+|---|---|
+| `text` _(default)_ | Human-readable report with rollback scripts and warnings |
+| `json` | Machine-readable JSON with summary statistics |
+
+| Flag | Description |
+|---|---|
+| `--generate` | Generate rollback scripts for reversible migrations _(default: true)_ |
+
+**Examples:**
+```bash
+sqlfy rollback-analysis ./migrations                  # Full analysis
+sqlfy rollback-analysis ./migrations --format json    # JSON output
+sqlfy rollback-analysis ./migrations --out report.txt
 ```
 
 #### `sqlfy insights`
