@@ -7,8 +7,36 @@
   ],
   "permissions": [
     "core:default",
-    "shell:allow-execute",
-    "shell:allow-spawn",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "sh",
+          "cmd": "sh",
+          "args": true
+        },
+        {
+          "name": "python3",
+          "cmd": "python3",
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "sh",
+          "cmd": "sh",
+          "args": true
+        },
+        {
+          "name": "python3",
+          "cmd": "python3",
+          "args": true
+        }
+      ]
+    },
     "shell:allow-kill",
     "dialog:allow-open",
     "fs:allow-read-dir",

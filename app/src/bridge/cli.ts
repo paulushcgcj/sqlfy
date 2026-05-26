@@ -27,13 +27,14 @@ export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' i
 
 // ── CLI path config ──────────────────────────────────────────────────────────
 //
-// DEV  → python3 ../cli/main.py   (resolves relative to the Tauri CWD,
-//         which is the workspace root when using `tauri dev`)
+// DEV  → PYTHONPATH=../../cli/src python3 -m sqlfy
+//         Invokes the CLI as a module (supports relative imports)
 // PROD → sidecar  binaries/sqlfy  (PyInstaller binary bundled in step 7)
 //
 // You can override DEV_CLI_PATH via the VITE_CLI_PATH env var in .env.local
 const DEV_CLI_CMD = 'python3';
-const DEV_CLI_SCRIPT = import.meta.env.VITE_CLI_PATH ?? '../cli/src/sqlfy/main.py';
+const DEV_CLI_ARGS = ['-m', 'sqlfy'];
+const DEV_PYTHONPATH = '../../cli/src';
 
 // ── Result type returned to the app ─────────────────────────────────────────
 export interface ParseResult {
@@ -57,10 +58,17 @@ async function parseWithTauri(files: MigrationFile[]): Promise<ParseResult> {
   await writeTextFile(tmp, JSON.stringify(files));
 
   try {
-    // Spawn CLI: dev uses python3 script, prod uses sidecar binary (step 7)
-    const command = import.meta.env.DEV
-      ? Command.create(DEV_CLI_CMD, [DEV_CLI_SCRIPT, '--json-input', tmp, '--all', '--json'])
-      : Command.sidecar('binaries/sqlfy', ['--json-input', tmp, '--all', '--json']);
+    // Spawn CLI: dev uses python3 -m sqlfy with PYTHONPATH, prod uses sidecar binary
+    let command;
+    if (import.meta.env.DEV) {
+      // Dev: invoke CLI as module with PYTHONPATH to support relative imports
+      // Use sh -c to set PYTHONPATH environment variable
+      const shellCmd = `PYTHONPATH="${DEV_PYTHONPATH}" ${DEV_CLI_CMD} ${DEV_CLI_ARGS.join(' ')} --json-input "${tmp}" --all --json`;
+      command = Command.create('sh', ['-c', shellCmd]);
+    } else {
+      // Prod: use sidecar binary (PyInstaller bundle)
+      command = Command.sidecar('binaries/sqlfy', ['--json-input', tmp, '--all', '--json']);
+    }
 
     const output = await command.execute();
 
@@ -177,9 +185,16 @@ async function runCliCommandTauri(
   await writeTextFile(tmp, JSON.stringify(files));
 
   try {
-    const command = import.meta.env.DEV
-      ? Command.create(DEV_CLI_CMD, [DEV_CLI_SCRIPT, subcommand, '--json-input', tmp, ...extraArgs])
-      : Command.sidecar('binaries/sqlfy', [subcommand, '--json-input', tmp, ...extraArgs]);
+    let command;
+    if (import.meta.env.DEV) {
+      // Dev: invoke CLI as module with PYTHONPATH to support relative imports
+      const args = [subcommand, '--json-input', tmp, ...extraArgs].map(arg => `"${arg}"`).join(' ');
+      const shellCmd = `PYTHONPATH="${DEV_PYTHONPATH}" ${DEV_CLI_CMD} ${DEV_CLI_ARGS.join(' ')} ${args}`;
+      command = Command.create('sh', ['-c', shellCmd]);
+    } else {
+      // Prod: use sidecar binary (PyInstaller bundle)
+      command = Command.sidecar('binaries/sqlfy', [subcommand, '--json-input', tmp, ...extraArgs]);
+    }
 
     const output = await command.execute();
     if (output.code !== 0) {

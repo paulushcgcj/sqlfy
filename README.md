@@ -162,6 +162,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `stability` | Calculate schema stability metrics and churn rates |
 | `validate` | Validate migration ordering and detect issues |
 | `deps` | Analyze migration dependencies and detect circular dependencies |
+| `drift` | Detect schema drift between migration folders and generate repair SQL |
 
 **Common flags available on most commands:**
 - `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
@@ -809,6 +810,132 @@ sqlfy lineage ./migrations APP.USERS.EMAIL --format json > lineage.json
 - **Dead code detection:** Find unused columns that can be safely removed
 - **Performance optimization:** Identify heavily used columns that should be indexed
 - **Data flow understanding:** Trace how data flows from source tables through views and aggregations
+
+#### `sqlfy drift`
+
+```bash
+sqlfy drift <base-migrations-dir> <target-migrations-dir> [--format text|json] 
+            [--generate-migration] [--next-version N] [--description DESC] 
+            [--dialect DIALECT] [--out FILE]
+```
+
+Detect schema drift between two migration folders and generate repair SQL. Compares two migration-derived schemas and identifies:
+- **Missing/extra tables** — Tables present in one schema but not the other
+- **Column changes** — Missing/extra columns, type mismatches, nullability differences
+- **Constraint differences** — Missing/extra primary keys, foreign keys, unique constraints
+- **Index differences** — Missing/extra indexes (unique or non-unique)
+
+| Flag | Default | Description |
+|---|---|---|
+| `base_migrations` | — | Base migrations directory (e.g., production, main branch, V5) |
+| `target_migrations` | — | Target migrations directory (e.g., development, feature branch, V10) |
+| `--format` | `text` | Output format: `text` (human-readable) or `json` (programmatic) |
+| `--generate-migration` | — | Generate catch-up migration file in target directory |
+| `--next-version` | auto | Version number for generated migration (default: auto-detect from target) |
+| `--description` | `catch_up_drift` | Description for generated migration file |
+| `--dialect` | `oracle` | SQL dialect: `oracle`, `postgres`, `mysql`, `sqlite` |
+| `--out` | stdout | Write output to file |
+
+**Drift Categories:**
+- `missing_table` — Table exists in base but not in target (severity: error)
+- `extra_table` — Table exists in target but not in base (severity: warning)
+- `missing_column` — Column exists in base but not in target (severity: error)
+- `extra_column` — Column exists in target but not in base (severity: warning)
+- `type_mismatch` — Column type differs between base and target (severity: error)
+- `nullability_mismatch` — Column nullability differs (severity: warning)
+- `missing_constraint` — Constraint exists in base but not in target (severity: warning)
+- `extra_constraint` — Constraint exists in target but not in base (severity: info)
+- `missing_index` — Index exists in base but not in target (severity: info)
+- `extra_index` — Index exists in target but not in base (severity: info)
+
+**Examples:**
+```bash
+# Compare dev vs production migrations
+sqlfy drift migrations-prod/ migrations-dev/
+  Schema Drift Report
+  ══════════════════════════════════════════════════════════
+  
+  Base:   migrations-prod
+  Target: migrations-dev
+  
+  Status: DRIFT DETECTED
+  Total findings: 5
+  
+  By Category:
+    missing_table      : 1
+    extra_column       : 2
+    type_mismatch      : 2
+  
+  By Severity:
+    error   : 3
+    warning : 2
+  
+  ─────────────────────────────────────────────────────────
+  
+  MISSING TABLES (1)
+  
+    [ERROR] APP.AUDIT_LOG
+      Expected: Exists (created in V3)
+      Actual:   Does not exist
+      
+      Repair SQL:
+        CREATE TABLE APP.AUDIT_LOG (
+          LOG_ID NUMBER PRIMARY KEY,
+          TABLE_NAME VARCHAR2(100),
+          RECORD_ID NUMBER,
+          ACTION VARCHAR2(20),
+          CHANGED_BY VARCHAR2(100),
+          CHANGED_AT TIMESTAMP
+        );
+
+# Generate catch-up migration
+sqlfy drift migrations-prod/ migrations-dev/ --generate-migration
+  ✓ Generated migrations-dev/V10__catch_up_drift.sql
+
+# Compare with custom version
+sqlfy drift migrations-prod/ migrations-dev/ --generate-migration --next-version 15
+  ✓ Generated migrations-dev/V15__catch_up_drift.sql
+
+# JSON output for programmatic access
+sqlfy drift migrations-prod/ migrations-dev/ --format json > drift.json
+  {
+    "status": "drift_detected",
+    "base_label": "migrations-prod",
+    "target_label": "migrations-dev",
+    "total_findings": 5,
+    "by_category": {
+      "missing_table": 1,
+      "extra_column": 2,
+      "type_mismatch": 2
+    },
+    "by_severity": {
+      "error": 3,
+      "warning": 2
+    },
+    "findings": [...]
+  }
+
+# Compare branch migrations
+sqlfy drift migrations-main/ migrations-feature-branch/ --generate-migration
+  ✓ Generated migrations-feature-branch/V8__catch_up_drift.sql
+
+# Write report to file
+sqlfy drift migrations-v5/ migrations-v10/ --out drift-v5-to-v10.txt
+```
+
+**Use Cases:**
+- **Dev vs Production:** Detect when someone made manual schema changes in production outside migrations
+- **Branch Reconciliation:** Compare feature branch migrations with main branch, generate catch-up migration
+- **Version Comparison:** Compare migrations at different versions (e.g., V5 vs V10) to see what changed
+- **Migration Gap Detection:** Identify missing migrations when branches diverge
+- **Automated Reconciliation:** Generate SQL to bring target schema in sync with base schema
+
+**Key Advantages:**
+- **No Database Connection Required** — Compares migration files directly, no credentials needed
+- **Branch-Safe** — Compare any two migration folders (dev/prod, main/feature, v5/v10)
+- **Automatic Repair SQL** — Every finding includes SQL to fix the drift
+- **Deterministic** — Same inputs always produce same drift report
+- **CI/CD Ready** — JSON output for automation, exit code 1 if drift detected
 
 #### `sqlfy domains`
 
