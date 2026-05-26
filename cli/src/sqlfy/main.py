@@ -272,6 +272,28 @@ def cmd_dump(args: argparse.Namespace) -> None:
     write_output(output, args.out)
 
 
+def cmd_manifest(args: argparse.Namespace) -> None:
+    """
+    Output graph manifest/metadata with high-level summary.
+    
+    Includes: schema version, fingerprint, node/edge counts, dialect,
+    migration count, generation timestamp, and SQLFY version.
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    
+    graph = (
+        reconstruct_at(files, version=args.at)
+        if getattr(args, 'at', None)
+        else reconstruct(files)
+    )
+    
+    state = SchemaStateBuilder.from_graph(graph)
+    manifest = state.to_manifest()
+    
+    output = json.dumps(manifest, indent=2, ensure_ascii=False)
+    write_output(output, args.out)
+
+
 def _format_state_summary(state) -> str:
     """Human-readable summary of the Schema State Dictionary."""
     lines: list[str] = []
@@ -1119,6 +1141,11 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     shared(p); p.add_argument('--format', choices=['json','yaml','summary'], default='json')
     p.set_defaults(func=cmd_dump)
 
+    # manifest
+    p = sub.add_parser('manifest', help='Output graph manifest/metadata summary')
+    shared(p)
+    p.set_defaults(func=cmd_manifest)
+
     # chunks
     p = sub.add_parser('chunks', help='Output LLM vector chunks')
     shared(p); p.add_argument('--format', choices=['json','text'], default='json')
@@ -1267,7 +1294,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
 
 
 def main() -> None:

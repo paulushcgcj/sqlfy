@@ -184,6 +184,38 @@ class SchemaState:
     def to_dict(self) -> dict:
         """Convert to a plain dict (JSON-safe)."""
         return _deep_asdict(self)
+    
+    def to_manifest(self) -> dict:
+        """Generate manifest/metadata dictionary with high-level summary.
+        
+        Returns graph metadata including:
+        - Schema version and fingerprint
+        - Node/edge counts
+        - Dialect
+        - Migration count
+        - Generation timestamp
+        - SQLFY version
+        """
+        return {
+            "schema_version": self.version,
+            "fingerprint": self.fingerprint,
+            "dialect": self.dialect,
+            "generated_at": self.generated_at,
+            "sqlfy_version": "0.3.0",  # TODO: get from package metadata
+            "node_count": self.stats.get("table_count", 0) + self.stats.get("sequence_count", 0),
+            "edge_count": self.stats.get("relationship_count", 0),
+            "table_count": self.stats.get("table_count", 0),
+            "column_count": self.stats.get("column_count", 0),
+            "sequence_count": self.stats.get("sequence_count", 0),
+            "relationship_count": self.stats.get("relationship_count", 0),
+            "index_count": self.stats.get("index_count", 0),
+            "tables_without_pk": self.stats.get("tables_without_pk", 0),
+            "migration_count": self.stats.get("migration_count", 0),
+            "migration_history": [
+                {"version": m.version, "description": m.description}
+                for m in self.migration_history
+            ],
+        }
 
     def to_json(self, indent: int = 2) -> str:
         """Serialise to JSON string."""
