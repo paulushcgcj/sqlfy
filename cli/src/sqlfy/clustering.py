@@ -8,7 +8,7 @@ Adapted from graphify (https://github.com/safishamsi/graphify).
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Union
 
 import networkx as nx
 
@@ -43,7 +43,7 @@ class CommunityResult:
 
 
 def detect_communities(
-    graph: Union[nx.Graph[Any], nx.DiGraph[Any]],
+    graph: Union[nx.Graph, nx.DiGraph],
     resolution: float = _DEFAULT_RESOLUTION,
     min_cohesion: float = _DEFAULT_MIN_COHESION,
     enable_splitting: bool = True,
@@ -115,7 +115,7 @@ def detect_communities(
 
 
 def _run_community_detection(
-    G: nx.Graph[Any],
+    G: nx.Graph,
     resolution: float,
 ) -> tuple[dict[str, int], str]:
     """
@@ -148,7 +148,7 @@ def _run_community_detection(
 
 
 def _split_oversized_communities(
-    G: nx.Graph[Any],
+    G: nx.Graph,
     communities: dict[int, list[str]],
     node_to_community: dict[str, int],
     resolution: float,
@@ -199,7 +199,7 @@ def _split_oversized_communities(
     return new_communities, new_node_to_community
 
 
-def _cohesion_score(G: nx.Graph[Any], community_nodes: list[str]) -> float:
+def _cohesion_score(G: nx.Graph, community_nodes: list[str]) -> float:
     """
     Compute cohesion score for a community.
     
@@ -263,7 +263,7 @@ def _filter_low_cohesion(
 
 def label_communities(
     communities: dict[int, list[str]],
-    graph: Union[nx.Graph[Any], nx.DiGraph[Any]],
+    graph: Union[nx.Graph, nx.DiGraph],
 ) -> dict[int, str]:
     """
     Generate human-readable labels for communities based on node types.
