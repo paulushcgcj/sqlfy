@@ -30,27 +30,38 @@ from typing import Any
 import networkx as nx
 
 from ..domain.models import SchemaGraph
+from ..clustering import detect_communities, label_communities
 
 
 # ──────────────────────────────────────────────
-# COMMUNITY DETECTION (Placeholder for Feature #4)
+# COMMUNITY DETECTION (Feature #4)
 # ──────────────────────────────────────────────
 
-def _compute_communities(graph: nx.Graph[Any] | nx.DiGraph[Any]) -> dict[int, list[str]]:
+def _compute_communities(
+    graph: nx.Graph[Any] | nx.DiGraph[Any],
+    resolution: float = 1.0,
+    min_cohesion: float = 0.1,
+    enable_splitting: bool = True,
+) -> dict[int, list[str]]:
     """
-    Compute community assignments for nodes.
-    
-    PLACEHOLDER: Currently assigns all nodes to community 0.
-    Feature #4 will replace this with Leiden/Louvain clustering.
+    Compute community assignments for nodes using Leiden/Louvain.
     
     Args:
         graph: NetworkX graph to analyze
+        resolution: Resolution parameter (>1 = more communities, <1 = fewer)
+        min_cohesion: Minimum cohesion score to keep a community
+        enable_splitting: Whether to split oversized communities
     
     Returns:
         Dictionary mapping community ID to list of node IDs
     """
-    # Placeholder: single community containing all nodes
-    return {0: list(graph.nodes())}
+    result = detect_communities(
+        graph,
+        resolution=resolution,
+        min_cohesion=min_cohesion,
+        enable_splitting=enable_splitting,
+    )
+    return result.communities
 
 
 def _get_community_labels(communities: dict[int, list[str]], graph: nx.Graph[Any] | nx.DiGraph[Any]) -> dict[int, str]:
@@ -64,22 +75,7 @@ def _get_community_labels(communities: dict[int, list[str]], graph: nx.Graph[Any
     Returns:
         Dictionary mapping community ID to label
     """
-    labels = {}
-    for cid, nodes in communities.items():
-        # Count node types in this community
-        type_counts: dict[str, int] = {}
-        for node in nodes:
-            node_type = graph.nodes[node].get('type', 'unknown')
-            type_counts[node_type] = type_counts.get(node_type, 0) + 1
-        
-        # Label by dominant type
-        if type_counts:
-            dominant = max(type_counts.items(), key=lambda x: x[1])
-            labels[cid] = f"{dominant[0].title()} Domain ({len(nodes)} nodes)"
-        else:
-            labels[cid] = f"Community {cid}"
-    
-    return labels
+    return label_communities(communities, graph)
 
 
 # ──────────────────────────────────────────────
@@ -89,7 +85,10 @@ def _get_community_labels(communities: dict[int, list[str]], graph: nx.Graph[Any
 def export_graph_json(
     graph: nx.Graph[Any] | nx.DiGraph[Any],
     communities: dict[int, list[str]] | None = None,
-    output_path: Path | str = Path('graph.json')
+    output_path: Path | str = Path('graph.json'),
+    resolution: float = 1.0,
+    min_cohesion: float = 0.1,
+    enable_splitting: bool = True,
 ) -> None:
     """
     Export graph in NetworkX node-link JSON format.
@@ -99,11 +98,14 @@ def export_graph_json(
     
     Args:
         graph: NetworkX graph to export
-        communities: Optional community assignments (default: auto-compute)
+        communities: Optional community assignments (default: auto-compute with Leiden/Louvain)
         output_path: Output file path
+        resolution: Community detection resolution (>1 = more communities)
+        min_cohesion: Minimum cohesion score for communities
+        enable_splitting: Whether to split oversized communities
     """
     if communities is None:
-        communities = _compute_communities(graph)
+        communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
     
     # Map node → community ID
     node_community: dict[str, int] = {}
@@ -142,7 +144,10 @@ def _get_community_color(cid: int) -> str:
 def export_graph_html(
     graph: nx.Graph[Any] | nx.DiGraph[Any],
     communities: dict[int, list[str]] | None = None,
-    output_path: Path | str = Path('graph.html')
+    output_path: Path | str = Path('graph.html'),
+    resolution: float = 1.0,
+    min_cohesion: float = 0.1,
+    enable_splitting: bool = True,
 ) -> None:
     """
     Export interactive HTML visualization using vis.js.
@@ -155,12 +160,15 @@ def export_graph_html(
       - Edge tooltips with relation type and confidence
     
     Args:
-        graph: NetworkX graph to visualize
-        communities: Optional community assignments (default: auto-compute)
+        graph: NetworkX graph to export
+        communities: Optional community assignments (default: auto-compute with Leiden/Louvain)
         output_path: Output file path
+        resolution: Community detection resolution (>1 = more communities)
+        min_cohesion: Minimum cohesion score for communities
+        enable_splitting: Whether to split oversized communities
     """
     if communities is None:
-        communities = _compute_communities(graph)
+        communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
     
     community_labels = _get_community_labels(communities, graph)
     
@@ -241,7 +249,7 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
 <html>
 <head>
   <meta charset="utf-8">
-  <title>SQLfy Schema Graph — {node_count} nodes, {edge_count} edges</title>
+  <title>SQLfy Schema Graph - {node_count} nodes, {edge_count} edges</title>
   <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
   <style>
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -479,7 +487,10 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
 def export_graph_report(
     graph: nx.Graph[Any] | nx.DiGraph[Any],
     communities: dict[int, list[str]] | None = None,
-    output_path: Path | str = Path('GRAPH_REPORT.md')
+    output_path: Path | str = Path('GRAPH_REPORT.md'),
+    resolution: float = 1.0,
+    min_cohesion: float = 0.1,
+    enable_splitting: bool = True,
 ) -> None:
     """
     Export human-readable GRAPH_REPORT.md with insights.
@@ -492,11 +503,14 @@ def export_graph_report(
     
     Args:
         graph: NetworkX graph to analyze
-        communities: Optional community assignments (default: auto-compute)
+        communities: Optional community assignments (default: auto-compute with Leiden/Louvain)
         output_path: Output file path
+        resolution: Community detection resolution (>1 = more communities)
+        min_cohesion: Minimum cohesion score for communities
+        enable_splitting: Whether to split oversized communities
     """
     if communities is None:
-        communities = _compute_communities(graph)
+        communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
     
     community_labels = _get_community_labels(communities, graph)
     

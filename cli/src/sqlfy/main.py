@@ -439,19 +439,42 @@ def cmd_graph(args: argparse.Namespace) -> None:
     output_dir = Path(getattr(args, 'output_dir', None) or 'sqlfy-out')
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Extract clustering parameters
+    resolution = getattr(args, 'resolution', 1.0)
+    min_cohesion = getattr(args, 'min_cohesion', 0.1)
+    enable_splitting = not getattr(args, 'no_split', False)
+    
     if fmt == 'json':
         output_path = output_dir / 'graph.json'
-        export_graph_json(nx_graph, output_path=output_path)
+        export_graph_json(
+            nx_graph,
+            output_path=output_path,
+            resolution=resolution,
+            min_cohesion=min_cohesion,
+            enable_splitting=enable_splitting,
+        )
         print(f'✓ Exported NetworkX graph to {output_path}', file=sys.stderr)
     
     elif fmt == 'html':
         output_path = output_dir / 'graph.html'
-        export_graph_html(nx_graph, output_path=output_path)
+        export_graph_html(
+            nx_graph,
+            output_path=output_path,
+            resolution=resolution,
+            min_cohesion=min_cohesion,
+            enable_splitting=enable_splitting,
+        )
         print(f'✓ Exported interactive visualization to {output_path}', file=sys.stderr)
     
     elif fmt == 'report':
         output_path = output_dir / 'GRAPH_REPORT.md'
-        export_graph_report(nx_graph, output_path=output_path)
+        export_graph_report(
+            nx_graph,
+            output_path=output_path,
+            resolution=resolution,
+            min_cohesion=min_cohesion,
+            enable_splitting=enable_splitting,
+        )
         print(f'✓ Exported graph report to {output_path}', file=sys.stderr)
     
     elif fmt == 'all':
@@ -459,9 +482,27 @@ def cmd_graph(args: argparse.Namespace) -> None:
         html_path = output_dir / 'graph.html'
         report_path = output_dir / 'GRAPH_REPORT.md'
         
-        export_graph_json(nx_graph, output_path=json_path)
-        export_graph_html(nx_graph, output_path=html_path)
-        export_graph_report(nx_graph, output_path=report_path)
+        export_graph_json(
+            nx_graph,
+            output_path=json_path,
+            resolution=resolution,
+            min_cohesion=min_cohesion,
+            enable_splitting=enable_splitting,
+        )
+        export_graph_html(
+            nx_graph,
+            output_path=html_path,
+            resolution=resolution,
+            min_cohesion=min_cohesion,
+            enable_splitting=enable_splitting,
+        )
+        export_graph_report(
+            nx_graph,
+            output_path=report_path,
+            resolution=resolution,
+            min_cohesion=min_cohesion,
+            enable_splitting=enable_splitting,
+        )
         
         print(f'✓ Exported all graph outputs to {output_dir}/', file=sys.stderr)
         print(f'  - graph.json', file=sys.stderr)
@@ -853,6 +894,12 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     shared(p); p.add_argument('--format', choices=['dot','mermaid','summary','json','html','report','all'], default='dot')
     p.add_argument('--title', metavar='TEXT')
     p.add_argument('--output-dir', metavar='PATH', help='Output directory for json/html/report (default: sqlfy-out)')
+    p.add_argument('--resolution', type=float, default=1.0, metavar='FLOAT',
+                   help='Community detection resolution: >1 = more communities, <1 = fewer (default: 1.0)')
+    p.add_argument('--min-cohesion', type=float, default=0.1, metavar='FLOAT',
+                   help='Minimum cohesion score to keep a community (default: 0.1)')
+    p.add_argument('--no-split', action='store_true',
+                   help='Disable oversized community splitting')
     p.set_defaults(func=cmd_graph)
 
     # insights
