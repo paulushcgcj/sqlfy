@@ -362,3 +362,4 @@ Cargo.lock
 # Keeping graphify out of the repo for now
 graphify-out
 .github/copilot-instructions.md
+docs/
