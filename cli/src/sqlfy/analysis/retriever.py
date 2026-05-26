@@ -36,7 +36,9 @@ import math
 import re
 import os
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
+
+from ..domain.models import VectorChunk
 
 # ─────────────────────────────────────────────
 # TYPES
@@ -101,7 +103,7 @@ class KeywordRetriever:
     _K1 = 1.5   # BM25 term saturation
     _B  = 0.75  # BM25 length normalisation
 
-    def __init__(self, chunks: list) -> None:
+    def __init__(self, chunks: list[VectorChunk]) -> None:
         self._chunks   = chunks
         self._docs     = self._index(chunks)
         self._avg_len  = sum(d['length'] for d in self._docs) / max(len(self._docs), 1)
@@ -192,7 +194,7 @@ class EmbeddingRetriever:
 
     _MODEL = 'voyage-3'
 
-    def __init__(self, chunks: list, api_key: Optional[str] = None) -> None:
+    def __init__(self, chunks: list[VectorChunk], api_key: Optional[str] = None) -> None:
         self._chunks = chunks
         self._key    = api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         if not self._key:
@@ -252,7 +254,7 @@ class EmbeddingRetriever:
 # FACTORY
 # ─────────────────────────────────────────────
 
-def make_retriever(chunks: list, use_embeddings: bool = False,
+def make_retriever(chunks: list[VectorChunk], use_embeddings: bool = False,
                    api_key: Optional[str] = None) -> Retriever:
     """
     Return the best available retriever.
