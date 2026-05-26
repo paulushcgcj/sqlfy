@@ -1,0 +1,47 @@
+name: Reusable CLI Tests
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  tests-cli:
+    name: CLI Unit Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: cli/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+        working-directory: cli
+
+      - name: Run tests
+        run: python -m pytest -v --tb=short
+        working-directory: cli
+
+      - name: Generate test report
+        if: always()
+        run: python -m pytest -v --tb=short --junit-xml=test-results.xml
+        working-directory: cli
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cli-test-results-py${{ matrix.python-version }}
+          path: cli/test-results.xml

@@ -1,0 +1,43 @@
+name: Automated Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  tests-app:
+    name: App Unit Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    permissions:
+      contents: read
+      checks: write
+    secrets: inherit
+    uses: ./.github/workflows/reusable-tests-app.yml
+
+  tests-cli:
+    name: CLI Unit Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    permissions:
+      contents: read
+      checks: write
+    secrets: inherit
+    uses: ./.github/workflows/reusable-tests-cli.yml
+
+  results:
+    name: Test Results
+    if: always()
+    needs: [tests-app, tests-cli]
+    runs-on: ubuntu-24.04
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: echo "At least one test job has failed." && exit 1
+      - run: echo "All tests passed!"
