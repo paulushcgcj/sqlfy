@@ -402,13 +402,15 @@ def cmd_graph(args: argparse.Namespace) -> None:
     Output a graph representation of the schema.
 
     Formats:
-      dot      — Graphviz DOT  (render with `dot -Tsvg schema.dot -o schema.svg`)
-      mermaid  — Mermaid ERD   (paste into GitHub Markdown or https://mermaid.live)
-      summary  — Compact ASCII adjacency list (good for LLM prompts)
-      json     — NetworkX node-link graph (graph.json)
-      html     — Interactive vis.js visualization (graph.html)
-      report   — Human-readable graph summary (GRAPH_REPORT.md)
-      all      — Generate json, html, and report together
+      dot        — Graphviz DOT  (render with `dot -Tsvg schema.dot -o schema.svg`)
+      mermaid    — Mermaid ERD   (paste into GitHub Markdown or https://mermaid.live)
+      excalidraw — Excalidraw JSON (open in excalidraw.com or VSCode extension)
+      drawio     — Draw.io XML (open in draw.io or VSCode extension)
+      summary    — Compact ASCII adjacency list (good for LLM prompts)
+      json       — NetworkX node-link graph (graph.json)
+      html       — Interactive vis.js visualization (graph.html)
+      report     — Human-readable graph summary (GRAPH_REPORT.md)
+      all        — Generate json, html, and report together
     """
     files = load_files(args.migrations_dir, args.json_input)
     graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
@@ -417,12 +419,19 @@ def cmd_graph(args: argparse.Namespace) -> None:
     fmt   = (args.format or 'dot').lower()
     title = getattr(args, 'title', '') or f'Schema V{state.version}'
     
-    # Legacy formats (dot, mermaid, summary) - write to stdout or --out
-    if fmt in ('dot', 'mermaid', 'summary'):
+    # Legacy formats (dot, mermaid, excalidraw, drawio, summary) - write to stdout or --out
+    if fmt in ('dot', 'mermaid', 'excalidraw', 'drawio', 'summary'):
         if fmt == 'dot':
             output = Grapher.to_dot(state, title=title)
         elif fmt == 'mermaid':
             output = Grapher.to_mermaid(state, title=title)
+        elif fmt == 'excalidraw':
+            from .output.excalidraw_exporter import to_excalidraw
+            import json as json_lib
+            output = json_lib.dumps(to_excalidraw(state, title=title), indent=2)
+        elif fmt == 'drawio':
+            from .output.drawio_exporter import to_drawio
+            output = to_drawio(state, title=title)
         else:  # summary
             output = Grapher.to_summary(state)
         write_output(output, args.out)
@@ -890,8 +899,8 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_diff)
 
     # graph
-    p = sub.add_parser('graph', help='Output graph (DOT, Mermaid, JSON, HTML, or report)')
-    shared(p); p.add_argument('--format', choices=['dot','mermaid','summary','json','html','report','all'], default='dot')
+    p = sub.add_parser('graph', help='Output graph (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, or report)')
+    shared(p); p.add_argument('--format', choices=['dot','mermaid','excalidraw','drawio','summary','json','html','report','all'], default='dot')
     p.add_argument('--title', metavar='TEXT')
     p.add_argument('--output-dir', metavar='PATH', help='Output directory for json/html/report (default: sqlfy-out)')
     p.add_argument('--resolution', type=float, default=1.0, metavar='FLOAT',

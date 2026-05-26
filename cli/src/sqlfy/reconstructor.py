@@ -39,6 +39,12 @@ from .core import (
     # Flyway version parser
     parse_flyway_ver,
 )
+from .domain.sqlglot_compat import (
+    SQLGLOT_HAS_MODIFY,
+    SQLGLOT_HAS_RENAME_COLUMN,
+    parse_modify_native,
+    log_sqlglot_capabilities,
+)
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +93,11 @@ class Reconstructor:
         self.mig_hist: list[MigrationHistory] = []
         self.actions:  list[MigrationAction]  = []
         self._applied: set[str] = set()   # versions already applied
+        
+        # Log sqlglot capabilities on first instantiation
+        if not hasattr(Reconstructor, '_logged_capabilities'):
+            log_sqlglot_capabilities()
+            Reconstructor._logged_capabilities = True
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -461,7 +472,10 @@ class Reconstructor:
 
         # ALTER TABLE ... MODIFY (col TYPE ...)
         elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'MODIFY' in expr_up:
-            acts += self._alter_modify_regex(f'ALTER {raw_expr}', version)
+            if SQLGLOT_HAS_MODIFY:
+                acts += self._alter_modify_native(f'ALTER {raw_expr}', version)
+            else:
+                acts += self._alter_modify_regex(f'ALTER {raw_expr}', version)
 
         # ALTER TABLE ... RENAME COLUMN old TO new
         elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'RENAME' in expr_up and 'COLUMN' in expr_up:
@@ -518,21 +532,31 @@ class Reconstructor:
         if cur: defs.append(''.join(cur).strip())
 
         for defn in defs:
-            cm = re.match(r'"?(\w+)"?\s+(\S+(?:\([^)]+\))?)(.*)', defn, re.I | re.S)
+            # Match: "colname type(precision, scale) rest"
+            # Use a greedy pattern that captures the entire type including parens and spaces
+            cm = re.match(r'"?(\w+)"?\s+(\w+(?:\s*\([^)]+\))?)(.*)', defn, re.I | re.S)
             if not cm:
                 continue
             col_name = cm.group(1).upper()
-            type_raw = cm.group(2).upper()
+            type_raw = cm.group(2).upper().strip()  # Strip whitespace from type
             rest     = cm.group(3).strip()
 
             for col in table.columns:
                 if col.name != col_name:
                     continue
-                tm = re.match(r'(\w[\w ]*?)(?:\((\d+)(?:,(\d+))?\))?$', type_raw)
+                # Match type with optional precision and scale (handles spaces: NUMBER(10, 2))
+                tm = re.match(r'(\w[\w ]*?)(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?$', type_raw)
                 if tm:
-                    col.type      = tm.group(1).strip()
-                    col.precision = int(tm.group(2)) if tm.group(2) else col.precision
-                    col.scale     = int(tm.group(3)) if tm.group(3) else col.scale
+                    col.type = tm.group(1).strip()
+                    # Update precision and scale based on what's explicitly provided
+                    # If precision is present, always update it (don't keep old value)
+                    # If scale is present, use it; otherwise reset to None
+                    if tm.group(2):  # precision present
+                        col.precision = int(tm.group(2))
+                        col.scale = int(tm.group(3)) if tm.group(3) else None
+                    else:
+                        # No precision specified, keep existing (rare case)
+                        pass
                 if re.search(r'NOT\s+NULL', rest, re.I):
                     col.nullable = False
                 elif re.search(r'\bNULL\b', rest, re.I):
@@ -550,7 +574,67 @@ class Reconstructor:
             table.actions.append(act)
 
         return acts
+    # ── Native sqlglot MODIFY parser ────────────────────────────────────────
 
+    def _alter_modify_native(self, raw_sql: str, version: str) -> list[MigrationAction]:
+        """
+        Parse ALTER TABLE MODIFY using native sqlglot AST (when supported).
+        
+        This is faster and more robust than regex parsing, but only works
+        with sqlglot versions that fully support Oracle MODIFY syntax.
+        As of sqlglot 30.8.0, MODIFY is still parsed as Command, so this
+        path is not yet active.
+        """
+        try:
+            table_name, modifications = parse_modify_native(raw_sql, dialect=self.dialect)
+        except (ValueError, AttributeError) as e:
+            log.warning(f"Native MODIFY parse failed: {e} — falling back to regex")
+            return self._alter_modify_regex(raw_sql, version)
+        
+        table = self.tables.get(table_name)
+        if not table:
+            log.warning(f"Table {table_name} not found for MODIFY statement")
+            return []
+        
+        acts: list[MigrationAction] = []
+        
+        for mod_info in modifications:
+            col_name = mod_info.column_name
+            
+            # Find the column in the table
+            for col in table.columns:
+                if col.name != col_name:
+                    continue
+                
+                # Update column properties
+                if mod_info.data_type is not None:
+                    col.type = mod_info.data_type
+                if mod_info.precision is not None:
+                    col.precision = mod_info.precision
+                if mod_info.scale is not None:
+                    col.scale = mod_info.scale
+                if mod_info.nullable is not None:
+                    col.nullable = mod_info.nullable
+                if mod_info.default is not None:
+                    col.default = mod_info.default
+                break
+            
+            # Track modification
+            if version not in table.modified_in:
+                table.modified_in.append(version)
+            
+            act = MigrationAction(
+                action='MODIFY_COLUMN',
+                object_type='COLUMN',
+                object_name=f'{table_name}.{col_name}',
+                version=version
+            )
+            acts.append(act)
+            table.actions.append(act)
+        
+        return acts
+
+    # ── Regex fallback MODIFY parser ────────────────────────────────────────
     def _alter_rename_column_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
         m = re.match(
             r'^ALTER\s+TABLE\s+"?(\w+(?:\.\w+)?)"?\s+RENAME\s+COLUMN\s+"?(\w+)"?\s+TO\s+"?(\w+)"?',

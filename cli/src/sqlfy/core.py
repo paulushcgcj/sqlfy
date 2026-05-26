@@ -38,6 +38,7 @@ from .domain.models import (
     Confidence,
 )
 from .domain.utils import type_str
+from .domain.sqlglot_compat import SQLGLOT_HAS_MODIFY, parse_modify_native
 from .output.chunker import build_chunks
 from .output.layout import compute_layout
 
@@ -333,8 +334,58 @@ def _handle_alter_table_command(
 ) -> None:
     """
     Fallback for ALTER TABLE MODIFY — sqlglot parses this as a Command.
-    We extract it via regex on the raw SQL text.
+    
+    This function is legacy code from before the reconstructor refactoring.
+    The preferred path is through reconstructor.py which has the same logic
+    with feature detection for native sqlglot MODIFY support.
+    
+    Kept for backward compatibility in case external code imports this.
     """
+    # Use native sqlglot parsing if available
+    if SQLGLOT_HAS_MODIFY:
+        try:
+            table_name, modifications = parse_modify_native(raw_sql, dialect='oracle')
+            table = tables.get(table_name)
+            if not table:
+                return
+            
+            for mod_info in modifications:
+                col_name = mod_info.column_name
+                
+                for col in table.columns:
+                    if col.name != col_name:
+                        continue
+                    
+                    if mod_info.data_type is not None:
+                        col.type = mod_info.data_type
+                    if mod_info.precision is not None:
+                        col.precision = mod_info.precision
+                    if mod_info.scale is not None:
+                        col.scale = mod_info.scale
+                    if mod_info.nullable is not None:
+                        col.nullable = mod_info.nullable
+                    if mod_info.default is not None:
+                        col.default = mod_info.default
+                    break
+                
+                if version not in table.modified_in:
+                    table.modified_in.append(version)
+                
+                act = MigrationAction(
+                    action='MODIFY_COLUMN',
+                    object_type='COLUMN',
+                    object_name=f'{table_name}.{col_name}',
+                    version=version,
+                )
+                all_actions.append(act)
+                table.actions.append(act)
+            
+            return
+        except (ValueError, AttributeError):
+            # Fall through to regex fallback
+            pass
+    
+    # Regex fallback for older sqlglot versions
     m = re.match(
         r'^(?:ALTER\s+TABLE)\s+"?(\w+(?:\.\w+)?)"?\s+MODIFY\s*\((.+)\)\s*$',
         raw_sql.strip(), re.I | re.S
@@ -366,22 +417,31 @@ def _handle_alter_table_command(
     if cur: defs.append(''.join(cur).strip())
 
     for defn in defs:
-        cm = re.match(r'"?(\w+)"?\s+(\S+(?:\([^)]+\))?)(.*)', defn, re.I | re.S)
+        # Match: "colname type(precision, scale) rest"
+        # Use a greedy pattern that captures the entire type including parens and spaces
+        cm = re.match(r'"?(\w+)"?\s+(\w+(?:\s*\([^)]+\))?)(.*)', defn, re.I | re.S)
         if not cm:
             continue
         col_name = cm.group(1).upper()
-        type_raw = cm.group(2).upper()
+        type_raw = cm.group(2).upper().strip()  # Strip whitespace from type
         rest     = cm.group(3).strip()
 
         # Find the column and update it
         for col in table.columns:
             if col.name == col_name:
-                # Parse new type
-                tm = re.match(r'(\w[\w ]*?)(?:\((\d+)(?:,(\d+))?\))?$', type_raw)
+                # Parse new type - handles spaces in precision/scale: NUMBER(10, 2)
+                tm = re.match(r'(\w[\w ]*?)(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?$', type_raw)
                 if tm:
-                    col.type      = tm.group(1).strip()
-                    col.precision = int(tm.group(2)) if tm.group(2) else col.precision
-                    col.scale     = int(tm.group(3)) if tm.group(3) else col.scale
+                    col.type = tm.group(1).strip()
+                    # Update precision and scale based on what's explicitly provided
+                    # If precision is present, always update it (don't keep old value)
+                    # If scale is present, use it; otherwise reset to None
+                    if tm.group(2):  # precision present
+                        col.precision = int(tm.group(2))
+                        col.scale = int(tm.group(3)) if tm.group(3) else None
+                    else:
+                        # No precision specified, keep existing (rare case)
+                        pass
                 if re.search(r'NOT\s+NULL', rest, re.I):
                     col.nullable = False
                 elif re.search(r'\bNULL\b', rest, re.I):

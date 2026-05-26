@@ -1,5 +1,4 @@
 # sqlfy CLI — Python dependencies
-# Currently stdlib-only. sqlglot will be added in step 8.
 
 # Install runtime only:
 #   pip install .
@@ -13,9 +12,9 @@
 # Build a self-contained binary:
 #   pip install pyinstaller
 #   pyinstaller --onefile src/sqlfy/main.py --name sqlfy
-# For binary builds:
-#   pip install pyinstaller
+
+# Core dependencies
+sqlglot>=30.0.0  # SQL parser and AST library (latest: v30.8.0)
+
 # Optional — for embedding-based retrieval (step 15)
 # voyageai  # only needed with --embed flag
-
-sqlglot>=25.0.0
