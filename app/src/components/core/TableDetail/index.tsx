@@ -1,6 +1,6 @@
 import type { FC } from 'react';
-import { typeStr } from '../../../core/core';
-import type { SchemaGraph } from '../../../core/types';
+import { typeStr } from '@/core/core';
+import type { SchemaGraph } from '@/core/types';
 import './index.scss';
 
 /** Props for the {@link TableDetail} component. */

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import type { VectorChunk } from '../../../core/types';
+import type { VectorChunk } from '@/core/types';
 import './index.scss';
 
 /** Props for the {@link LlmTab} component. */

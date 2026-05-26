@@ -21,8 +21,8 @@
 
 import { useState, useRef } from 'react';
 import type { FC, KeyboardEvent } from 'react';
-import type { SchemaGraph } from '../../../core/types';
-import { buildChunks } from '../../../core/core';
+import type { SchemaGraph } from '@/core/types';
+import { buildChunks } from '@/core/core';
 import './index.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

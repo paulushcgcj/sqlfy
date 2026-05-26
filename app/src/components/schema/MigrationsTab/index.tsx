@@ -1,6 +1,6 @@
 import type { FC } from 'react';
-import type { MigrationFile } from '../../../core/types';
-import { writeFile, folderLabel, type FolderHandle } from '../../../bridge/folder';
+import type { MigrationFile } from '@/core/types';
+import { writeFile, folderLabel, type FolderHandle } from '@/bridge/folder';
 import './index.scss';
 
 /** Props for the {@link MigrationsTab} component. */

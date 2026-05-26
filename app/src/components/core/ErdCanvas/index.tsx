@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
-import { computeLayout } from '../../../core/core';
-import type { SchemaGraph } from '../../../core/types';
+import { computeLayout } from '@/core/core';
+import type { SchemaGraph } from '@/core/types';
 import './index.scss';
 
 /** Props for the {@link ErdCanvas} component. */

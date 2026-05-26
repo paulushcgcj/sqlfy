@@ -18,8 +18,8 @@
  *   cargo add tauri-plugin-shell tauri-plugin-fs
  */
 
-import type { MigrationFile, SchemaGraph, VectorChunk } from '../core/types';
-import { applyMigrations, buildChunks } from '../core/core';
+import type { MigrationFile, SchemaGraph, VectorChunk } from '@/core/types';
+import { applyMigrations, buildChunks } from '@/core/core';
 
 // ── Tauri detection ──────────────────────────────────────────────────────────
 export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;

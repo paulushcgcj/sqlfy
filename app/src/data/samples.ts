@@ -1,4 +1,4 @@
-import type { MigrationFile } from '../core/types';
+import type { MigrationFile } from '@/core/types';
 
 // Load .sql files from the shared samples/ folder at the repo root.
 // Vite resolves this glob statically at build time.

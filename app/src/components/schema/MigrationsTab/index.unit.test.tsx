@@ -1,6 +1,6 @@
 import { render, fireEvent } from '@testing-library/react';
 import MigrationsTab from './index';
-import type { MigrationFile } from '../../../core/types';
+import type { MigrationFile } from '@/core/types';
 
 const mockFiles: MigrationFile[] = [
   { filename: 'V1__create_users.sql', sql: 'CREATE TABLE users (id NUMBER);' },

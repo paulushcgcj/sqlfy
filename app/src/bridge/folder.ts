@@ -11,7 +11,7 @@
  */
 
 import { IS_TAURI } from './cli';
-import type { MigrationFile } from '../core/types';
+import type { MigrationFile } from '@/core/types';
 
 // ── Handle ───────────────────────────────────────────────────────────────────
 

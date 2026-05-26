@@ -1,7 +1,7 @@
 import type { FC } from 'react';
-import ForceErd from '../../core/ForceErd';
-import TableDetail from '../../core/TableDetail';
-import type { SchemaGraph } from '../../../core/types';
+import ForceErd from '@/components/core/ForceErd';
+import TableDetail from '@/components/core/TableDetail';
+import type { SchemaGraph } from '@/core/types';
 
 /** Props for the {@link GraphTab} component. */
 export interface GraphTabProps {

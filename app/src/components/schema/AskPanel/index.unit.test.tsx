@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import AskPanel from './index';
-import type { SchemaGraph } from '../../../core/types';
+import type { SchemaGraph } from '@/core/types';
 
 const mockGraph: SchemaGraph = {
   tables: new Map([
