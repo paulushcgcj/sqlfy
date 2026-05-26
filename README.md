@@ -61,6 +61,54 @@ sqlfy ./samples      # human-readable schema summary
 
 ---
 
+## Distribution
+
+### Automated releases (Recommended)
+
+Every time you create a new tag, GitHub Actions automatically builds binaries for all platforms:
+
+```bash
+# Create and push a tag
+git tag v0.20.0
+git push origin v0.20.0
+```
+
+This triggers the build workflow which creates:
+- `sqlfy-macos-arm64.zip` (macOS Apple Silicon)
+- `sqlfy-linux-amd64.zip` (Linux x86_64)
+- `sqlfy-windows-amd64.zip` (Windows x86_64)
+
+Each zip contains the binary + README.md. The workflow automatically creates a GitHub Release with all files attached.
+
+**Users download from:** `https://github.com/paulushcgcj/sqlfy/releases`
+
+### Building a standalone binary locally
+
+To build manually for your current platform:
+
+```bash
+cd cli
+bash build-binary.sh
+```
+
+This creates `cli/dist/sqlfy-binary/sqlfy` (~35 MB) — a self-contained executable with zero dependencies.
+
+**To share:**
+1. Zip the binary: `tar -czf sqlfy-macos.tar.gz -C dist/sqlfy-binary sqlfy`
+2. Send `sqlfy-macos.tar.gz` to your user
+3. They extract and run: `tar -xzf sqlfy-macos.tar.gz && chmod +x sqlfy && ./sqlfy --help`
+
+**Cross-platform:** Build on macOS → works on macOS. Build on Linux → works on Linux.
+
+**Alternative (requires Python 3.11+):**
+```bash
+cd cli
+python -m build                    # creates wheel
+pip install dist/sqlfy-*.whl       # install from wheel
+```
+
+---
+
 ## CLI Reference
 
 ### Subcommand style (preferred)

@@ -1,7 +1,3 @@
-# This is a template for automated GitHub Releases
-# To use: Create .github/workflows/release.yml with this content
-# Then: git tag v0.20.0 && git push origin v0.20.0
-
 name: Release
 
 on:
@@ -10,113 +6,159 @@ on:
       - 'v*'
 
 jobs:
-  build-python:
-    name: Build Python wheel
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Build wheel
-        run: |
-          cd cli
-          pip install build
-          python -m build
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-wheel
-          path: cli/dist/*.whl
-
-  build-binary-macos:
-    name: Build binary (macOS)
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Build binary
-        run: |
-          cd cli
-          pip install pyinstaller
-          pyinstaller --onefile --name sqlfy src/sqlfy/main.py
-          chmod +x dist/sqlfy
-          tar -czf sqlfy-macos.tar.gz -C dist sqlfy
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-macos
-          path: cli/sqlfy-macos.tar.gz
-
-  build-binary-linux:
-    name: Build binary (Linux)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Build binary
-        run: |
-          cd cli
-          pip install pyinstaller
-          pyinstaller --onefile --name sqlfy src/sqlfy/main.py
-          chmod +x dist/sqlfy
-          tar -czf sqlfy-linux.tar.gz -C dist sqlfy
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-linux
-          path: cli/sqlfy-linux.tar.gz
-
-  build-tauri:
-    name: Build Tauri app
+  build-binaries:
+    name: Build ${{ matrix.os }} binary
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.platform }}
+        include:
+          - os: macos-latest
+            artifact_name: sqlfy
+            asset_name: sqlfy-macos-arm64.zip
+          - os: ubuntu-latest
+            artifact_name: sqlfy
+            asset_name: sqlfy-linux-amd64.zip
+          - os: windows-latest
+            artifact_name: sqlfy.exe
+            asset_name: sqlfy-windows-amd64.zip
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '22'
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-latest'
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y libwebkit2gtk-4.0-dev libssl-dev libgtk-3-dev
-      - name: Build Tauri app
+          cd cli
+          pip install pyinstaller
+          pip install -e .
+
+      - name: Build binary (Unix)
+        if: runner.os != 'Windows'
         run: |
-          cd app
-          npm install
-          npm run tauri build
-      - name: Upload installers
+          cd cli
+          pyinstaller \
+            --name sqlfy \
+            --onefile \
+            --console \
+            --noconfirm \
+            --clean \
+            --collect-all sqlfy \
+            --collect-all sqlglot \
+            --hidden-import=sqlglot \
+            --hidden-import=sqlglot.dialects.oracle \
+            --hidden-import=networkx \
+            pyinstaller_entry.py
+
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd cli
+          pyinstaller `
+            --name sqlfy `
+            --onefile `
+            --console `
+            --noconfirm `
+            --clean `
+            --collect-all sqlfy `
+            --collect-all sqlglot `
+            --hidden-import=sqlglot `
+            --hidden-import=sqlglot.dialects.oracle `
+            --hidden-import=networkx `
+            pyinstaller_entry.py
+
+      - name: Create release package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p release-package
+          cp cli/dist/${{ matrix.artifact_name }} release-package/
+          cp README.md release-package/
+          cd release-package
+          zip -r ../${{ matrix.asset_name }} .
+
+      - name: Create release package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path release-package
+          Copy-Item cli\dist\${{ matrix.artifact_name }} release-package\
+          Copy-Item README.md release-package\
+          Compress-Archive -Path release-package\* -DestinationPath ${{ matrix.asset_name }}
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-${{ matrix.platform }}
-          path: app/src-tauri/target/release/bundle/
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}
 
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-binary-macos, build-binary-linux, build-tauri]
+    needs: build-binaries
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
-      - uses: actions/checkout@v4
-      - name: Download artifacts
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure
+        run: ls -R artifacts
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## SQLfy v${{ steps.get_version.outputs.VERSION }}
+            
+            Schema Graph Engine — Parse Flyway migrations into knowledge graphs and LLM-ready context.
+            
+            ### 📦 Downloads
+            
+            Choose the right package for your platform:
+            
+            | Platform | File | Installation |
+            |----------|------|--------------|
+            | **macOS** (Apple Silicon) | `sqlfy-macos-arm64.zip` | `unzip sqlfy-macos-arm64.zip && chmod +x sqlfy && ./sqlfy --help` |
+            | **Linux** (x86_64) | `sqlfy-linux-amd64.zip` | `unzip sqlfy-linux-amd64.zip && chmod +x sqlfy && ./sqlfy --help` |
+            | **Windows** (x86_64) | `sqlfy-windows-amd64.zip` | `Expand-Archive sqlfy-windows-amd64.zip` then run `sqlfy.exe` |
+            
+            Each package includes:
+            - Standalone binary (no Python required)
+            - README.md documentation
+            
+            ### 🚀 Quick Start
+            
+            ```bash
+            # Extract and run
+            unzip sqlfy-*.zip
+            ./sqlfy dump ./your-migrations --format summary
+            ```
+            
+            ### 📝 Full documentation
+            
+            See [README.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for complete command reference.
+            
+            ---
+            
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.ref_name }}
           files: |
-            python-wheel/*.whl
-            binary-macos/sqlfy-macos.tar.gz
-            binary-linux/sqlfy-linux.tar.gz
-            tauri-macos-latest/dmg/*.dmg
-            tauri-ubuntu-latest/appimage/*.AppImage
-            tauri-windows-latest/msi/*.msi
+            artifacts/sqlfy-macos-arm64.zip/sqlfy-macos-arm64.zip
+            artifacts/sqlfy-linux-amd64.zip/sqlfy-linux-amd64.zip
+            artifacts/sqlfy-windows-amd64.zip/sqlfy-windows-amd64.zip
           draft: false
           prerelease: false
         env:

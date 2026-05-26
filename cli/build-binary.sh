@@ -18,6 +18,10 @@ fi
 # Clean previous builds
 rm -rf build/ dist/sqlfy dist/sqlfy-binary/
 
+# Install package first (so imports work)
+echo "Installing package..."
+pip3 install -e . -q
+
 # Build single-file executable
 echo "Building binary..."
 pyinstaller \
@@ -26,12 +30,12 @@ pyinstaller \
   --console \
   --noconfirm \
   --clean \
-  --hidden-import=sqlfy.core \
-  --hidden-import=sqlfy.reconstructor \
-  --hidden-import=sqlfy.schema_state \
-  --hidden-import=sqlfy.analysis.rollback \
-  --hidden-import=sqlfy.migration_graph \
-  src/sqlfy/main.py
+  --collect-all sqlfy \
+  --collect-all sqlglot \
+  --hidden-import=sqlglot \
+  --hidden-import=sqlglot.dialects.oracle \
+  --hidden-import=networkx \
+  pyinstaller_entry.py
 
 # Create distribution directory
 mkdir -p dist/sqlfy-binary
