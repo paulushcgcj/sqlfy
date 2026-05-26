@@ -141,6 +141,108 @@ export async function parse(files: MigrationFile[]): Promise<ParseResult> {
 }
 
 // ─────────────────────────────────────────────
+// GENERIC CLI COMMAND RUNNER
+// ─────────────────────────────────────────────
+
+export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export';
+
+/**
+ * Run an arbitrary CLI subcommand and return stdout as a string.
+ *
+ * Routing:
+ *  1. Tauri desktop  → spawn Python CLI via plugin-shell
+ *  2. Vite dev server → proxy via /api/sqlfy/run
+ *  3. Pure browser    → throws (CLI not available)
+ */
+export async function runCliCommand(
+  subcommand: CliSubcommand,
+  files: MigrationFile[],
+  extraArgs: string[] = [],
+): Promise<string> {
+  if (IS_TAURI) return runCliCommandTauri(subcommand, files, extraArgs);
+  if (import.meta.env.DEV) return runCliCommandDevServer(subcommand, files, extraArgs);
+  throw new Error('CLI not available in pure-browser mode');
+}
+
+async function runCliCommandTauri(
+  subcommand: CliSubcommand,
+  files: MigrationFile[],
+  extraArgs: string[],
+): Promise<string> {
+  const { Command } = await import('@tauri-apps/plugin-shell');
+  const { writeTextFile, remove } = await import('@tauri-apps/plugin-fs');
+  const { tempDir, join } = await import('@tauri-apps/api/path');
+
+  const tmp = await join(await tempDir(), `sqlfy-input-${Date.now()}.json`);
+  await writeTextFile(tmp, JSON.stringify(files));
+
+  try {
+    const command = import.meta.env.DEV
+      ? Command.create(DEV_CLI_CMD, [DEV_CLI_SCRIPT, subcommand, '--json-input', tmp, ...extraArgs])
+      : Command.sidecar('binaries/sqlfy', [subcommand, '--json-input', tmp, ...extraArgs]);
+
+    const output = await command.execute();
+    if (output.code !== 0) {
+      throw new Error(`CLI exited with code ${output.code}.\n${output.stderr || '(no stderr)'}`);
+    }
+    return output.stdout;
+  } finally {
+    await remove(tmp).catch(() => {
+      /* best-effort */
+    });
+  }
+}
+
+async function runCliCommandDevServer(
+  subcommand: CliSubcommand,
+  files: MigrationFile[],
+  extraArgs: string[],
+): Promise<string> {
+  const resp = await fetch('/api/sqlfy/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subcommand, args: extraArgs, files }),
+  });
+
+  if (!resp.ok) {
+    const err = (await resp.json().catch(() => ({ error: resp.statusText }))) as { error: string };
+    throw new Error(`Dev-server CLI error: ${err.error}`);
+  }
+
+  const result = (await resp.json()) as { output: string };
+  return result.output;
+}
+
+// ─────────────────────────────────────────────
+// NAMED COMMAND SHORTCUTS
+// ─────────────────────────────────────────────
+
+/** Output the Schema State Dictionary as JSON. */
+export function dump(files: MigrationFile[]): Promise<string> {
+  return runCliCommand('dump', files, ['--format', 'json']);
+}
+
+/** Run schema insights analysis, returning JSON. */
+export function insights(files: MigrationFile[]): Promise<string> {
+  return runCliCommand('insights', files, ['--format', 'json']);
+}
+
+/** Export the schema as a Mermaid ERD string. */
+export function graphMermaid(files: MigrationFile[]): Promise<string> {
+  return runCliCommand('graph', files, ['--format', 'mermaid']);
+}
+
+/** Export the schema as a Graphviz DOT string. */
+export function graphDot(files: MigrationFile[]): Promise<string> {
+  return runCliCommand('graph', files, ['--format', 'dot']);
+}
+
+/** Export the schema as an ASCII summary string. */
+export function graphSummary(files: MigrationFile[]): Promise<string> {
+  return runCliCommand('graph', files, ['--format', 'summary']);
+}
+
+// ─────────────────────────────────────────────
 // DESERIALISERS  (Python snake_case → TS camelCase)
 // ─────────────────────────────────────────────
 

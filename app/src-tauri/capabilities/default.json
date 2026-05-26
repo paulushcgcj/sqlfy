@@ -14,10 +14,10 @@
     "fs:allow-read-dir",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
-    "fs:allow-create-file",
-    "fs:allow-remove-file",
+    "fs:allow-create",
+    "fs:allow-remove",
     "fs:scope-temp",
     "fs:scope-home-recursive",
-    "path:default"
+    "core:path:default"
   ]
 }

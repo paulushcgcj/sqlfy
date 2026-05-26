@@ -176,11 +176,11 @@ function buildPrompt(question: string, hits: Hit[]): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const EXAMPLES = [
-  'Which tables cascade delete from users?',
-  'What indexes exist on the orders table?',
+  'Which tables have cascading deletes?',
+  'What indexes exist across all tables?',
   'Which columns are nullable foreign keys?',
   'What tables have no primary key?',
-  'How are orders and products related?',
+  'How are the main tables related to each other?',
 ];
 
 /**

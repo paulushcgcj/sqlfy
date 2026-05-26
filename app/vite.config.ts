@@ -58,6 +58,54 @@ function sqlifyCliPlugin(): Plugin {
           });
         });
       });
+
+      // Generic CLI command proxy: POST /api/sqlfy/run
+      // Body: { subcommand, args, files }
+      // Returns: { output: string }
+      server.middlewares.use('/api/sqlfy/run', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          const { subcommand, args, files } = JSON.parse(body) as {
+            subcommand: string;
+            args: string[];
+            files: unknown[];
+          };
+
+          const tmp = join(tmpdir(), `sqlfy-input-${Date.now()}.json`);
+          writeFileSync(tmp, JSON.stringify(files));
+
+          const proc = spawn('python3', [
+            '-m',
+            'sqlfy.main',
+            subcommand,
+            '--json-input',
+            tmp,
+            ...args,
+          ]);
+
+          let stdout = '';
+          let stderr = '';
+          proc.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
+          proc.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
+          proc.on('close', (code) => {
+            try {
+              unlinkSync(tmp);
+            } catch {
+              /* best-effort */
+            }
+            if (code === 0) {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ output: stdout }));
+            } else {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: stderr || 'CLI process failed', code }));
+            }
+          });
+        });
+      });
     },
   };
 }
