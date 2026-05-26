@@ -172,8 +172,8 @@ const AskPanel: FC<AskPanelProps> = ({ graph }) => {
     return (
       <div className="no-data" style={{ height: '100%' }}>
         <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10" stroke="var(--color-border-secondary)" strokeWidth="1.2"/>
-          <path d="M12 8v4M12 16h.01" stroke="var(--color-border-secondary)" strokeWidth="1.5" strokeLinecap="round"/>
+          <circle cx="12" cy="12" r="10" stroke="var(--border)" strokeWidth="1.2"/>
+          <path d="M12 8v4M12 16h.01" stroke="var(--border)" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
         Parse your migrations first to enable schema queries.
       </div>
