@@ -1753,6 +1753,93 @@ def cmd_lineage(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: drift
+# ─────────────────────────────────────────────
+
+def cmd_drift(args: argparse.Namespace) -> None:
+    """
+    Detect schema drift and generate repair SQL.
+    
+    Compares two schema states (both derived from migrations) and identifies
+    differences. Generates SQL statements to reconcile drift.
+    
+    Use cases:
+      - Compare dev vs production migration folders
+      - Detect manual schema changes
+      - Generate catch-up migrations
+      - Reconcile divergent branches
+    
+    Examples:
+      sqlfy drift migrations-prod/ migrations-dev/
+      sqlfy drift migrations-v5/ migrations-v10/ --generate-migration
+      sqlfy drift migrations-prod/ migrations-dev/ --format json
+    """
+    from .analysis.drift_repair import analyze_drift, generate_repair_migration
+    
+    # Load base schema
+    base_files = load_files(args.base_migrations, None, use_cache=getattr(args, 'no_cache', False))
+    dialect = getattr(args, 'dialect', 'oracle')
+    base_graph = reconstruct(base_files, dialect=dialect)
+    
+    # Load target schema
+    target_files = load_files(args.target_migrations, None, use_cache=getattr(args, 'no_cache', False))
+    target_graph = reconstruct(target_files, dialect=dialect)
+    
+    # Extract labels from paths
+    from pathlib import Path
+    base_label = Path(args.base_migrations).name if args.base_migrations else "Base"
+    target_label = Path(args.target_migrations).name if args.target_migrations else "Target"
+    
+    # Analyze drift
+    report = analyze_drift(base_graph, target_graph, base_label=base_label, target_label=target_label)
+    
+    # Format output
+    fmt = getattr(args, 'format', 'text')
+    if fmt == 'json':
+        output = report.to_json()
+    else:
+        output = report.to_text()
+    
+    write_output(output, args.out)
+    
+    # Generate migration if requested
+    if getattr(args, 'generate_migration', False) and not report.is_clean:
+        # Determine next version
+        if getattr(args, 'next_version', None):
+            version = args.next_version
+        else:
+            # Auto-detect next version from target migrations
+            from .analysis.ordering import parse_migration_filename
+            versions = []
+            for file_dict in target_files:
+                parsed = parse_migration_filename(file_dict['filename'])
+                if parsed['version']:
+                    try:
+                        versions.append(int(parsed['version'].split('.')[0]))
+                    except (ValueError, AttributeError):
+                        pass
+            version = str(max(versions) + 1) if versions else "1"
+        
+        # Generate migration content
+        description = getattr(args, 'description', 'catch_up_drift')
+        migration_content = generate_repair_migration(report, version, description)
+        
+        # Write to file
+        migration_filename = f"V{version}__{description}.sql"
+        migration_path = Path(args.target_migrations) / migration_filename
+        migration_path.write_text(migration_content, encoding='utf-8')
+        
+        print(f"\n✓ Generated {migration_path}", file=sys.stderr)
+    
+    # Summary to stderr
+    if report.is_clean:
+        print(f'  No drift detected', file=sys.stderr)
+    else:
+        print(f'  {report.total_drift_count} drift finding(s)', file=sys.stderr)
+        print(f'  {len(report.errors())} error(s), {len(report.warnings())} warning(s)', file=sys.stderr)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -1948,6 +2035,26 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Write output to file instead of stdout')
     p.set_defaults(func=cmd_lint)
 
+    # drift
+    p = sub.add_parser('drift', help='Detect schema drift and generate repair SQL')
+    p.add_argument('base_migrations', metavar='BASE_MIGRATIONS',
+                   help='Base migrations directory (e.g., production)')
+    p.add_argument('target_migrations', metavar='TARGET_MIGRATIONS',
+                   help='Target migrations directory (e.g., development)')
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--generate-migration', action='store_true',
+                   help='Generate catch-up migration file')
+    p.add_argument('--next-version', metavar='N',
+                   help='Version number for generated migration (default: auto-detect)')
+    p.add_argument('--description', default='catch_up_drift',
+                   help='Description for generated migration (default: catch_up_drift)')
+    p.add_argument('--dialect', default='oracle',
+                   help='SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)')
+    p.add_argument('--out', metavar='FILE',
+                   help='Write output to file')
+    p.set_defaults(func=cmd_drift)
+
     # domains
     p = sub.add_parser('domains', help='Detect semantic business domains in the schema')
     shared(p)
@@ -2047,7 +2154,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate', 'deps', 'lineage'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate', 'deps', 'lineage', 'drift'}
 
 
 def main() -> None:
