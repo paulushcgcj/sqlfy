@@ -1310,6 +1310,98 @@ def cmd_lint(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: domains
+# ─────────────────────────────────────────────
+
+def cmd_domains(args: argparse.Namespace) -> None:
+    """
+    Detect semantic business domains in the schema.
+    
+    Automatically clusters tables into domains using:
+    - Dependency density (community detection)
+    - Naming patterns (common prefixes)
+    - Cross-domain dependency analysis
+    """
+    from .analysis.domains import detect_domains, format_text, format_json
+    
+    files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, 'dialect', 'oracle')
+    
+    # Reconstruct schema
+    graph = (
+        reconstruct_at(files, version=args.at, dialect=dialect)
+        if getattr(args, 'at', None)
+        else reconstruct(files, dialect=dialect)
+    )
+    
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
+    
+    # Detect domains
+    result = detect_domains(
+        state,
+        resolution=getattr(args, 'resolution', 1.0),
+        min_cohesion=getattr(args, 'min_cohesion', 0.1),
+        enable_splitting=not getattr(args, 'no_split', False),
+    )
+    
+    # Format output
+    fmt = getattr(args, 'format', 'text')
+    if fmt == 'json':
+        output = format_json(result)
+    else:
+        output = format_text(result)
+    
+    write_output(output, args.out)
+
+
+# ─────────────────────────────────────────────
+# SUBCOMMAND: stability
+# ─────────────────────────────────────────────
+
+def cmd_stability(args: argparse.Namespace) -> None:
+    """
+    Calculate schema stability metrics.
+    
+    Computes:
+    - Churn rate: How often tables change
+    - Stability score: Inverse of churn (higher is better)
+    - High-churn vs stable tables
+    - Volatility: Standard deviation of change frequency
+    """
+    from .analysis.stability import calculate_stability, format_text, format_json
+    
+    files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, 'dialect', 'oracle')
+    
+    # Reconstruct schema
+    graph = (
+        reconstruct_at(files, version=args.at, dialect=dialect)
+        if getattr(args, 'at', None)
+        else reconstruct(files, dialect=dialect)
+    )
+    
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
+    
+    # Calculate stability metrics
+    report = calculate_stability(
+        state,
+        high_churn_threshold=getattr(args, 'high_churn_threshold', 20.0),
+        stable_threshold=getattr(args, 'stable_threshold', 10.0),
+    )
+    
+    # Format output
+    fmt = getattr(args, 'format', 'text')
+    show_all = getattr(args, 'show_all', False)
+    
+    if fmt == 'json':
+        output = format_json(report)
+    else:
+        output = format_text(report, show_all=show_all)
+    
+    write_output(output, args.out)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -1505,6 +1597,32 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Write output to file instead of stdout')
     p.set_defaults(func=cmd_lint)
 
+    # domains
+    p = sub.add_parser('domains', help='Detect semantic business domains in the schema')
+    shared(p)
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--resolution', type=float, default=1.0, metavar='FLOAT',
+                   help='Community detection resolution: >1 = more communities, <1 = fewer (default: 1.0)')
+    p.add_argument('--min-cohesion', type=float, default=0.1, metavar='FLOAT',
+                   help='Minimum cohesion score to keep a domain (default: 0.1)')
+    p.add_argument('--no-split', action='store_true',
+                   help='Disable oversized domain splitting')
+    p.set_defaults(func=cmd_domains)
+
+    # stability
+    p = sub.add_parser('stability', help='Calculate schema stability metrics and churn rates')
+    shared(p)
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--show-all', action='store_true',
+                   help='Show all tables in text output (default: only high-churn and stable)')
+    p.add_argument('--high-churn-threshold', type=float, default=20.0, metavar='FLOAT',
+                   help='Churn rate threshold for high-churn classification (default: 20.0)')
+    p.add_argument('--stable-threshold', type=float, default=10.0, metavar='FLOAT',
+                   help='Churn rate threshold for stable classification (default: 10.0)')
+    p.set_defaults(func=cmd_stability)
+
     return parser
 
 
@@ -1527,7 +1645,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability'}
 
 
 def main() -> None:

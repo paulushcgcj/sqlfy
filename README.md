@@ -157,6 +157,8 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `export` | Export schema as self-contained HTML documentation |
 | `query` | Deterministic graph queries (no LLM) |
 | `impact` | Analyze impact of schema object changes using graph traversal |
+| `domains` | Detect semantic business domains using community detection |
+| `stability` | Calculate schema stability metrics and churn rates |
 
 **Common flags available on most commands:**
 - `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
@@ -716,6 +718,169 @@ Analyze impact of changes to a schema object using graph traversal. Finds all ob
 sqlfy impact ./migrations APP.USERS                 # Impact of USER table
 sqlfy impact ./migrations APP.USERS.EMAIL --depth 3
 sqlfy impact ./migrations APP.ORDERS --direction in --format json
+```
+
+#### `sqlfy domains`
+
+```bash
+sqlfy domains <migrations-dir> [--format text|json] [--resolution FLOAT] 
+              [--min-cohesion FLOAT] [--no-split] [--at VERSION] [--out FILE]
+```
+
+Detect semantic business domains in the schema using community detection algorithms (Leiden/Louvain). Automatically clusters tables into domains based on:
+- **Dependency density** — Tables frequently referencing each other
+- **Naming patterns** — Common prefixes (e.g., `order_`, `user_`)
+- **Cross-domain dependencies** — Strength classification (weak/medium/strong)
+
+| Flag | Description |
+|---|---|
+| `--resolution FLOAT` | Community detection resolution: >1 = more communities, <1 = fewer (default: 1.0) |
+| `--min-cohesion FLOAT` | Minimum cohesion score to keep a domain (default: 0.1) |
+| `--no-split` | Disable oversized domain splitting |
+
+**Outputs:**
+- List of domains with table membership
+- Domain cohesion scores (0.0-1.0)
+- Cross-domain dependencies with strength classification
+- Semantic labels inferred from table names
+
+**Use cases:**
+- **Architecture review** — Ensure domains are properly separated
+- **Microservice extraction** — Identify schema boundaries for splitting
+- **Documentation** — Auto-generate domain documentation
+
+**Examples:**
+```bash
+sqlfy domains ./migrations                         # Detect domains
+sqlfy domains ./migrations --format json           # JSON output
+sqlfy domains ./migrations --resolution 1.5        # More granular domains
+sqlfy domains ./migrations --min-cohesion 0.5      # Filter weak domains
+```
+
+**Example output:**
+```
+╔══════════════════════════════════════════╗
+║     SEMANTIC DOMAIN DETECTION            ║
+╚══════════════════════════════════════════╝
+
+Algorithm: louvain
+Total tables: 15
+Domains detected: 3
+
+
+━━━ User Management Domain (cohesion: 0.85) ━━━
+  Tables (5):
+    • APP.USERS
+    • APP.USER_PROFILES
+    • APP.USER_ROLES
+    • APP.USER_SESSIONS
+    • APP.USER_PREFERENCES
+  Description: Domain containing 5 related tables
+
+━━━ Order Processing Domain (cohesion: 0.72) ━━━
+  Tables (6):
+    • APP.ORDERS
+    • APP.ORDER_ITEMS
+    • APP.ORDER_HISTORY
+    • APP.SHIPPING
+    • APP.INVOICES
+    • APP.PAYMENTS
+  Description: Domain containing 6 related tables
+
+
+╔══════════════════════════════════════════╗
+║     CROSS-DOMAIN DEPENDENCIES            ║
+╚══════════════════════════════════════════╝
+
+● Order Processing → User Management (strong: 12 FKs)
+◐ Order Processing → Product Catalog (medium: 6 FKs)
+○ Product Catalog → User Management (weak: 2 FKs)
+```
+
+#### `sqlfy stability`
+
+```bash
+sqlfy stability <migrations-dir> [--format text|json] [--show-all]
+                [--high-churn-threshold FLOAT] [--stable-threshold FLOAT]
+                [--at VERSION] [--out FILE]
+```
+
+Calculate schema stability metrics and churn rates to identify unstable tables requiring refactoring. Analyzes how frequently tables change across migrations.
+
+| Flag | Description |
+|---|---|
+| `--show-all` | Show all tables in text output (default: only high-churn and stable) |
+| `--high-churn-threshold FLOAT` | Churn rate threshold for high-churn classification (default: 20.0%) |
+| `--stable-threshold FLOAT` | Churn rate threshold for stable classification (default: 10.0%) |
+
+**Metrics:**
+- **Churn rate** — Percentage of migrations affecting each table (0-100%)
+- **Stability score** — Inverse of churn, 0-100 scale (higher is better)
+- **Volatility** — Standard deviation of modification counts across tables
+- **Letter grade** — Overall assessment (A=Excellent, F=Critical)
+
+**Outputs:**
+- Overall stability score with letter grade
+- High-churn tables (>=20% churn) — candidates for refactoring
+- Stable tables (<10% churn) — well-designed tables
+- Modification count per table
+- Versions where each table was modified
+
+**Use cases:**
+- **Identify unstable tables** — Find tables modified too frequently
+- **Architecture assessment** — Measure schema design quality
+- **Refactoring prioritization** — Focus on high-churn areas
+- **Team velocity tracking** — Monitor schema change rate
+
+**Examples:**
+```bash
+sqlfy stability ./migrations                       # Stability report
+sqlfy stability ./migrations --format json         # JSON output
+sqlfy stability ./migrations --show-all            # Include all tables
+sqlfy stability ./migrations --high-churn-threshold 15.0  # Lower threshold
+```
+
+**Example output:**
+```
+╔══════════════════════════════════════════╗
+║     SCHEMA STABILITY METRICS             ║
+╚══════════════════════════════════════════╝
+
+Overall:
+  Total migrations: 50
+  Stability score: 68/100
+  Volatility (std dev): 2.34
+
+  Grade: C (Fair)
+
+
+High Churn Tables (4):
+  (Tables with churn rate >= 20%)
+
+  • APP.USERS
+      18 modifications
+      36.0% churn rate
+      Stability score: 28/100
+      Modified in versions: 3, 7, 12, 15, 18, 22, 25...
+
+  • APP.ORDERS
+      12 modifications
+      24.0% churn rate
+      Stability score: 52/100
+
+
+Stable Tables (12):
+  (Tables with churn rate < 10%)
+
+  • APP.PRODUCTS
+      3 modifications
+      6.0% churn rate
+      Stability score: 88/100
+
+  • APP.CATEGORIES
+      2 modifications
+      4.0% churn rate
+      Stability score: 92/100
 ```
 
 ### Legacy style (backward compatible)

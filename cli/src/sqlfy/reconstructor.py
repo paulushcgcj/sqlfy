@@ -339,8 +339,19 @@ class Reconstructor:
 
         for action_node in stmt.args.get('actions', []):
 
-            # ADD COLUMN(S)
-            if isinstance(action_node, exp.Schema):
+            # ADD COLUMN(S) - handle both Schema-wrapped and direct ColumnDef
+            if isinstance(action_node, exp.ColumnDef) and table:
+                # Direct ColumnDef (common in ALTER TABLE ADD COLUMN)
+                col = _parse_column_def(action_node)
+                if not any(c.name == col.name for c in table.columns):
+                    table.columns.append(col)
+                mark()
+                act = MigrationAction(action='ADD_COLUMN', object_type='COLUMN',
+                                      object_name=f'{full}.{col.name}', version=version)
+                acts.append(act); table.actions.append(act)
+            
+            elif isinstance(action_node, exp.Schema):
+                # Schema-wrapped ColumnDef(s)
                 for node in action_node.expressions:
                     if isinstance(node, exp.ColumnDef) and table:
                         col = _parse_column_def(node)
