@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
-import eslintPluginImport from 'eslint-plugin-import';
+import eslintPluginImport from 'eslint-plugin-import-x';
 import prettierPlugin from 'eslint-plugin-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
@@ -63,12 +63,6 @@ export default defineConfig([
     settings: {
       'react': {
         version: 'detect',
-      },
-      'import/resolver': {
-        alias: {
-          map: [['@/', './src']],
-          extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
-        },
       },
     },
   },
