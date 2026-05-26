@@ -122,6 +122,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report) |
 | `graph-migrations` | Visualize migration timeline and dependency graph |
 | `rollback-analysis` | Analyze migration rollback feasibility and generate rollback scripts |
+| `lint` | Lint migration SQL for quality and style using sqlfluff |
 | `insights` | Analyse schema and report findings (orphan tables, missing PKs, etc.) |
 | `health` | Generate migration folder health report with quality score |
 | `simulate` | Simulate schema evolution with hypothetical migrations |
@@ -303,7 +304,103 @@ sqlfy rollback-analysis ./migrations --format json    # JSON output
 sqlfy rollback-analysis ./migrations --out report.txt
 ```
 
-#### `sqlfy insights`
+#### `sqlfy lint`
+
+```bash
+sqlfy lint <path> [--format text|json] [--min-score N] [--config FILE] 
+           [--dialect DIALECT] [--no-recursive] [--out FILE]
+```
+
+Lint migration SQL files for quality and style using sqlfluff. Checks keyword capitalization, naming conventions, query anti-patterns (SELECT *), code formatting, and SQL best practices.
+
+**Features:**
+- 200+ built-in SQL linting rules from sqlfluff
+- Support for multiple dialects (Oracle, PostgreSQL, MySQL, SQLite)
+- Configurable rule severity and exclusions via `.sqlfluff` config
+- Quality score (0-100) calculation per file
+- CI/CD-friendly exit codes and JSON output
+
+| Flag | Default | Description |
+|---|---|---|
+| `path` | — | Path to SQL file or directory to lint |
+| `--format` | `text` | Output format: `text` or `json` |
+| `--min-score N` | `0` | Fail if score < N (useful for CI/CD gates) |
+| `--config FILE` | — | Path to `.sqlfluff` config file |
+| `--dialect` | `oracle` | SQL dialect: `oracle`, `postgres`, `mysql`, `sqlite` |
+| `--no-recursive` | `false` | Do not recursively scan subdirectories |
+| `--out FILE` | stdout | Write output to file |
+
+**Quality Score:**
+- Starts at 100
+- -10 per error violation
+- -5 per warning violation
+- -1 per info violation
+- Minimum score is 0
+
+**Violation Severity:**
+- **Error** — Critical issues (parse errors, syntax violations)
+- **Warning** — Style violations (lowercase keywords, short aliases, SELECT *)
+- **Info** — Minor suggestions (whitespace, formatting)
+
+**Configuration:**
+
+Create a `.sqlfluff` file in your project root to customize rules:
+
+```toml
+[sqlfluff]
+dialect = oracle
+exclude_rules = L034,L042  # Allow SELECT *, table aliases
+
+[sqlfluff:rules:L010]
+capitalisation_policy = upper  # Enforce uppercase keywords
+
+[sqlfluff:rules:L014]
+extended_capitalisation_policy = upper
+```
+
+**Examples:**
+
+```bash
+# Lint a single file
+sqlfy lint migrations/V2__add_users.sql
+
+# Lint all files in a directory
+sqlfy lint migrations/
+
+# Lint with minimum score threshold (CI/CD gate)
+sqlfy lint migrations/ --min-score 80
+
+# Lint with custom config
+sqlfy lint migrations/ --config .sqlfluff
+
+# Lint PostgreSQL migrations
+sqlfy lint migrations/ --dialect postgres
+
+# JSON output for CI/CD pipelines
+sqlfy lint migrations/ --format json --min-score 80
+
+# Non-recursive directory scan
+sqlfy lint migrations/ --no-recursive
+```
+
+**CI/CD Integration:**
+
+```yaml
+# .github/workflows/migration-quality.yml
+- name: Lint migrations
+  run: |
+    pip install sqlfluff>=3.0.0
+    sqlfy lint migrations/ --format json --min-score 80
+  # Fails build if any file scores < 80
+```
+
+**Notes:**
+- Requires `sqlfluff>=3.0.0` (install with `pip install sqlfluff`)
+- sqlfluff is an optional dependency — install only if you need linting
+- sqlfluff performs static analysis only (no database connection required)
+- Supports 200+ built-in rules covering SQL style, performance, and best practices
+
+**Examples:**
 
 ```bash
 sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] 

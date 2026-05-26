@@ -1210,6 +1210,92 @@ def cmd_rollback_analysis(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: lint
+# ─────────────────────────────────────────────
+
+def cmd_lint(args: argparse.Namespace) -> None:
+    """
+    Lint migration SQL files for quality and style using sqlfluff.
+    
+    Checks:
+      - Keyword capitalization
+      - Naming conventions
+      - Query anti-patterns (SELECT *)
+      - Code formatting and style
+      - SQL best practices
+    
+    Supports single file or directory (recursive) linting.
+    Configurable via .sqlfluff config file.
+    """
+    from .analysis.linter import (
+        lint_migration,
+        lint_directory,
+        format_text,
+        format_json,
+        format_directory_text,
+        format_directory_json,
+        SQLFLUFF_AVAILABLE,
+    )
+    
+    if not SQLFLUFF_AVAILABLE:
+        print("Error: sqlfluff is not installed", file=sys.stderr)
+        print("Install with: pip install sqlfluff>=3.0.0", file=sys.stderr)
+        sys.exit(1)
+    
+    path = args.path
+    dialect = getattr(args, 'dialect', 'oracle')
+    config_path = getattr(args, 'config', None)
+    min_score = getattr(args, 'min_score', 0)
+    fmt = getattr(args, 'format', 'text')
+    
+    # Check if path is file or directory
+    p = Path(path)
+    if not p.exists():
+        print(f"Error: path does not exist: {path}", file=sys.stderr)
+        sys.exit(1)
+    
+    if p.is_file():
+        # Lint single file
+        sql_content = p.read_text(encoding='utf-8')
+        result = lint_migration(sql_content, p.name, dialect=dialect, config_path=config_path)
+        
+        if fmt == 'json':
+            output = format_json(result)
+        else:
+            output = format_text(result)
+        
+        write_output(output, args.out)
+        
+        # Exit with error if below threshold
+        if result.score < min_score:
+            print(f"\nError: Score {result.score} is below minimum {min_score}", file=sys.stderr)
+            sys.exit(1)
+    
+    else:
+        # Lint directory
+        results = lint_directory(
+            str(p),
+            min_score=min_score,
+            recursive=not getattr(args, 'no_recursive', False),
+            dialect=dialect,
+            config_path=config_path,
+        )
+        
+        if fmt == 'json':
+            output = format_directory_json(results)
+        else:
+            output = format_directory_text(results)
+        
+        write_output(output, args.out)
+        
+        # Exit with error if any file below threshold
+        failed = [r for r in results if r.score < min_score]
+        if failed:
+            print(f"\nError: {len(failed)}/{len(results)} files below minimum score {min_score}", file=sys.stderr)
+            sys.exit(1)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -1385,6 +1471,24 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Generate rollback scripts for reversible migrations')
     p.set_defaults(func=cmd_rollback_analysis)
 
+    # lint
+    p = sub.add_parser('lint', help='Lint migration SQL files for quality and style (sqlfluff)')
+    p.add_argument('path', metavar='PATH',
+                   help='Path to SQL file or directory')
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--min-score', type=int, default=0, metavar='N',
+                   help='Fail if score < N (default: 0)')
+    p.add_argument('--config', metavar='FILE',
+                   help='Path to .sqlfluff config file')
+    p.add_argument('--dialect', default='oracle',
+                   help='SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)')
+    p.add_argument('--no-recursive', action='store_true',
+                   help='Do not recursively scan subdirectories')
+    p.add_argument('--out', metavar='FILE',
+                   help='Write output to file instead of stdout')
+    p.set_defaults(func=cmd_lint)
+
     return parser
 
 
@@ -1405,7 +1509,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint'}
 
 
 def main() -> None:

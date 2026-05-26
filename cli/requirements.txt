@@ -16,5 +16,8 @@
 # Core dependencies
 sqlglot>=30.0.0  # SQL parser and AST library (latest: v30.8.0)
 
+# Optional — for SQL linting (Feature #38)
+sqlfluff>=3.0.0  # SQL linter and style checker
+
 # Optional — for embedding-based retrieval (step 15)
 # voyageai  # only needed with --embed flag
