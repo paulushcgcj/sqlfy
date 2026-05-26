@@ -160,6 +160,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `domains` | Detect semantic business domains using community detection |
 | `stability` | Calculate schema stability metrics and churn rates |
 | `validate` | Validate migration ordering and detect issues |
+| `deps` | Analyze migration dependencies and detect circular dependencies |
 
 **Common flags available on most commands:**
 - `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
@@ -993,6 +994,145 @@ sqlfy validate ./migrations --strict || {
   echo "Migration validation failed. Run 'sqlfy validate ./migrations --fix-numbering' for suggestions."
   exit 1
 }
+```
+
+#### `sqlfy deps`
+
+```bash
+sqlfy deps <migrations-dir> [--format text|json|dot] [--validate] [--strict] [--critical-path] [--summary-only] [--out FILE]
+```
+
+Analyze migration dependencies to detect circular dependencies, unreferenced objects, parallel-safe migrations, and the critical path. Uses NetworkX graph analysis to validate that migrations reference objects that are actually created.
+
+| Flag | Description |
+|---|---|
+| `--format text\|json\|dot` | Output format: text (default), json, or dot (Graphviz) |
+| `--validate` | Show validation summary with pass/fail status |
+| `--strict` | Exit with code 1 on warnings (not just errors) |
+| `--critical-path` | Show longest dependency chain |
+| `--summary-only` | Show only summary statistics (skip detailed dependencies) |
+| `--out FILE` | Write output to file instead of stdout |
+
+**Detection Categories:**
+
+1. **Circular Dependencies** (Error)  
+   Impossible migration order where migrations depend on each other in a cycle
+
+2. **Unreferenced Objects** (Error)  
+   Migrations reference or alter tables that are never created
+
+3. **Isolated Migrations** (Warning)  
+   Migrations with no dependencies that create no objects
+
+**Analysis Features:**
+
+- **Dependency Map** — Shows which migrations depend on which other migrations
+- **Reverse Dependency Map** — Shows which migrations are required by others
+- **Parallel-Safe Sets** — Groups migrations that can run concurrently (topological layers)
+- **Critical Path** — Longest dependency chain (minimum sequential execution time)
+- **Validation** — Detects unreferenced objects and circular dependencies
+
+**Exit Codes:**
+- `0` — No issues (or warnings in non-strict mode)
+- `1` — Errors found (or warnings in strict mode)
+
+**Use Cases:**
+- **CI/CD Gate** — Prevent deployment of migrations with dependency errors
+- **Optimization** — Identify migrations that can run in parallel
+- **Debugging** — Understand why migrations are failing at runtime
+- **Documentation** — Generate dependency graphs for team reference
+
+**Examples:**
+```bash
+# Basic dependency analysis
+sqlfy deps ./migrations
+
+# Show validation summary
+sqlfy deps ./migrations --validate
+
+# Show critical path
+sqlfy deps ./migrations --critical-path
+
+# Export as Graphviz DOT
+sqlfy deps ./migrations --format dot --out deps.dot
+dot -Tsvg deps.dot -o deps.svg
+
+# Export as JSON for automation
+sqlfy deps ./migrations --format json --out deps.json
+
+# Summary only (skip detailed dependencies)
+sqlfy deps ./migrations --summary-only
+
+# Strict mode for CI/CD
+sqlfy deps ./migrations --validate --strict
+```
+
+**Example Output:**
+```
+Migration Dependency Analysis
+==================================================
+
+Total Migrations: 6
+Total Dependencies: 5
+Circular Dependencies: 0
+Parallel-Safe Sets: 3
+Critical Path Length: 4
+
+Issues Found: 0 total
+  ✅ No issues found
+
+Critical Path (Longest Dependency Chain)
+--------------------------------------------------
+V1 → V2 → V3 → V5
+(4 migrations must run sequentially)
+
+Parallel-Safe Migration Sets
+--------------------------------------------------
+Layer 1: V1
+Layer 2: V2, V4 (can run in parallel)
+Layer 3: V3, V5 (can run in parallel)
+Layer 4: V6
+
+Migration Dependencies
+--------------------------------------------------
+
+V1__create_users.sql
+  Depends on: (none)
+  Required by: V2__create_profiles.sql, V3__add_foreign_key.sql
+
+V2__create_profiles.sql
+  Depends on: V1__create_users.sql
+  Required by: V3__add_foreign_key.sql
+
+...
+```
+
+**Example with Issues:**
+```
+Migration Dependency Analysis
+==================================================
+
+Total Migrations: 3
+Total Dependencies: 0
+Circular Dependencies: 0
+Parallel-Safe Sets: 1
+Critical Path Length: 1
+
+Issues Found: 2 total
+  ❌ 2 error(s)
+
+Issues Detail
+--------------------------------------------------
+
+ERRORS:
+  [UNREFERENCED_OBJECT] Migration V2 alters table ORDERS that is never created
+  [UNREFERENCED_OBJECT] Migration V3 references table USERS that is never created
+```
+
+**CI/CD Integration Example (GitHub Actions):**
+```yaml
+- name: Validate Migration Dependencies
+  run: sqlfy deps ./migrations --validate --strict
 ```
 
 ### Legacy style (backward compatible)

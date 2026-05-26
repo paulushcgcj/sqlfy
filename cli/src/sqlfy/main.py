@@ -1476,6 +1476,79 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_deps(args: argparse.Namespace) -> int:
+    """
+    Analyze migration dependencies.
+    
+    Detects:
+    - Circular dependencies (impossible migration order)
+    - Unreferenced objects (migrations reference tables not yet created)
+    - Parallel-safe migrations (can run concurrently)
+    - Critical path (longest dependency chain)
+    
+    Returns:
+        0 if valid, 1 if errors found (or warnings in --strict mode)
+    """
+    from .analysis.deps import analyze_dependencies, format_text, format_json, format_dot, validate_dependencies
+    
+    migrations_dir = Path(args.migrations_dir)
+    
+    if not migrations_dir.is_dir():
+        print(f"Error: migrations directory not found: {migrations_dir}", file=sys.stderr)
+        return 1
+    
+    try:
+        # Analyze dependencies
+        analysis = analyze_dependencies(migrations_dir)
+        
+        # Format output
+        fmt = getattr(args, 'format', 'text')
+        show_details = not getattr(args, 'summary_only', False)
+        
+        if fmt == 'json':
+            output = format_json(analysis)
+        elif fmt == 'dot':
+            output = format_dot(analysis)
+        else:
+            output = format_text(analysis, show_details=show_details)
+        
+        # Print output
+        write_output(output, getattr(args, 'out', None))
+        
+        # Validate if requested
+        if getattr(args, 'validate', False):
+            is_valid, message = validate_dependencies(analysis, strict=getattr(args, 'strict', False))
+            print(f"\n{message}", file=sys.stderr)
+            if not is_valid:
+                return 1
+        
+        # Show critical path if requested
+        if getattr(args, 'critical_path', False) and analysis.critical_path:
+            print("\n🔴 Critical Path (Longest Dependency Chain):", file=sys.stderr)
+            print(f"  {' → '.join(analysis.critical_path)}", file=sys.stderr)
+            print(f"  ({len(analysis.critical_path)} migrations must run sequentially)", file=sys.stderr)
+        
+        # Exit code
+        error_count = sum(1 for issue in analysis.issues if issue.severity == 'error')
+        warning_count = sum(1 for issue in analysis.issues if issue.severity == 'warning')
+        
+        if error_count > 0:
+            return 1
+        if getattr(args, 'strict', False) and warning_count > 0:
+            return 1
+        return 0
+        
+    except ImportError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        print("Install networkx: pip install networkx", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error analyzing dependencies: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
 # ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
@@ -1711,6 +1784,23 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Write output to file instead of stdout')
     p.set_defaults(func=cmd_validate)
 
+    # deps
+    p = sub.add_parser('deps', help='Analyze migration dependencies and detect issues')
+    p.add_argument('migrations_dir', help='Path to directory containing migration files')
+    p.add_argument('--format', choices=['text', 'json', 'dot'], default='text',
+                   help='Output format: text, json, or dot (Graphviz) (default: text)')
+    p.add_argument('--validate', action='store_true',
+                   help='Validate dependencies and show validation summary')
+    p.add_argument('--strict', action='store_true',
+                   help='Exit with code 1 on warnings (not just errors)')
+    p.add_argument('--critical-path', action='store_true',
+                   help='Show critical path (longest dependency chain)')
+    p.add_argument('--summary-only', action='store_true',
+                   help='Show only summary statistics (skip detailed dependency info)')
+    p.add_argument('--out', metavar='FILE',
+                   help='Write output to file instead of stdout')
+    p.set_defaults(func=cmd_deps)
+
     return parser
 
 
@@ -1733,7 +1823,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate', 'deps'}
 
 
 def main() -> None:
