@@ -405,6 +405,10 @@ def cmd_graph(args: argparse.Namespace) -> None:
       dot      — Graphviz DOT  (render with `dot -Tsvg schema.dot -o schema.svg`)
       mermaid  — Mermaid ERD   (paste into GitHub Markdown or https://mermaid.live)
       summary  — Compact ASCII adjacency list (good for LLM prompts)
+      json     — NetworkX node-link graph (graph.json)
+      html     — Interactive vis.js visualization (graph.html)
+      report   — Human-readable graph summary (GRAPH_REPORT.md)
+      all      — Generate json, html, and report together
     """
     files = load_files(args.migrations_dir, args.json_input)
     graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
@@ -412,18 +416,61 @@ def cmd_graph(args: argparse.Namespace) -> None:
 
     fmt   = (args.format or 'dot').lower()
     title = getattr(args, 'title', '') or f'Schema V{state.version}'
-
-    if fmt == 'dot':
-        output = Grapher.to_dot(state, title=title)
-    elif fmt == 'mermaid':
-        output = Grapher.to_mermaid(state, title=title)
-    elif fmt == 'summary':
-        output = Grapher.to_summary(state)
+    
+    # Legacy formats (dot, mermaid, summary) - write to stdout or --out
+    if fmt in ('dot', 'mermaid', 'summary'):
+        if fmt == 'dot':
+            output = Grapher.to_dot(state, title=title)
+        elif fmt == 'mermaid':
+            output = Grapher.to_mermaid(state, title=title)
+        else:  # summary
+            output = Grapher.to_summary(state)
+        write_output(output, args.out)
+        return
+    
+    # New formats (json, html, report, all) - require NetworkX graph and output to files
+    from .core import build_networkx_graph
+    from .output.graph_export import export_graph_json, export_graph_html, export_graph_report
+    
+    # Build NetworkX graph
+    nx_graph = build_networkx_graph(graph, directed=True)
+    
+    # Determine output directory
+    output_dir = Path(getattr(args, 'output_dir', None) or 'sqlfy-out')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    if fmt == 'json':
+        output_path = output_dir / 'graph.json'
+        export_graph_json(nx_graph, output_path=output_path)
+        print(f'✓ Exported NetworkX graph to {output_path}', file=sys.stderr)
+    
+    elif fmt == 'html':
+        output_path = output_dir / 'graph.html'
+        export_graph_html(nx_graph, output_path=output_path)
+        print(f'✓ Exported interactive visualization to {output_path}', file=sys.stderr)
+    
+    elif fmt == 'report':
+        output_path = output_dir / 'GRAPH_REPORT.md'
+        export_graph_report(nx_graph, output_path=output_path)
+        print(f'✓ Exported graph report to {output_path}', file=sys.stderr)
+    
+    elif fmt == 'all':
+        json_path = output_dir / 'graph.json'
+        html_path = output_dir / 'graph.html'
+        report_path = output_dir / 'GRAPH_REPORT.md'
+        
+        export_graph_json(nx_graph, output_path=json_path)
+        export_graph_html(nx_graph, output_path=html_path)
+        export_graph_report(nx_graph, output_path=report_path)
+        
+        print(f'✓ Exported all graph outputs to {output_dir}/', file=sys.stderr)
+        print(f'  - graph.json', file=sys.stderr)
+        print(f'  - graph.html', file=sys.stderr)
+        print(f'  - GRAPH_REPORT.md', file=sys.stderr)
+    
     else:
-        print(f'Error: unknown format "{fmt}". Choose dot, mermaid, or summary.', file=sys.stderr)
+        print(f'Error: unknown format "{fmt}". Choose dot, mermaid, summary, json, html, report, or all.', file=sys.stderr)
         sys.exit(1)
-
-    write_output(output, args.out)
 
 
 # ─────────────────────────────────────────────
@@ -751,9 +798,10 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_diff)
 
     # graph
-    p = sub.add_parser('graph', help='Output graph (DOT, Mermaid, or summary)')
-    shared(p); p.add_argument('--format', choices=['dot','mermaid','summary'], default='dot')
+    p = sub.add_parser('graph', help='Output graph (DOT, Mermaid, JSON, HTML, or report)')
+    shared(p); p.add_argument('--format', choices=['dot','mermaid','summary','json','html','report','all'], default='dot')
     p.add_argument('--title', metavar='TEXT')
+    p.add_argument('--output-dir', metavar='PATH', help='Output directory for json/html/report (default: sqlfy-out)')
     p.set_defaults(func=cmd_graph)
 
     # insights
