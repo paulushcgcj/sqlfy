@@ -761,6 +761,57 @@ def _parse_bool(val: object) -> 'bool | None':
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: impact
+# ─────────────────────────────────────────────
+
+def cmd_impact(args: argparse.Namespace) -> None:
+    """
+    Analyze impact of changes to a schema object.
+    
+    Uses graph traversal to find all objects (tables, views, columns, etc.)
+    that would be affected by changes to the specified object.
+    
+    Supports:
+      - Direct dependencies (depth 1)
+      - Transitive dependencies (depth > 1)
+      - Critical path identification
+      - Grouping by object type
+    """
+    files = load_files(args.migrations_dir, args.json_input)
+    graph_data = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    
+    # Build NetworkX graph
+    from .core import build_networkx_graph
+    from .analysis.impact import analyze_impact, format_impact_text, format_impact_json
+    
+    nx_graph = build_networkx_graph(graph_data, directed=True)
+    
+    # Analyze impact
+    object_id = args.object.upper()
+    max_depth = getattr(args, 'depth', 5)
+    direction = getattr(args, 'direction', 'out')
+    
+    result = analyze_impact(nx_graph, object_id, max_depth=max_depth, follow_direction=direction)
+    
+    # Format output
+    fmt = getattr(args, 'format', 'text')
+    if fmt == 'json':
+        output = format_impact_json(result)
+    else:
+        output = format_impact_text(result, nx_graph)
+    
+    write_output(output, args.out)
+    
+    # Summary to stderr
+    if result.total_count == 0:
+        print(f'No affected objects found for {object_id}', file=sys.stderr)
+    else:
+        print(f'  {result.total_count} affected object(s)', file=sys.stderr)
+        print(f'  {len(result.direct)} direct, {len(result.transitive)} transitive', file=sys.stderr)
+        print(f'  Max depth: {result.max_depth}', file=sys.stderr)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -858,6 +909,19 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument('--created-in', metavar='VER',    help='Filter by created version')
     p.add_argument('--unique-only',action='store_true', help='indexes: unique only')
     p.set_defaults(func=cmd_query)
+
+    # impact
+    p = sub.add_parser('impact', help='Analyze impact of schema object changes (NetworkX)')
+    shared(p)
+    p.add_argument('object', metavar='OBJECT_ID',
+                   help='Schema object to analyze (e.g., APP.USERS, APP.USERS.EMAIL)')
+    p.add_argument('--depth', type=int, default=5, metavar='N',
+                   help='Maximum traversal depth (default: 5)')
+    p.add_argument('--direction', choices=['in', 'out'], default='out',
+                   help='Traversal direction: out=affected by, in=depends on (default: out)')
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.set_defaults(func=cmd_impact)
 
     return parser
 

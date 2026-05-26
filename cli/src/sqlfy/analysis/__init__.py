@@ -1,7 +1,7 @@
 """
 sqlfy.analysis
 ==============
-Schema analysis tools: diff, insights, validation, querying, vector retrieval.
+Schema analysis tools: diff, insights, validation, querying, vector retrieval, impact analysis.
 """
 
 from .differ import SchemaDiffer, DiffResult
@@ -10,6 +10,7 @@ from .validator import validate_graph_structure, validate_node_types, validate_e
 from .asker import Asker, ChatSession
 from .query import QueryEngine
 from .retriever import KeywordRetriever, EmbeddingRetriever, make_retriever
+from .impact import analyze_impact, ImpactResult, format_impact_text, format_impact_json
 
 __all__ = [
     # Diff
@@ -24,4 +25,6 @@ __all__ = [
     'QueryEngine',
     # Retrieval
     'KeywordRetriever', 'EmbeddingRetriever', 'make_retriever',
+    # Impact
+    'analyze_impact', 'ImpactResult', 'format_impact_text', 'format_impact_json',
 ]
