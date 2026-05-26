@@ -1119,6 +1119,54 @@ def cmd_impact(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: graph-migrations
+# ─────────────────────────────────────────────
+
+def cmd_graph_migrations(args: argparse.Namespace) -> None:
+    """
+    Visualize migration timeline and dependency graph.
+    
+    Generates:
+      - DOT format (Graphviz) for static diagrams
+      - HTML format (vis.js) for interactive exploration
+      - Timeline format for chronological view
+      - JSON format for programmatic access
+    
+    Dependency detection:
+      - CREATE TABLE → no dependencies
+      - ALTER TABLE → depends on migrations that created the table
+      - CREATE VIEW → depends on tables used in the view
+      - Foreign keys → depends on referenced tables
+    """
+    files = load_files(args.migrations_dir, args.json_input, use_cache=False)
+    
+    from .migration_graph import build_migration_graph, format_dot, format_html, format_timeline, format_json
+    
+    # Build migration graph
+    migration_graph = build_migration_graph(files)
+    
+    # Format output
+    fmt = getattr(args, 'format', 'timeline')
+    if fmt == 'dot':
+        output = format_dot(migration_graph)
+    elif fmt == 'html':
+        output = format_html(migration_graph)
+    elif fmt == 'timeline':
+        output = format_timeline(migration_graph)
+    elif fmt == 'json':
+        output = format_json(migration_graph)
+    else:
+        print(f'Error: unsupported format: {fmt}', file=sys.stderr)
+        sys.exit(1)
+    
+    write_output(output, args.out)
+    
+    # Summary to stderr
+    print(f'  {len(migration_graph.nodes)} migrations', file=sys.stderr)
+    print(f'  {len(migration_graph.edges)} dependencies', file=sys.stderr)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -1278,6 +1326,13 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Output format (default: text)')
     p.set_defaults(func=cmd_impact)
 
+    # graph-migrations
+    p = sub.add_parser('graph-migrations', help='Visualize migration timeline and dependencies')
+    shared(p)
+    p.add_argument('--format', choices=['dot', 'html', 'timeline', 'json'], default='timeline',
+                   help='Output format: dot (Graphviz), html (interactive), timeline (text), json (default: timeline)')
+    p.set_defaults(func=cmd_graph_migrations)
+
     return parser
 
 
@@ -1298,7 +1353,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
 
 
 def main() -> None:

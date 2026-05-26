@@ -72,6 +72,7 @@ sqlfy ./samples      # human-readable schema summary
 | `chunks` | Output LLM vector chunks |
 | `diff` | Compare two Schema State Dictionaries or migration directories |
 | `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report) |
+| `graph-migrations` | Visualize migration timeline and dependency graph |
 | `insights` | Analyse schema and report findings (orphan tables, missing PKs, etc.) |
 | `health` | Generate migration folder health report with quality score |
 | `simulate` | Simulate schema evolution with hypothetical migrations |
@@ -186,6 +187,36 @@ sqlfy graph ./migrations --format drawio --out schema.drawio
 sqlfy graph ./migrations --format json --output-dir ./out
 sqlfy graph ./migrations --format html --output-dir ./out
 sqlfy graph ./migrations --format all                 # All formats
+```
+
+#### `sqlfy graph-migrations`
+
+```bash
+sqlfy graph-migrations <migrations-dir> [--format FORMAT] [--at VERSION] [--out FILE]
+```
+
+Visualize the migration timeline and dependency graph. Shows which migrations depend on others based on DDL operations (CREATE TABLE, ALTER TABLE, CREATE VIEW, foreign keys).
+
+| Format | Description |
+|---|---|
+| `timeline` _(default)_ | Text-based chronological view with dependency annotations |
+| `dot` | Graphviz DOT format — render with `dot -Tsvg migrations.dot -o migrations.svg` |
+| `html` | Interactive vis.js visualization with hierarchical layout |
+| `json` | Machine-readable graph structure with nodes and edges |
+
+**Dependency detection:**
+- `CREATE TABLE` → no dependencies
+- `ALTER TABLE` → depends on migrations that created the table
+- `CREATE VIEW` → depends on tables used in the view
+- `Foreign keys` → depends on referenced tables
+- Transitive dependency resolution
+
+**Examples:**
+```bash
+sqlfy graph-migrations ./migrations                   # Timeline view
+sqlfy graph-migrations ./migrations --format dot      # Graphviz format
+sqlfy graph-migrations ./migrations --format html --out migrations.html
+sqlfy graph-migrations ./migrations --format json --out graph.json
 ```
 
 #### `sqlfy insights`
