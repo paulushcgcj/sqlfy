@@ -655,6 +655,55 @@ def cmd_simulate(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: integrity
+# ─────────────────────────────────────────────
+
+def cmd_integrity(args: argparse.Namespace) -> None:
+    """
+    Check migration file integrity using SHA256 hashes.
+    
+    Detect tampering or edits to migration files by comparing current
+    file hashes against a manifest of previously recorded hashes.
+    """
+    from .analysis.integrity import check_integrity, update_manifest
+    
+    migrations_dir = Path(args.migrations_dir)
+    
+    if getattr(args, 'update_manifest', False):
+        update_manifest(migrations_dir)
+        print("✓ Manifest updated")
+        return
+    
+    report = check_integrity(migrations_dir)
+    
+    if report.status == "clean":
+        print(f"✓ All {report.total_migrations} migrations verified")
+        return
+    
+    # Print warnings
+    if report.modified:
+        print("\n⚠ Modified migrations:")
+        for m in report.modified:
+            print(f"  {m['filename']} (V{m['version']})")
+            print(f"    Old: {m['old_hash'][:12]}...")
+            print(f"    New: {m['new_hash'][:12]}...")
+    
+    if report.missing:
+        print("\n⚠ Missing migrations:")
+        for m in report.missing:
+            print(f"  {m['filename']} (V{m['version']})")
+    
+    if report.new:
+        print(f"\n✓ New migrations ({len(report.new)}):")
+        for m in report.new:
+            print(f"  {m['filename']} (V{m['version']})")
+    
+    if getattr(args, 'strict', False) and report.modified:
+        print("\nError: Modified migrations detected (--strict mode)")
+        sys.exit(1)
+
+
+# ─────────────────────────────────────────────
 # SUBCOMMAND: ask
 # ─────────────────────────────────────────────
 
@@ -1032,6 +1081,15 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Exit with error if simulation is unsafe')
     p.set_defaults(func=cmd_simulate)
 
+    # integrity
+    p = sub.add_parser('integrity', help='Check migration file integrity using SHA256 hashes')
+    p.add_argument('migrations_dir', help='Path to migrations directory')
+    p.add_argument('--strict', action='store_true',
+                   help='Exit with error if modified migrations detected')
+    p.add_argument('--update-manifest', action='store_true',
+                   help='Accept modifications and update manifest')
+    p.set_defaults(func=cmd_integrity)
+
     # ask
     p = sub.add_parser('ask', help='Ask a natural language question (RAG)')
     rag_shared(p)
@@ -1113,7 +1171,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'ask', 'chat', 'export', 'query', 'impact'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'integrity', 'ask', 'chat', 'export', 'query', 'impact'}
 
 
 def main() -> None:

@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "migrations": [
+    {
+      "filename": "V1__create_core_tables.sql",
+      "version": "1",
+      "hash": "e63fba3a7f35f5d18c96c26174ed2921cf4213cfb32d62484fb1ebaf11d69566",
+      "first_seen": "2026-05-26T19:59:05.291694+00:00",
+      "last_modified": null
+    },
+    {
+      "filename": "V2__create_orders.sql",
+      "version": "2",
+      "hash": "523f31d0b0c193b7572978e1c3a62383cd1c29927ca25c52d3b553e61ee82415",
+      "first_seen": "2026-05-26T19:59:05.291694+00:00",
+      "last_modified": null
+    },
+    {
+      "filename": "V3__add_audit.sql",
+      "version": "3",
+      "hash": "5778ea35d6bb530a45501733dcb2042ddc6fe7607c53430a7b64967f6a08cd2c",
+      "first_seen": "2026-05-26T19:59:05.291694+00:00",
+      "last_modified": null
+    }
+  ]
+}
