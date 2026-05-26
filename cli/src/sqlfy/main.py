@@ -564,6 +564,97 @@ def cmd_insights(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: health
+# ─────────────────────────────────────────────
+
+def cmd_health(args: argparse.Namespace) -> None:
+    """
+    Generate migration folder health report.
+    
+    Provides high-level summary of migration quality:
+    - Safe vs unsafe migrations
+    - Irreversible operations
+    - Health score (0-100)
+    - Migration file status
+    """
+    from .analysis.health import HealthAnalyzer
+    
+    files = load_files(args.migrations_dir, args.json_input)
+    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
+    
+    # Run insights analysis first
+    report = InsightsEngine.analyse(state)
+    
+    # Generate health report
+    health_report = HealthAnalyzer.analyze(state, report, args.migrations_dir or '.')
+    
+    # Format output
+    fmt = (args.format or 'text').lower()
+    if fmt == 'json':
+        output = health_report.to_json()
+    else:
+        output = health_report.to_text()
+    
+    write_output(output, args.out)
+    
+    # Exit with non-zero if health score is critical
+    if getattr(args, 'strict', False) and health_report.health_score.grade == 'critical':
+        sys.exit(1)
+
+
+# ─────────────────────────────────────────────
+# SUBCOMMAND: simulate
+# ─────────────────────────────────────────────
+
+def cmd_simulate(args: argparse.Namespace) -> None:
+    """
+    Simulate schema evolution with hypothetical migrations.
+    
+    Test DDL changes before committing:
+    - Apply what-if SQL on top of existing state
+    - Compare simulated vs actual state
+    - Validate migration safety
+    """
+    from .analysis.simulator import SchemaSimulator
+    
+    files = load_files(args.migrations_dir, args.json_input)
+    
+    # Create simulator at base version
+    simulator = SchemaSimulator(files, base_version=getattr(args, 'at', None))
+    
+    # Get SQL to simulate
+    if getattr(args, 'sql', None):
+        sql = args.sql
+        result = simulator.simulate_sql(sql)
+    elif getattr(args, 'file', None):
+        result = simulator.simulate_file(args.file)
+    else:
+        print("Error: Must provide --sql or --file", file=sys.stderr)
+        sys.exit(1)
+    
+    # Format output
+    fmt = (args.format or 'text').lower()
+    if fmt == 'json':
+        output = result.to_json()
+    else:
+        output = result.to_text()
+    
+    write_output(output, args.out)
+    
+    # Show diff if requested
+    if getattr(args, 'diff', False):
+        print("\n" + "="*60)
+        print("DIFF:")
+        print("="*60)
+        print(result.diff.to_text())
+    
+    # Exit with error if not safe
+    if getattr(args, 'strict', False) and not result.is_safe():
+        sys.exit(1)
+
+
+# ─────────────────────────────────────────────
 # SUBCOMMAND: ask
 # ─────────────────────────────────────────────
 
@@ -921,6 +1012,26 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument('--strict', action='store_true')
     p.set_defaults(func=cmd_insights)
 
+    # health
+    p = sub.add_parser('health', help='Generate migration folder health report')
+    shared(p); p.add_argument('--format', choices=['text','json'], default='text')
+    p.add_argument('--strict', action='store_true',
+                   help='Exit with error code if health score is critical')
+    p.set_defaults(func=cmd_health)
+
+    # simulate
+    p = sub.add_parser('simulate', help='Simulate schema evolution with hypothetical migrations')
+    shared(p)
+    p.add_argument('--sql', metavar='SQL', help='Inline SQL to simulate')
+    p.add_argument('--file', metavar='PATH', help='Path to SQL file to simulate')
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format')
+    p.add_argument('--diff', action='store_true',
+                   help='Show diff between base and simulated state')
+    p.add_argument('--strict', action='store_true',
+                   help='Exit with error if simulation is unsafe')
+    p.set_defaults(func=cmd_simulate)
+
     # ask
     p = sub.add_parser('ask', help='Ask a natural language question (RAG)')
     rag_shared(p)
@@ -1002,7 +1113,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'ask', 'chat', 'export', 'query'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'ask', 'chat', 'export', 'query', 'impact'}
 
 
 def main() -> None:
