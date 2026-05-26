@@ -214,13 +214,13 @@ a{{color:var(--acc);text-decoration:none}}
     <div class="nav-item" onclick="showSection('erd', this)">
       ERD Diagram
     </div>
-    {f'<div class="nav-item" onclick="showSection(\'insights\', this)">Insights <span class="badge">{errors+warnings+infos}</span></div>' if report else ''}
+    {f'<div class="nav-item" onclick="showSection(&apos;insights&apos;, this)">Insights <span class="badge">{errors+warnings+infos}</span></div>' if report else ''}
     <div class="nav-item" onclick="showSection('history', this)">Migration History</div>
 
     <div class="nav-sect">Tables ({stats['table_count']})</div>
     {''.join(
       f'<div class="nav-item table-nav" data-target="tbl-{_e(t.full_name.replace(".", "-"))}" '
-      f'onclick="scrollToTable(\'{_e(t.full_name)}\', this)">'
+      f'onclick="scrollToTable(&apos;{_e(t.full_name)}&apos;, this)">'
       f'{_e(t.name)} <span class="badge">{len(t.columns)}c</span></div>'
       for t in state.tables.values()
     )}
@@ -413,7 +413,7 @@ document.querySelectorAll('.table-card').forEach(c => c.classList.add('visible')
                 f'<tr><td>▶</td>'
                 f'<td>{_e(r.constraint_name or "")}</td>'
                 f'<td><code>{_e(", ".join(r.from_columns))}</code> → '
-                f'<a href="#" onclick="scrollToTable(\'{_e(r.to_table)}\',null);return false">'
+                f'<a href="#" onclick="scrollToTable(&apos;{_e(r.to_table)}&apos;,null);return false">'
                 f'{_e(r.to_table)}</a>.<code>{_e(", ".join(r.to_columns))}</code>{od}</td>'
                 f'</tr>'
             )
@@ -421,7 +421,7 @@ document.querySelectorAll('.table-card').forEach(c => c.classList.add('visible')
             rel_rows += (
                 f'<tr><td>◀</td>'
                 f'<td>{_e(r.constraint_name or "")}</td>'
-                f'<td><a href="#" onclick="scrollToTable(\'{_e(r.from_table)}\',null);return false">'
+                f'<td><a href="#" onclick="scrollToTable(&apos;{_e(r.from_table)}&apos;,null);return false">'
                 f'{_e(r.from_table)}</a>.<code>{_e(", ".join(r.from_columns))}</code> → '
                 f'<code>{_e(", ".join(r.to_columns))}</code></td>'
                 f'</tr>'
