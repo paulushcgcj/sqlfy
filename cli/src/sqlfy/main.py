@@ -58,15 +58,26 @@ from .analysis.query import QueryEngine
 # FILE LOADING
 # ─────────────────────────────────────────────
 
-def load_files(migrations_dir: str | None, json_input: str | None) -> list[dict]:
-    """Load migration files from a directory or a JSON input file."""
+def load_files(
+    migrations_dir: str | None, json_input: str | None, use_cache: bool = True
+) -> list[dict]:
+    """Load migration files from a directory or a JSON input file.
+    
+    Args:
+        migrations_dir: Path to directory containing migration files.
+        json_input: Path to JSON file with pre-loaded migrations.
+        use_cache: Enable file-based caching (default: True).
+    
+    Returns:
+        List of dicts with {filename, sql} for each migration.
+    """
     if json_input:
         p = Path(json_input)
         if not p.is_file():
-            print(f'Error: --json-input file not found: {p}', file=sys.stderr)
+            print(f"Error: --json-input file not found: {p}", file=sys.stderr)
             sys.exit(1)
-        files = json.loads(p.read_text(encoding='utf-8'))
-        print(f'Loaded {len(files)} migration(s) from JSON input', file=sys.stderr)
+        files = json.loads(p.read_text(encoding="utf-8"))
+        print(f"Loaded {len(files)} migration(s) from JSON input", file=sys.stderr)
         return files
 
     if migrations_dir:
@@ -74,15 +85,43 @@ def load_files(migrations_dir: str | None, json_input: str | None) -> list[dict]
         if not p.is_dir():
             print(f'Error: "{p}" is not a directory.', file=sys.stderr)
             sys.exit(1)
-        sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == '.sql')
+        sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == ".sql")
         if not sql_files:
-            print(f'No .sql files found in {p}', file=sys.stderr)
+            print(f"No .sql files found in {p}", file=sys.stderr)
             sys.exit(1)
-        files = [{'filename': f.name, 'sql': f.read_text(encoding='utf-8')} for f in sql_files]
-        print(f'Loaded {len(files)} migration file(s) from {p}', file=sys.stderr)
+        
+        if use_cache:
+            from .cache import load_cached, save_cached
+            
+            files = []
+            cache_hits = 0
+            for f in sql_files:
+                cached = load_cached(f)
+                if cached:
+                    files.append(cached)
+                    cache_hits += 1
+                else:
+                    # Cache miss — read and cache
+                    sql_content = f.read_text(encoding="utf-8")
+                    result = {"filename": f.name, "sql": sql_content}
+                    save_cached(f, result)
+                    files.append(result)
+            
+            if cache_hits > 0:
+                print(
+                    f"Cache: {cache_hits}/{len(sql_files)} hits",
+                    file=sys.stderr
+                )
+        else:
+            files = [
+                {"filename": f.name, "sql": f.read_text(encoding="utf-8")}
+                for f in sql_files
+            ]
+        
+        print(f"Loaded {len(files)} migration file(s) from {p}", file=sys.stderr)
         return files
 
-    print('Error: provide either migrations_dir or --json-input FILE', file=sys.stderr)
+    print("Error: provide either migrations_dir or --json-input FILE", file=sys.stderr)
     sys.exit(1)
 
 
@@ -704,6 +743,57 @@ def cmd_integrity(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: cache
+# ─────────────────────────────────────────────
+
+def cmd_cache(args: argparse.Namespace) -> None:
+    """
+    Manage the file-based caching system.
+    
+    Subcommands:
+    - clear: Delete all cache entries
+    - info: Show cache statistics
+    """
+    from .cache import clear_cache, _CACHE_ROOT
+    
+    action = args.cache_action
+    
+    if action == "clear":
+        clear_cache()
+        print("✓ Cache cleared")
+    elif action == "info":
+        cache_dir = _CACHE_ROOT / "migrations"
+        stat_index = _CACHE_ROOT / "stat-index.json"
+        
+        if not cache_dir.exists() and not stat_index.exists():
+            print("Cache is empty")
+            return
+        
+        # Count cache entries
+        cache_count = len(list(cache_dir.glob("*.json"))) if cache_dir.exists() else 0
+        
+        # Compute total cache size
+        total_size = 0
+        if cache_dir.exists():
+            for f in cache_dir.glob("*.json"):
+                try:
+                    total_size += f.stat().st_size
+                except OSError:
+                    pass
+        if stat_index.exists():
+            try:
+                total_size += stat_index.stat().st_size
+            except OSError:
+                pass
+        
+        size_mb = total_size / (1024 * 1024)
+        
+        print(f"Cache location: {_CACHE_ROOT}")
+        print(f"Cached entries: {cache_count}")
+        print(f"Total size: {size_mb:.2f} MB")
+
+
+# ─────────────────────────────────────────────
 # SUBCOMMAND: ask
 # ─────────────────────────────────────────────
 
@@ -1090,6 +1180,12 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Accept modifications and update manifest')
     p.set_defaults(func=cmd_integrity)
 
+    # cache
+    p = sub.add_parser('cache', help='Manage file-based caching system')
+    p.add_argument('cache_action', choices=['clear', 'info'],
+                   help='Action: clear (delete all) or info (show stats)')
+    p.set_defaults(func=cmd_cache)
+
     # ask
     p = sub.add_parser('ask', help='Ask a natural language question (RAG)')
     rag_shared(p)
@@ -1171,7 +1267,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'integrity', 'ask', 'chat', 'export', 'query', 'impact'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact'}
 
 
 def main() -> None:
