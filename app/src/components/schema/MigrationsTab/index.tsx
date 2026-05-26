@@ -1,5 +1,6 @@
-import type { FC } from 'react';
 import type { MigrationFile } from '@/core/types';
+import type { FC } from 'react';
+
 import { writeFile, folderLabel, type FolderHandle } from '@/bridge/folder';
 import './index.scss';
 
@@ -39,7 +40,7 @@ export interface MigrationsTabProps {
  */
 const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, onLoadFolder }) => {
   function updateFile(index: number, field: keyof MigrationFile, value: string) {
-    const next = files.map((f, i) => i === index ? { ...f, [field]: value } : f);
+    const next = files.map((f, i) => (i === index ? { ...f, [field]: value } : f));
     onChange(next);
   }
 
@@ -49,7 +50,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
 
   async function addFile() {
     const filename = `V${files.length + 1}__new_migration.sql`;
-    const sql      = '-- Add your SQL here\n';
+    const sql = '-- Add your SQL here\n';
     if (folderHandle) {
       await writeFile(folderHandle, filename, sql);
     }
@@ -58,22 +59,27 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
 
   return (
     <div className="panel">
-
       {/* Toolbar */}
       <div className="migrations-toolbar">
-        <button className="migraton-btn add-btn" onClick={addFile}>+ Add Migration File</button>
+        <button className="migraton-btn add-btn" onClick={addFile}>
+          + Add Migration File
+        </button>
         {onLoadFolder && (
           <button className="migraton-btn load-folder-btn" onClick={onLoadFolder}>
             📁 Load from folder
           </button>
         )}
         {folderHandle && (
-          <span className="folder-badge" title={folderHandle.type === 'tauri' ? folderHandle.path : folderHandle.dir.name}>
+          <span
+            className="folder-badge"
+            title={folderHandle.type === 'tauri' ? folderHandle.path : folderHandle.dir.name}
+          >
             {folderLabel(folderHandle)}
-            <span className="folder-count">{files.length} file{files.length !== 1 ? 's' : ''}</span>
+            <span className="folder-count">
+              {files.length} file{files.length !== 1 ? 's' : ''}
+            </span>
           </span>
         )}
-        
       </div>
 
       {files.map((file, i) => (
@@ -82,15 +88,17 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
             <span className="file-v-badge">V</span>
             <input
               value={file.filename}
-              onChange={e => updateFile(i, 'filename', e.target.value)}
+              onChange={(e) => updateFile(i, 'filename', e.target.value)}
             />
-            <button className="rm" onClick={() => removeFile(i)}>×</button>
+            <button className="rm" onClick={() => removeFile(i)}>
+              ×
+            </button>
           </div>
           <textarea
             className="sql-area"
             rows={10}
             value={file.sql}
-            onChange={e => updateFile(i, 'sql', e.target.value)}
+            onChange={(e) => updateFile(i, 'sql', e.target.value)}
           />
         </div>
       ))}

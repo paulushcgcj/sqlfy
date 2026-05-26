@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+
 import type { Plugin } from 'vite';
 
 /**
@@ -29,9 +30,12 @@ function sqlifyCliPlugin(): Plugin {
           writeFileSync(tmp, body);
 
           const proc = spawn('python3', [
-            '-m', 'sqlfy.main',
-            '--json-input', tmp,
-            '--all', '--json',
+            '-m',
+            'sqlfy.main',
+            '--json-input',
+            tmp,
+            '--all',
+            '--json',
           ]);
 
           let stdout = '';
@@ -39,7 +43,11 @@ function sqlifyCliPlugin(): Plugin {
           proc.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
           proc.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
           proc.on('close', (code) => {
-            try { unlinkSync(tmp); } catch { /* best-effort */ }
+            try {
+              unlinkSync(tmp);
+            } catch {
+              /* best-effort */
+            }
             if (code === 0) {
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(stdout);

@@ -1,6 +1,6 @@
+import * as d3 from 'd3';
 import { useCallback, useEffect, useRef } from 'react';
 import { type FC } from 'react';
-import * as d3 from 'd3';
 
 import type { SchemaGraph } from '@/core/types';
 
@@ -101,6 +101,7 @@ export interface ForceErdProps {
 const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, height = 360 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<d3.Simulation<NodeDatum, LinkDatum> | null>(null);
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const isDark = globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
   const pal = palette(isDark);
 
@@ -109,7 +110,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
   const { tables, edges } = graph;
 
   const connectedIds = new Set<string>();
-  edges.forEach(e => {
+  edges.forEach((e) => {
     connectedIds.add(e.fromTable);
     connectedIds.add(e.toTable);
   });
@@ -122,9 +123,9 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     isOrphan: !connectedIds.has(id),
   }));
 
-  const nodeById = new Map(nodeData.map(n => [n.id, n]));
+  const nodeById = new Map(nodeData.map((n) => [n.id, n]));
 
-  const linkData: LinkDatum[] = edges.map(e => ({
+  const linkData: LinkDatum[] = edges.map((e) => ({
     source: nodeById.get(e.fromTable) ?? e.fromTable,
     target: nodeById.get(e.toTable) ?? e.toTable,
     constraintName: e.constraintName,
@@ -165,14 +166,15 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.2, 3])
-      .on('zoom', event => root.attr('transform', event.transform));
+      .on('zoom', (event) => root.attr('transform', event.transform));
     svg.call(zoom);
     svg.on('dblclick.zoom', null);
+    zoomRef.current = zoom;
 
     // ── Island background blobs (convex hull per component) ───────────
     const adjList = new Map<string, Set<string>>();
-    nodeData.forEach(n => adjList.set(n.id, new Set()));
-    edges.forEach(e => {
+    nodeData.forEach((n) => adjList.set(n.id, new Set()));
+    edges.forEach((e) => {
       adjList.get(e.fromTable)?.add(e.toTable);
       adjList.get(e.toTable)?.add(e.fromTable);
     });
@@ -189,7 +191,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
           if (visited.has(cur)) continue;
           visited.add(cur);
           comp.push(cur);
-          adjList.get(cur)?.forEach(nb => {
+          adjList.get(cur)?.forEach((nb) => {
             if (!visited.has(nb)) stack.push(nb);
           });
         }
@@ -202,7 +204,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     const islandGroup = root.append('g').attr('class', 'islands');
     const islandPaths = islandGroup
       .selectAll<SVGPathElement, string[]>('path')
-      .data(components.filter(c => c.length !== 1))
+      .data(components.filter((c) => c.length !== 1))
       .join('path')
       .attr('fill', pal.islandColor)
       .attr('stroke', 'none');
@@ -245,7 +247,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
             : 'FK';
         tooltip.style('opacity', 1).text(label);
       })
-      .on('mousemove', event => {
+      .on('mousemove', (event) => {
         tooltip.style('left', `${event.clientX + 12}px`).style('top', `${event.clientY - 8}px`);
       })
       .on('mouseleave', () => tooltip.style('opacity', 0));
@@ -266,10 +268,10 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       .attr('height', NODE_H)
       .attr('rx', R)
       .attr('ry', R)
-      .attr('fill', d => (d.isOrphan ? pal.orphanFill : pal.nodeFill))
-      .attr('stroke', d => (d.isOrphan ? pal.orphanStroke : pal.nodeStroke))
+      .attr('fill', (d) => (d.isOrphan ? pal.orphanFill : pal.nodeFill))
+      .attr('stroke', (d) => (d.isOrphan ? pal.orphanStroke : pal.nodeStroke))
       .attr('stroke-width', 1)
-      .attr('stroke-dasharray', d => (d.isOrphan ? '4 3' : 'none'));
+      .attr('stroke-dasharray', (d) => (d.isOrphan ? '4 3' : 'none'));
 
     nodeSel
       .append('text')
@@ -280,7 +282,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       .attr('font-weight', 600)
       .attr('fill', pal.labelColor)
       .attr('class', 'node-label')
-      .text(d => d.name);
+      .text((d) => d.name);
 
     nodeSel
       .append('text')
@@ -289,10 +291,10 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       .attr('text-anchor', 'middle')
       .attr('font-size', 10)
       .attr('fill', pal.subColor)
-      .text(d => `${d.colCount} cols${d.schema ? ` · ${d.schema}` : ''}`);
+      .text((d) => `${d.colCount} cols${d.schema ? ` · ${d.schema}` : ''}`);
 
     nodeSel
-      .filter(d => d.isOrphan)
+      .filter((d) => d.isOrphan)
       .append('text')
       .attr('x', NODE_W - 8)
       .attr('y', 14)
@@ -307,16 +309,19 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       if (!hoveredId) {
         nodeSel
           .select('rect')
-          .attr('fill', d => (d.isOrphan ? pal.orphanFill : pal.nodeFill))
-          .attr('stroke', d => (d.isOrphan ? pal.orphanStroke : pal.nodeStroke))
+          .attr('fill', (d) => (d.isOrphan ? pal.orphanFill : pal.nodeFill))
+          .attr('stroke', (d) => (d.isOrphan ? pal.orphanStroke : pal.nodeStroke))
           .attr('stroke-width', 1);
         nodeSel.select('.node-label').attr('fill', pal.labelColor);
-        linkSel.attr('stroke', pal.edgeColor).attr('opacity', 0.7).attr('marker-end', 'url(#arrow)');
+        linkSel
+          .attr('stroke', pal.edgeColor)
+          .attr('opacity', 0.7)
+          .attr('marker-end', 'url(#arrow)');
         return;
       }
 
       const neighbours = new Set<string>([hoveredId]);
-      linkData.forEach(l => {
+      linkData.forEach((l) => {
         const src = (l.source as NodeDatum).id;
         const tgt = (l.target as NodeDatum).id;
         if (src === hoveredId) neighbours.add(tgt);
@@ -325,35 +330,35 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
 
       nodeSel
         .select('rect')
-        .attr('fill', d => {
+        .attr('fill', (d) => {
           if (d.id === hoveredId) return pal.nodeSelFill;
           if (neighbours.has(d.id)) return d.isOrphan ? pal.orphanFill : pal.nodeFill;
           return pal.nodeDimFill;
         })
-        .attr('stroke', d => {
+        .attr('stroke', (d) => {
           if (d.id === hoveredId) return pal.nodeSelStroke;
           if (neighbours.has(d.id)) return d.isOrphan ? pal.orphanStroke : pal.nodeStroke;
           return pal.nodeDimStroke;
         })
-        .attr('stroke-width', d => (d.id === hoveredId ? 2 : 1));
+        .attr('stroke-width', (d) => (d.id === hoveredId ? 2 : 1));
 
-      nodeSel.select('.node-label').attr('fill', d => {
+      nodeSel.select('.node-label').attr('fill', (d) => {
         if (d.id === hoveredId) return pal.labelSel;
         return neighbours.has(d.id) ? pal.labelColor : pal.labelDim;
       });
 
       linkSel
-        .attr('stroke', l => {
+        .attr('stroke', (l) => {
           const src = (l.source as NodeDatum).id;
           const tgt = (l.target as NodeDatum).id;
           return src === hoveredId || tgt === hoveredId ? pal.edgeColor : pal.edgeDim;
         })
-        .attr('opacity', l => {
+        .attr('opacity', (l) => {
           const src = (l.source as NodeDatum).id;
           const tgt = (l.target as NodeDatum).id;
           return src === hoveredId || tgt === hoveredId ? 1 : 0.15;
         })
-        .attr('marker-end', l => {
+        .attr('marker-end', (l) => {
           const src = (l.source as NodeDatum).id;
           const tgt = (l.target as NodeDatum).id;
           return src === hoveredId || tgt === hoveredId ? 'url(#arrow)' : 'url(#arrow-dim)';
@@ -393,7 +398,11 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       .forceSimulation<NodeDatum>(nodeData)
       .force(
         'link',
-        d3.forceLink<NodeDatum, LinkDatum>(linkData).id(d => d.id).distance(LINK_D).strength(0.4),
+        d3
+          .forceLink<NodeDatum, LinkDatum>(linkData)
+          .id((d) => d.id)
+          .distance(LINK_D)
+          .strength(0.4),
       )
       .force('charge', d3.forceManyBody().strength(CHARGE))
       .force('center', d3.forceCenter(width / 2, height / 2))
@@ -405,13 +414,13 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
 
     // ── Tick ──────────────────────────────────────────────────────────
     sim.on('tick', () => {
-      linkSel.attr('d', l => {
+      linkSel.attr('d', (l) => {
         const s = l.source as NodeDatum;
         const t = l.target as NodeDatum;
         const sx = (s.x ?? 0) + NODE_W / 2;
         const sy = (s.y ?? 0) + NODE_H;
         const tx = (t.x ?? 0) + NODE_W / 2;
-        const ty = (t.y ?? 0);
+        const ty = t.y ?? 0;
         const dx = tx - sx;
         const dy = ty - sy;
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -422,13 +431,16 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
         return `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`;
       });
 
-      nodeSel.attr('transform', d => `translate(${(d.x ?? 0) - NODE_W / 2}, ${(d.y ?? 0) - NODE_H / 2})`);
+      nodeSel.attr(
+        'transform',
+        (d) => `translate(${(d.x ?? 0) - NODE_W / 2}, ${(d.y ?? 0) - NODE_H / 2})`,
+      );
 
-      islandPaths.attr('d', comp => {
+      islandPaths.attr('d', (comp) => {
         const pts = comp
-          .map(id => nodeById.get(id))
+          .map((id) => nodeById.get(id))
           .filter((n): n is NodeDatum => !!n)
-          .flatMap(n => [
+          .flatMap((n) => [
             [(n.x ?? 0) - NODE_W * 0.7, (n.y ?? 0) - NODE_H * 0.7],
             [(n.x ?? 0) + NODE_W * 0.7, (n.y ?? 0) - NODE_H * 0.7],
             [(n.x ?? 0) - NODE_W * 0.7, (n.y ?? 0) + NODE_H * 0.7],
@@ -478,11 +490,10 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     const scale = 0.85 * Math.min(W / bbox.width, height / bbox.height);
     const tx = W / 2 - scale * (bbox.x + bbox.width / 2);
     const ty = height / 2 - scale * (bbox.y + bbox.height / 2);
-    svg
-      .transition()
-      .duration(500)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .call((d3.zoom<SVGSVGElement, unknown>().transform as any), d3.zoomIdentity.translate(tx, ty).scale(scale));
+    zoomRef.current?.transform(
+      d3.select(svgRef.current!).transition().duration(500),
+      d3.zoomIdentity.translate(tx, ty).scale(scale),
+    );
   }, [height]);
 
   const reheat = useCallback(() => {
@@ -491,7 +502,13 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
-    <div style={{ position: 'relative', width: '100%', background: palette(isDark).bgColor }}>
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        background: palette(isDark).bgColor,
+      }}
+    >
       {/* Controls */}
       <div
         style={{
@@ -503,29 +520,36 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
           gap: 4,
         }}
       >
-        {(
-          [
-            { label: '⟲ Reheat', fn: reheat, title: 'Re-run simulation' },
-            { label: '⊡ Fit', fn: fitView, title: 'Fit all nodes in view' },
-          ] as const
-        ).map(({ label, fn, title }) => (
-          <button
-            key={label}
-            onClick={fn}
-            title={title}
-            style={{
-              padding: '3px 9px',
-              fontSize: 11,
-              cursor: 'pointer',
-              background: isDark ? '#1e2235' : '#fff',
-              border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
-              borderRadius: 5,
-              color: isDark ? '#9ca3af' : '#6b7280',
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          onClick={reheat}
+          title="Re-run simulation"
+          style={{
+            padding: '3px 9px',
+            fontSize: 11,
+            cursor: 'pointer',
+            background: isDark ? '#1e2235' : '#fff',
+            border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
+            borderRadius: 5,
+            color: isDark ? '#9ca3af' : '#6b7280',
+          }}
+        >
+          ⟲ Reheat
+        </button>
+        <button
+          onClick={fitView}
+          title="Fit all nodes in view"
+          style={{
+            padding: '3px 9px',
+            fontSize: 11,
+            cursor: 'pointer',
+            background: isDark ? '#1e2235' : '#fff',
+            border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
+            borderRadius: 5,
+            color: isDark ? '#9ca3af' : '#6b7280',
+          }}
+        >
+          ⊡ Fit
+        </button>
       </div>
 
       {/* Legend */}
@@ -542,7 +566,14 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
         }}
       >
         <span>── FK edge</span>
-        <span style={{ borderBottom: '1.5px dashed currentColor', paddingBottom: 1 }}>╌ orphan</span>
+        <span
+          style={{
+            borderBottom: '1.5px dashed currentColor',
+            paddingBottom: 1,
+          }}
+        >
+          ╌ orphan
+        </span>
         <span>hover to highlight · drag to move · scroll to zoom</span>
       </div>
 

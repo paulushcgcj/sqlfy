@@ -1,5 +1,7 @@
 import { render } from '@testing-library/react';
+
 import LlmTab from './index';
+
 import type { VectorChunk } from '@/core/types';
 
 const mockChunks: VectorChunk[] = [

@@ -1,24 +1,26 @@
 import { useState } from 'react';
+
 import { parse, IS_TAURI } from './bridge/cli';
 import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
+import AskPanel from './components/schema/AskPanel';
+import GraphTab from './components/schema/GraphTab';
+import LlmTab from './components/schema/LlmTab';
 import MigrationsTab from './components/schema/MigrationsTab';
-import GraphTab      from './components/schema/GraphTab';
-import LlmTab        from './components/schema/LlmTab';
-import AskPanel      from './components/schema/AskPanel';
 import { SAMPLE_MIGRATIONS } from './data/samples';
+
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
 
 type Tab = 'migrations' | 'graph' | 'llm' | 'ask';
 
 export default function App() {
-  const [files, setFiles]             = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
-  const [graph, setGraph]             = useState<SchemaGraph | null>(null);
-  const [chunks, setChunks]           = useState<VectorChunk[] | null>(null);
+  const [files, setFiles] = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
+  const [graph, setGraph] = useState<SchemaGraph | null>(null);
+  const [chunks, setChunks] = useState<VectorChunk[] | null>(null);
   const [folderHandle, setFolderHandle] = useState<FolderHandle | null>(null);
-  const [activeTab, setActiveTab]     = useState<Tab>('migrations');
+  const [activeTab, setActiveTab] = useState<Tab>('migrations');
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [error, setError]             = useState<string | null>(null);
-  const [parsing, setParsing]         = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [parsing, setParsing] = useState(false);
 
   async function handleLoadFolder() {
     setError(null);
@@ -53,9 +55,9 @@ export default function App() {
   }
 
   function switchTab(tab: Tab) {
-    if (tab === 'graph' && !graph)  return;
-    if (tab === 'llm'   && !chunks) return;
-    if (tab === 'ask'   && !graph)  return;
+    if (tab === 'graph' && !graph) return;
+    if (tab === 'llm' && !chunks) return;
+    if (tab === 'ask' && !graph) return;
     setActiveTab(tab);
   }
 
@@ -64,9 +66,9 @@ export default function App() {
       {/* Top bar */}
       <div className="topbar">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <circle cx="9" cy="9" r="8" stroke="#7c3aed" strokeWidth="1.2"/>
-          <circle cx="9" cy="9" r="4" fill="#7c3aed" opacity=".4"/>
-          <circle cx="9" cy="9" r="1.5" fill="#7c3aed"/>
+          <circle cx="9" cy="9" r="8" stroke="#7c3aed" strokeWidth="1.2" />
+          <circle cx="9" cy="9" r="4" fill="#7c3aed" opacity=".4" />
+          <circle cx="9" cy="9" r="1.5" fill="#7c3aed" />
         </svg>
         <span className="topbar-title">SQLfy - Schema Graph Engine</span>
         <span className="topbar-sub">Flyway → AST → Vector Context</span>
@@ -130,18 +132,10 @@ export default function App() {
           />
         )}
         {activeTab === 'graph' && graph && (
-          <GraphTab
-            graph={graph}
-            selectedTable={selectedTable}
-            onSelectTable={setSelectedTable}
-          />
+          <GraphTab graph={graph} selectedTable={selectedTable} onSelectTable={setSelectedTable} />
         )}
-        {activeTab === 'llm' && chunks && (
-          <LlmTab chunks={chunks} />
-        )}
-        {activeTab === 'ask' && graph && (
-          <AskPanel graph={graph} />
-        )}
+        {activeTab === 'llm' && chunks && <LlmTab chunks={chunks} />}
+        {activeTab === 'ask' && graph && <AskPanel graph={graph} />}
       </div>
     </div>
   );

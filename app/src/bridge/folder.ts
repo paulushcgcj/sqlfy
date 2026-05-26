@@ -11,13 +11,14 @@
  */
 
 import { IS_TAURI } from './cli';
+
 import type { MigrationFile } from '@/core/types';
 
 // ── Handle ───────────────────────────────────────────────────────────────────
 
 /** Opaque reference to a folder; varies by runtime. */
 export type FolderHandle =
-  | { readonly type: 'tauri';   readonly path: string }
+  | { readonly type: 'tauri'; readonly path: string }
   | { readonly type: 'browser'; readonly dir: FileSystemDirectoryHandle };
 
 /** Returns the folder's base name for display. */
@@ -37,8 +38,8 @@ export async function pickFolder(): Promise<FolderHandle | null> {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const result = await open({
       directory: true,
-      multiple:  false,
-      title:     'Select migrations folder',
+      multiple: false,
+      title: 'Select migrations folder',
     });
     if (!result) return null;
     return { type: 'tauri', path: result as string };
@@ -48,7 +49,7 @@ export async function pickFolder(): Promise<FolderHandle | null> {
   if (!('showDirectoryPicker' in globalThis)) {
     throw new Error(
       'Your browser does not support the File System Access API.\n' +
-      'Please use Chrome, Edge, or Opera — or run the Tauri desktop app.'
+        'Please use Chrome, Edge, or Opera — or run the Tauri desktop app.',
     );
   }
   try {
@@ -67,16 +68,16 @@ export async function pickFolder(): Promise<FolderHandle | null> {
 export async function readMigrations(handle: FolderHandle): Promise<MigrationFile[]> {
   if (handle.type === 'tauri') {
     const { readDir, readTextFile } = await import('@tauri-apps/plugin-fs');
-    const { join }                  = await import('@tauri-apps/api/path');
+    const { join } = await import('@tauri-apps/api/path');
     const entries = await readDir(handle.path);
     const sqlEntries = entries
-      .filter(e => e.name?.endsWith('.sql'))
+      .filter((e) => e.name?.endsWith('.sql'))
       .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     return Promise.all(
-      sqlEntries.map(async e => ({
+      sqlEntries.map(async (e) => ({
         filename: e.name!,
         sql: await readTextFile(await join(handle.path, e.name!)),
-      }))
+      })),
     );
   }
 
@@ -98,20 +99,20 @@ export async function readMigrations(handle: FolderHandle): Promise<MigrationFil
  * Creates or overwrites a `.sql` file in the folder.
  */
 export async function writeFile(
-  handle:   FolderHandle,
+  handle: FolderHandle,
   filename: string,
-  content:  string,
+  content: string,
 ): Promise<void> {
   if (handle.type === 'tauri') {
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-    const { join }          = await import('@tauri-apps/api/path');
+    const { join } = await import('@tauri-apps/api/path');
     await writeTextFile(await join(handle.path, filename), content);
     return;
   }
 
   // Browser
   const fileHandle = await handle.dir.getFileHandle(filename, { create: true });
-  const writable   = await fileHandle.createWritable();
+  const writable = await fileHandle.createWritable();
   await writable.write(content);
   await writable.close();
 }

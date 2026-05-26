@@ -1,7 +1,8 @@
+import type { SchemaGraph } from '@/core/types';
 import type { FC } from 'react';
+
 import ForceErd from '@/components/core/ForceErd';
 import TableDetail from '@/components/core/TableDetail';
-import type { SchemaGraph } from '@/core/types';
 
 /** Props for the {@link GraphTab} component. */
 export interface GraphTabProps {
@@ -33,8 +34,8 @@ const GraphTab: FC<GraphTabProps> = ({ graph, selectedTable, onSelectTable }) =>
       <div className="sidebar">
         <div className="sbar-sect">Tables ({tables.size})</div>
         {[...tables.entries()].map(([key, t]) => {
-          const out = edges.filter(e => e.fromTable === key).length;
-          const inn = edges.filter(e => e.toTable   === key).length;
+          const out = edges.filter((e) => e.fromTable === key).length;
+          const inn = edges.filter((e) => e.toTable === key).length;
           return (
             <button
               key={key}
@@ -42,7 +43,9 @@ const GraphTab: FC<GraphTabProps> = ({ graph, selectedTable, onSelectTable }) =>
               onClick={() => onSelectTable(key)}
             >
               {t.name}
-              <div className="sub">{t.columns.length} cols · {out + inn} rels · V{t.createdIn}</div>
+              <div className="sub">
+                {t.columns.length} cols · {out + inn} rels · V{t.createdIn}
+              </div>
             </button>
           );
         })}
@@ -50,10 +53,12 @@ const GraphTab: FC<GraphTabProps> = ({ graph, selectedTable, onSelectTable }) =>
         {seqs.size > 0 && (
           <>
             <div className="sbar-sect">Sequences ({seqs.size})</div>
-            {[...seqs.values()].map(s => (
+            {[...seqs.values()].map((s) => (
               <div key={s.full} className="sbar-item" style={{ cursor: 'default' }}>
                 {s.name}
-                <div className="sub">START {s.startWith} INC {s.incrementBy}</div>
+                <div className="sub">
+                  START {s.startWith} INC {s.incrementBy}
+                </div>
               </div>
             ))}
           </>
@@ -70,10 +75,11 @@ const GraphTab: FC<GraphTabProps> = ({ graph, selectedTable, onSelectTable }) =>
             height={340}
           />
         </div>
-        {selectedTable
-          ? <TableDetail tableKey={selectedTable} graph={graph} />
-          : <div className="no-data">Select a table to view details</div>
-        }
+        {selectedTable ? (
+          <TableDetail tableKey={selectedTable} graph={graph} />
+        ) : (
+          <div className="no-data">Select a table to view details</div>
+        )}
       </div>
     </div>
   );

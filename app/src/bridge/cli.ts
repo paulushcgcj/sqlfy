@@ -19,6 +19,7 @@
  */
 
 import type { MigrationFile, SchemaGraph, VectorChunk } from '@/core/types';
+
 import { applyMigrations, buildChunks } from '@/core/core';
 
 // ── Tauri detection ──────────────────────────────────────────────────────────
@@ -31,14 +32,14 @@ export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' i
 // PROD → sidecar  binaries/sqlfy  (PyInstaller binary bundled in step 7)
 //
 // You can override DEV_CLI_PATH via the VITE_CLI_PATH env var in .env.local
-const DEV_CLI_CMD    = 'python3';
+const DEV_CLI_CMD = 'python3';
 const DEV_CLI_SCRIPT = import.meta.env.VITE_CLI_PATH ?? '../cli/src/sqlfy/main.py';
 
 // ── Result type returned to the app ─────────────────────────────────────────
 export interface ParseResult {
-  graph:  SchemaGraph;
+  graph: SchemaGraph;
   chunks: VectorChunk[];
-  source: 'cli' | 'browser';   // for debugging
+  source: 'cli' | 'browser'; // for debugging
 }
 
 // ─────────────────────────────────────────────
@@ -47,9 +48,9 @@ export interface ParseResult {
 
 async function parseWithTauri(files: MigrationFile[]): Promise<ParseResult> {
   // Dynamic imports — only available in Tauri context
-  const { Command }        = await import('@tauri-apps/plugin-shell');
+  const { Command } = await import('@tauri-apps/plugin-shell');
   const { writeTextFile, remove } = await import('@tauri-apps/plugin-fs');
-  const { tempDir, join }  = await import('@tauri-apps/api/path');
+  const { tempDir, join } = await import('@tauri-apps/api/path');
 
   // Write migrations to a temp JSON file
   const tmp = await join(await tempDir(), `sqlfy-input-${Date.now()}.json`);
@@ -59,14 +60,12 @@ async function parseWithTauri(files: MigrationFile[]): Promise<ParseResult> {
     // Spawn CLI: dev uses python3 script, prod uses sidecar binary (step 7)
     const command = import.meta.env.DEV
       ? Command.create(DEV_CLI_CMD, [DEV_CLI_SCRIPT, '--json-input', tmp, '--all', '--json'])
-      : Command.sidecar('binaries/sqlfy',              ['--json-input', tmp, '--all', '--json']);
+      : Command.sidecar('binaries/sqlfy', ['--json-input', tmp, '--all', '--json']);
 
     const output = await command.execute();
 
     if (output.code !== 0) {
-      throw new Error(
-        `CLI exited with code ${output.code}.\n${output.stderr || '(no stderr)'}`
-      );
+      throw new Error(`CLI exited with code ${output.code}.\n${output.stderr || '(no stderr)'}`);
     }
 
     if (!output.stdout.trim()) {
@@ -77,14 +76,15 @@ async function parseWithTauri(files: MigrationFile[]): Promise<ParseResult> {
 
     // The Python CLI returns snake_case; massage into the TypeScript shape
     return {
-      graph:  deserialiseGraph(result.graph),
+      graph: deserialiseGraph(result.graph),
       chunks: deserialiseChunks(result.chunks),
       source: 'cli',
     };
-
   } finally {
     // Always clean up the temp file
-    await remove(tmp).catch(() => {/* best-effort */});
+    await remove(tmp).catch(() => {
+      /* best-effort */
+    });
   }
 }
 
@@ -100,13 +100,13 @@ async function parseWithDevServer(files: MigrationFile[]): Promise<ParseResult> 
   });
 
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ error: resp.statusText })) as { error: string };
+    const err = (await resp.json().catch(() => ({ error: resp.statusText }))) as { error: string };
     throw new Error(`Dev-server CLI error: ${err.error}`);
   }
 
-  const result = await resp.json() as { graph: unknown; chunks: unknown[] };
+  const result = (await resp.json()) as { graph: unknown; chunks: unknown[] };
   return {
-    graph:  deserialiseGraph(result.graph),
+    graph: deserialiseGraph(result.graph),
     chunks: deserialiseChunks(result.chunks),
     source: 'cli',
   };
@@ -117,7 +117,7 @@ async function parseWithDevServer(files: MigrationFile[]): Promise<ParseResult> 
 // ─────────────────────────────────────────────
 
 function parseInBrowser(files: MigrationFile[]): ParseResult {
-  const graph  = applyMigrations(files);
+  const graph = applyMigrations(files);
   const chunks = buildChunks(graph);
   return { graph, chunks, source: 'browser' };
 }
@@ -147,21 +147,21 @@ export async function parse(files: MigrationFile[]): Promise<ParseResult> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserialiseGraph(raw: any): SchemaGraph {
   const tables = new Map<string, import('../core/types').Table>();
-  const seqs   = new Map<string, import('../core/types').Sequence>();
+  const seqs = new Map<string, import('../core/types').Sequence>();
 
   for (const [key, t] of Object.entries(raw.tables ?? {})) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rt = t as any;
     tables.set(key, {
-      id:         rt.id,
-      schema:     rt.schema,
-      name:       rt.name,
-      full:       rt.full,
-      columns:    (rt.columns ?? []).map(deserialiseColumn),
-      constraints:(rt.constraints ?? []).map(deserialiseConstraint),
-      indexes:    (rt.indexes ?? []).map(deserialiseIndex),
-      comments:   rt.comments ?? {},
-      createdIn:  rt.created_in,
+      id: rt.id,
+      schema: rt.schema,
+      name: rt.name,
+      full: rt.full,
+      columns: (rt.columns ?? []).map(deserialiseColumn),
+      constraints: (rt.constraints ?? []).map(deserialiseConstraint),
+      indexes: (rt.indexes ?? []).map(deserialiseIndex),
+      comments: rt.comments ?? {},
+      createdIn: rt.created_in,
       modifiedIn: rt.modified_in ?? [],
     });
   }
@@ -170,19 +170,19 @@ function deserialiseGraph(raw: any): SchemaGraph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rs = s as any;
     seqs.set(key, {
-      name:        rs.name,
-      schema:      rs.schema,
-      full:        rs.full,
-      startWith:   rs.start_with,
+      name: rs.name,
+      schema: rs.schema,
+      full: rs.full,
+      startWith: rs.start_with,
       incrementBy: rs.increment_by,
-      createdIn:   rs.created_in,
+      createdIn: rs.created_in,
     });
   }
 
   const edges = (raw.edges ?? []).map(deserialiseEdge);
   const migHist = (raw.migration_history ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (m: any) => ({ version: m.version, description: m.description })
+    (m: any) => ({ version: m.version, description: m.description }),
   );
 
   return { tables, seqs, edges, migHist };
@@ -191,28 +191,30 @@ function deserialiseGraph(raw: any): SchemaGraph {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserialiseColumn(c: any): import('../core/types').Column {
   return {
-    name:       c.name,
-    type:       c.type,
-    precision:  c.precision,
-    scale:      c.scale,
-    nullable:   c.nullable,
-    default:    c.default,
+    name: c.name,
+    type: c.type,
+    precision: c.precision,
+    scale: c.scale,
+    nullable: c.nullable,
+    default: c.default,
     primaryKey: c.primary_key,
-    unique:     c.unique,
-    references: c.references
-      ? { table: c.references.table, column: c.references.column }
-      : null,
+    unique: c.unique,
+    references: c.references ? { table: c.references.table, column: c.references.column } : null,
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserialiseConstraint(c: any): import('../core/types').Constraint {
   return {
-    name:      c.name,
-    type:      c.type,
-    columns:   c.columns ?? [],
+    name: c.name,
+    type: c.type,
+    columns: c.columns ?? [],
     references: c.references
-      ? { table: c.references.table, columns: c.references.columns, onDelete: c.references.on_delete }
+      ? {
+          table: c.references.table,
+          columns: c.references.columns,
+          onDelete: c.references.on_delete,
+        }
       : undefined,
     checkExpr: c.check_expr,
   };
@@ -226,24 +228,24 @@ function deserialiseIndex(i: any): import('../core/types').Index {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserialiseEdge(e: any): import('../core/types').Edge {
   return {
-    id:             e.id,
-    fromTable:      e.from_table,
-    fromCols:       e.from_cols,
-    toTable:        e.to_table,
-    toCols:         e.to_cols,
+    id: e.id,
+    fromTable: e.from_table,
+    fromCols: e.from_cols,
+    toTable: e.to_table,
+    toCols: e.to_cols,
     constraintName: e.constraint_name,
-    onDelete:       e.on_delete,
+    onDelete: e.on_delete,
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserialiseChunks(raw: any[]): VectorChunk[] {
-  return (raw ?? []).map(c => ({
-    id:      c.id,
-    type:    c.type,
-    title:   c.title,
+  return (raw ?? []).map((c) => ({
+    id: c.id,
+    type: c.type,
+    title: c.title,
     content: c.content,
-    meta:    c.metadata ?? c.meta ?? {},
-    hint:    c.hint,
+    meta: c.metadata ?? c.meta ?? {},
+    hint: c.hint,
   }));
 }

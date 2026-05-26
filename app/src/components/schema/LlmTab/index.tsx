@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { FC } from 'react';
+
 import type { VectorChunk } from '@/core/types';
+import type { FC } from 'react';
 import './index.scss';
 
 /** Props for the {@link LlmTab} component. */
@@ -25,17 +26,26 @@ export interface LlmTabProps {
  */
 const LlmTab: FC<LlmTabProps> = ({ chunks }) => {
   const [selected, setSelected] = useState<VectorChunk>(chunks[0]);
-  const [copied, setCopied]     = useState(false);
+  const [copied, setCopied] = useState(false);
 
   function exportJson() {
     const json = JSON.stringify(
-      chunks.map(c => ({ id: c.id, type: c.type, title: c.title, content: c.content, metadata: c.meta })),
-      null, 2
+      chunks.map((c) => ({
+        id: c.id,
+        type: c.type,
+        title: c.title,
+        content: c.content,
+        metadata: c.meta,
+      })),
+      null,
+      2,
     );
     const blob = new Blob([json], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'schema_vector_chunks.json'; a.click();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'schema_vector_chunks.json';
+    a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -49,16 +59,20 @@ const LlmTab: FC<LlmTabProps> = ({ chunks }) => {
     <div className="split">
       {/* Sidebar */}
       <div className="sidebar">
-        <button className="export-btn" onClick={exportJson}>⬇ Export all JSON</button>
+        <button className="export-btn" onClick={exportJson}>
+          ⬇ Export all JSON
+        </button>
         <div className="sbar-sect">Chunks ({chunks.length})</div>
-        {chunks.map(chunk => (
+        {chunks.map((chunk) => (
           <button
             key={chunk.id}
             className={`sbar-item${chunk.id === selected?.id ? ' active' : ''}`}
             onClick={() => setSelected(chunk)}
           >
             {chunk.title}
-            <div className="sub">{chunk.type} · {chunk.content.length} chars</div>
+            <div className="sub">
+              {chunk.type} · {chunk.content.length} chars
+            </div>
           </button>
         ))}
       </div>
@@ -70,10 +84,7 @@ const LlmTab: FC<LlmTabProps> = ({ chunks }) => {
             <div className="chunk-hdr">
               <span className="chunk-title">{selected.title}</span>
               <span className="chunk-type-badge">{selected.type}</span>
-              <button
-                className={`copy-btn${copied ? ' ok' : ''}`}
-                onClick={copyContent}
-              >
+              <button className={`copy-btn${copied ? ' ok' : ''}`} onClick={copyContent}>
                 {copied ? 'Copied!' : 'Copy content'}
               </button>
             </div>
