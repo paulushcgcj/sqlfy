@@ -55,6 +55,7 @@ from .grapher import Grapher
 from .insights import InsightsEngine
 from .asker import Asker, ChatSession
 from .exporter import Exporter
+from .query import QueryEngine
 
 
 # ─────────────────────────────────────────────
@@ -319,9 +320,6 @@ def cmd_diff(args: argparse.Namespace) -> None:
 
     def is_json_file(p: str) -> bool:
         return os.path.isfile(p) and p.endswith('.json')
-
-    from schema_state import SchemaStateBuilder
-    from reconstructor import reconstruct
 
     if is_json_file(args.state_a) and is_json_file(args.state_b):
         # Fast path: diff pre-built state files
@@ -608,6 +606,118 @@ def cmd_export(args: argparse.Namespace) -> None:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: query
+# ─────────────────────────────────────────────
+
+_QUERY_TYPES = [
+    'tables', 'columns', 'fk-path', 'refs',
+    'orphans', 'islands', 'cycles',
+    'missing-pk', 'missing-fk', 'impact', 'indexes',
+]
+
+def cmd_query(args: argparse.Namespace) -> None:
+    """
+    Run a deterministic graph-traversal query against the schema.
+    No LLM, no API calls — instant results.
+
+    Query types
+    -----------
+      tables      List/filter tables
+      columns     List/filter columns
+      fk-path     Shortest FK path between two tables
+      refs        Tables referencing or referenced by a table
+      orphans     Tables with no FK relationships
+      islands     Disconnected clusters of tables
+      cycles      Circular FK references
+      missing-pk  Tables without a primary key
+      missing-fk  Columns that look like FKs but have no constraint
+      impact      Tables affected by dropping a given table
+      indexes     List all indexes
+    """
+    files  = load_files(args.migrations_dir, args.json_input)
+    graph  = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    state  = SchemaStateBuilder.from_graph(graph)
+    engine = QueryEngine(state)
+    qt     = args.query_type
+    fmt    = getattr(args, 'format', 'text')
+
+    # Dispatch to correct engine method
+    if qt == 'tables':
+        result = engine.tables(
+            pattern=getattr(args, 'pattern', None),
+            schema=getattr(args, 'schema', None),
+            has_pk=_parse_bool(getattr(args, 'has_pk', None)),
+            is_orphan=_parse_bool(getattr(args, 'is_orphan', None)),
+            min_cols=getattr(args, 'min_cols', None),
+            max_cols=getattr(args, 'max_cols', None),
+            created_in=getattr(args, 'created_in', None),
+        )
+    elif qt == 'columns':
+        result = engine.columns(
+            table=getattr(args, 'table', None),
+            pattern=getattr(args, 'pattern', None),
+            type_like=getattr(args, 'type_like', None),
+            is_pk=_parse_bool(getattr(args, 'is_pk', None)),
+            is_fk=_parse_bool(getattr(args, 'is_fk', None)),
+            is_unique=_parse_bool(getattr(args, 'is_unique', None)),
+            nullable=_parse_bool(getattr(args, 'nullable', None)),
+            has_default=_parse_bool(getattr(args, 'has_default', None)),
+        )
+    elif qt == 'fk-path':
+        if not args.from_table or not args.to_table:
+            print('Error: fk-path requires --from TABLE and --to TABLE', file=sys.stderr)
+            sys.exit(1)
+        result = engine.fk_path(args.from_table, args.to_table)
+    elif qt == 'refs':
+        if not args.table:
+            print('Error: refs requires --table TABLE', file=sys.stderr)
+            sys.exit(1)
+        result = engine.refs(args.table, direction=getattr(args, 'direction', 'both'))
+    elif qt == 'orphans':
+        result = engine.orphans()
+    elif qt == 'islands':
+        result = engine.islands()
+    elif qt == 'cycles':
+        result = engine.cycles()
+    elif qt == 'missing-pk':
+        result = engine.missing_pk()
+    elif qt == 'missing-fk':
+        result = engine.missing_fk()
+    elif qt == 'impact':
+        if not args.table:
+            print('Error: impact requires --table TABLE', file=sys.stderr)
+            sys.exit(1)
+        result = engine.impact(args.table)
+    elif qt == 'indexes':
+        result = engine.indexes(
+            table=getattr(args, 'table', None),
+            unique_only=getattr(args, 'unique_only', False),
+        )
+    else:
+        print(f'Unknown query type: {qt}', file=sys.stderr)
+        sys.exit(1)
+
+    if fmt == 'json':
+        output = result.to_json()
+    elif fmt == 'csv':
+        output = result.to_csv()
+    else:
+        output = result.to_text()
+
+    write_output(output, args.out)
+
+    # Summary to stderr so it doesn't pollute piped output
+    print(f'  {len(result)} row(s)', file=sys.stderr)
+
+
+def _parse_bool(val: object) -> 'bool | None':
+    """Parse 'true'|'false'|None from argparse string."""
+    if val is None:     return None
+    if isinstance(val, bool): return val
+    return str(val).lower() in ('1', 'true', 'yes')
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -670,13 +780,40 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     rag_shared(p)
     p.set_defaults(func=cmd_chat)
 
-    # export  ← new
+    # export
     p = sub.add_parser('export', help='Export schema as self-contained HTML docs')
     shared(p)
-    p.add_argument('--title', metavar='TEXT', help='Document title')
-    p.add_argument('--insights', action='store_true',
-                   help='Include insights panel in the HTML')
+    p.add_argument('--title', metavar='TEXT')
+    p.add_argument('--insights', action='store_true')
     p.set_defaults(func=cmd_export)
+
+    # query  ← new
+    p = sub.add_parser('query', help='Deterministic graph queries (no LLM)')
+    shared(p)
+    p.add_argument('query_type', choices=_QUERY_TYPES, metavar='TYPE',
+                   help='Query type: ' + ' | '.join(_QUERY_TYPES))
+    p.add_argument('--format', choices=['text','json','csv'], default='text')
+    # Shared filter flags
+    p.add_argument('--pattern',    metavar='REGEX',  help='Name regex filter')
+    p.add_argument('--schema',     metavar='NAME',   help='Schema filter')
+    p.add_argument('--table',      metavar='TABLE',  help='Table name (full)')
+    p.add_argument('--type-like',  metavar='TYPE',   help='Column type substring')
+    p.add_argument('--from-table', metavar='TABLE',  help='fk-path: source table')
+    p.add_argument('--to-table',   metavar='TABLE',  help='fk-path: target table')
+    p.add_argument('--direction',  choices=['in','out','both'], default='both',
+                   help='refs: direction (default: both)')
+    p.add_argument('--has-pk',     metavar='BOOL',   help='Filter by PK presence (true/false)')
+    p.add_argument('--is-orphan',  metavar='BOOL',   help='Filter by orphan status')
+    p.add_argument('--is-pk',      metavar='BOOL',   help='Filter columns: is primary key')
+    p.add_argument('--is-fk',      metavar='BOOL',   help='Filter columns: is foreign key')
+    p.add_argument('--is-unique',  metavar='BOOL',   help='Filter columns: is unique')
+    p.add_argument('--nullable',   metavar='BOOL',   help='Filter columns: is nullable')
+    p.add_argument('--has-default',metavar='BOOL',   help='Filter columns: has default')
+    p.add_argument('--min-cols',   type=int,          help='Min column count')
+    p.add_argument('--max-cols',   type=int,          help='Max column count')
+    p.add_argument('--created-in', metavar='VER',    help='Filter by created version')
+    p.add_argument('--unique-only',action='store_true', help='indexes: unique only')
+    p.set_defaults(func=cmd_query)
 
     return parser
 
@@ -698,7 +835,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'ask', 'chat', 'export'}
+KNOWN_SUBCOMMANDS = {'dump', 'chunks', 'diff', 'graph', 'insights', 'ask', 'chat', 'export', 'query'}
 
 
 def main() -> None:
