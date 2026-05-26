@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from sqlfy.core import apply_migrations, build_chunks
+from sqlfy.core import apply_migrations
+from sqlfy.output.chunker import build_chunks
 
 # Resolve samples directory: cli/tests/ → cli/ → repo root → samples/
 SAMPLES_DIR = Path(__file__).parent.parent.parent / 'samples'

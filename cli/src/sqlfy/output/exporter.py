@@ -31,8 +31,8 @@ from __future__ import annotations
 
 import json
 import html as html_mod
-from .schema_state import SchemaState, TableState
-from .insights import InsightsReport, Finding
+from ..domain.schema_state import SchemaState, TableState
+from ..analysis.insights import InsightsReport, Finding
 from .grapher import Grapher
 
 

@@ -55,7 +55,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .schema_state import SchemaState, TableState
+from ..domain.schema_state import SchemaState, TableState
 
 
 # ─────────────────────────────────────────────

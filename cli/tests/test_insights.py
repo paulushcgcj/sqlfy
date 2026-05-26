@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from sqlfy.core import apply_migrations
-from sqlfy.schema_state import SchemaStateBuilder, SchemaState
-from sqlfy.insights import InsightsEngine, InsightsReport, Finding
+from sqlfy.domain.schema_state import SchemaStateBuilder, SchemaState
+from sqlfy.analysis.insights import InsightsEngine, InsightsReport, Finding
 
 SAMPLES_DIR = Path(__file__).parent.parent.parent / 'samples'
 

@@ -42,7 +42,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .schema_state import (
+from ..domain.schema_state import (
     SchemaState, TableState, ColumnState,
     ConstraintState, IndexState, SequenceState, RelationshipState, MigrationStep,
 )

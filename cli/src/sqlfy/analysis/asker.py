@@ -36,7 +36,8 @@ import urllib.error
 from dataclasses import dataclass, field
 from typing import Iterator, Optional
 
-from .core import build_chunks, SchemaGraph
+from ..output.chunker import build_chunks
+from ..domain.models import SchemaGraph
 from .retriever import make_retriever, RetrievedChunk
 
 

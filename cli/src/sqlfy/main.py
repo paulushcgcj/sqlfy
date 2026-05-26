@@ -41,21 +41,17 @@ import json
 import argparse
 from pathlib import Path
 
-from .core import (
-    apply_migrations,
-    build_chunks,
-    type_str,
-    SchemaGraph,
-    VectorChunk,
-)
+from .core import apply_migrations
+from .domain.models import SchemaGraph, VectorChunk
+from .domain.schema_state import SchemaStateBuilder, type_str
 from .reconstructor import reconstruct, reconstruct_at
-from .schema_state import SchemaStateBuilder
-from .differ import SchemaDiffer, diff_files
-from .grapher import Grapher
-from .insights import InsightsEngine
-from .asker import Asker, ChatSession
-from .exporter import Exporter
-from .query import QueryEngine
+from .output.chunker import build_chunks
+from .output.grapher import Grapher
+from .output.exporter import Exporter
+from .analysis.differ import SchemaDiffer, diff_files
+from .analysis.insights import InsightsEngine
+from .analysis.asker import Asker, ChatSession
+from .analysis.query import QueryEngine
 
 
 # ─────────────────────────────────────────────

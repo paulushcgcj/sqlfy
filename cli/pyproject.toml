@@ -8,7 +8,10 @@ version     = "0.18.0"
 description = "Flyway SQL migration parser — schema graph engine and LLM vector chunk builder"
 readme      = "README.md"
 requires-python = ">=3.11"
-dependencies = ["sqlglot>=25.0.0"]
+dependencies = [
+    "sqlglot>=25.0.0",
+    "networkx>=3.0",
+]
 
 [project.optional-dependencies]
 yaml = ["pyyaml"]
@@ -25,3 +28,12 @@ include = ["sqlfy", "sqlfy.*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/node_modules", "**/__pycache__"]
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+pythonVersion = "3.11"
+pythonPlatform = "All"

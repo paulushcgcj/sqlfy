@@ -45,7 +45,8 @@ import datetime
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
-from .core import SchemaGraph, type_str
+from .models import SchemaGraph
+from .utils import type_str
 
 
 # ─────────────────────────────────────────────

@@ -25,7 +25,7 @@ Usage
 
 from __future__ import annotations
 
-from .schema_state import SchemaState, TableState
+from ..domain.schema_state import SchemaState, TableState
 
 
 # ─────────────────────────────────────────────

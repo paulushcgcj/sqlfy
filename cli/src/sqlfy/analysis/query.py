@@ -54,7 +54,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .schema_state import SchemaState, TableState, ColumnState
+from ..domain.schema_state import SchemaState, TableState, ColumnState
 
 
 # ─────────────────────────────────────────────

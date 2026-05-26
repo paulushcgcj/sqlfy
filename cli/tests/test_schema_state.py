@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from sqlfy.core import apply_migrations
-from sqlfy.schema_state import (
+from sqlfy.domain.schema_state import (
     SchemaStateBuilder,
     SchemaState,
     TableState,
