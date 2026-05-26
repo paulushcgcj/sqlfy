@@ -1,0 +1,15 @@
+// ─────────────────────────────────────────────
+// sqlfy — styles barrel
+// Import order: tokens first, then reset/base,
+// then layout, then components/utilities.
+// ─────────────────────────────────────────────
+
+@use 'tokens';
+@use 'reset';
+@use 'base';
+@use 'layout';
+@use 'topbar';
+@use 'tabs';
+@use 'sidebar';
+@use 'badges';
+@use 'utilities';

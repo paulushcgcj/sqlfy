@@ -1,0 +1,36 @@
+// ─────────────────────────────────────────────
+// Badges — inline constraint flags (PK, NN, UQ, FK)
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+.badge {
+  display: inline-block;
+  font-size: $fs-badge;
+  padding: $space-1 $space-5;
+  border-radius: $radius-sm;
+  margin-right: $space-3;
+
+  &.pk {
+    background: $accent-15;
+    color: $accent;
+    border: 0.5px solid $accent-30;
+  }
+
+  &.nn {
+    background: $error-10;
+    color: $color-error;
+    border: 0.5px solid $error-25;
+  }
+
+  &.uq {
+    background: $fk-10;
+    color: $color-fk;
+    border: 0.5px solid $fk-25;
+  }
+
+  &.fk {
+    background: $warn-10;
+    color: $color-warn;
+    border: 0.5px solid $warn-25;
+  }
+}

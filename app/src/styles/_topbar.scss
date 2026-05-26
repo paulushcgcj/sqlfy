@@ -1,0 +1,46 @@
+// ─────────────────────────────────────────────
+// Topbar
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: $space-10;
+  padding: $space-8 $space-14;
+  background: var(--bg-card);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  font-weight: $fw-medium;
+  font-size: $fs-title-sm;
+}
+
+.topbar-sub {
+  font-size: $fs-sub;
+  color: var(--text-3);
+}
+
+// ── Mode badge
+.mode-badge {
+  margin-left: auto;
+  font-size: $fs-meta;
+  padding: $space-2 $space-8;
+  border-radius: $radius-md;
+  border: 0.5px solid var(--border-sub);
+  color: var(--text-3);
+
+  &[data-mode='tauri'] {
+    color: $accent;
+    border-color: $accent-30;
+    background: $accent-08;
+  }
+
+  &[data-mode='browser'] {
+    color: $color-fk;
+    border-color: $fk-30;
+    background: $fk-08;
+  }
+}

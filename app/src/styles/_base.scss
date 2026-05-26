@@ -1,0 +1,14 @@
+// ─────────────────────────────────────────────
+// Base — html/body/root defaults
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+html,
+body,
+#root {
+  height: 100%;
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+  font-size: $fs-body;
+}

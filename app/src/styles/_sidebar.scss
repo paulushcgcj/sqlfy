@@ -1,0 +1,52 @@
+// ─────────────────────────────────────────────
+// Sidebar (shared by GraphTab, LlmTab)
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+.sidebar {
+  width: $sidebar-width;
+  flex-shrink: 0;
+  border-right: 0.5px solid var(--border-sub);
+  overflow-y: auto;
+  padding: $space-8 0;
+  background: var(--bg-card);
+}
+
+.sbar-sect {
+  font-size: $fs-meta;
+  color: var(--text-3);
+  padding: $space-10 $space-12 $space-4;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sbar-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: $space-6 $space-12;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: $fs-body;
+  color: var(--text-2);
+  border-left: 2px solid transparent;
+
+  &:hover {
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  &.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: $accent-06;
+  }
+
+  .sub {
+    font-size: $fs-meta;
+    color: var(--text-3);
+    margin-top: $space-1;
+  }
+}

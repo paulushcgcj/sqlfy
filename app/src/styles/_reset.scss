@@ -1,0 +1,12 @@
+// ─────────────────────────────────────────────
+// Reset — box-sizing + margin/padding zero-out
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}

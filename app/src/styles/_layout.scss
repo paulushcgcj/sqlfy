@@ -1,0 +1,35 @@
+// ─────────────────────────────────────────────
+// Layout — shell, content, split, panel, main
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: $shell-min-height;
+}
+
+.content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.split {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.panel {
+  flex: 1;
+  overflow: auto;
+  padding: $space-12;
+}
+
+.main {
+  flex: 1;
+  overflow: auto;
+}

@@ -1,0 +1,59 @@
+// ─────────────────────────────────────────────
+// Tab bar + Parse button
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+.tabs {
+  display: flex;
+  background: var(--bg-card);
+  border-bottom: 0.5px solid var(--border-sub);
+  flex-shrink: 0;
+}
+
+.tab {
+  padding: $space-8 $space-16;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: $fs-body;
+  color: var(--text-2);
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+
+  &:hover {
+    color: var(--text);
+  }
+
+  &.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  &.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.parse-btn {
+  margin-left: auto;
+  padding: $space-5 $space-14;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: $radius-lg;
+  cursor: pointer;
+  font-size: $fs-body;
+  font-family: inherit;
+  font-weight: $fw-medium;
+
+  &:hover {
+    background: $accent-hover;
+  }
+
+  &:disabled {
+    background: $color-disabled;  // $color-disabled is still defined
+    cursor: not-allowed;
+  }
+}

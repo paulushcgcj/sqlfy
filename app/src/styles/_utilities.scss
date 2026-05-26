@@ -1,0 +1,36 @@
+// ─────────────────────────────────────────────
+// Utilities — error bar, no-data, code blocks
+// ─────────────────────────────────────────────
+@use 'tokens' as *;
+
+// ── Error bar
+.err-bar {
+  padding: $space-6 $space-14;
+  background: $error-08;
+  border-bottom: 0.5px solid $error-30;
+  color: $color-error;
+  font-size: $fs-sub;
+  flex-shrink: 0;
+}
+
+// ── Empty / no-data state
+.no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-3);
+  font-size: $fs-body;
+  flex-direction: column;
+  gap: $space-8;
+}
+
+// ── Code block (SQL textarea, chunk-content)
+%code-block {
+  background: $color-code-bg;
+  color: $color-code-text;
+  font-family: var(--font-mono);
+  font-size: $fs-sub;
+  white-space: pre-wrap;
+  line-height: $lh-base;
+}
