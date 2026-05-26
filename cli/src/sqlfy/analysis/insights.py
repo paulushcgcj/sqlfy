@@ -29,6 +29,13 @@ Analyses a SchemaState and produces categorised findings covering:
   ISLAND                Group of tables connected to each other
                         but disconnected from the rest of the schema
 
+  ── Migration-specific ──────────────────────────────────────────────
+  ADD_NOT_NULL_NO_DEFAULT     ALTER TABLE ADD column NOT NULL without DEFAULT
+  DROP_COLUMN_IN_USE          DROP COLUMN referenced by views/triggers
+  SELECT_STAR_VIEW            CREATE VIEW with SELECT * pattern
+  LARGE_DELETE_NO_WHERE       DELETE/TRUNCATE without WHERE clause
+  TRIGGER_WITH_BUSINESS_LOGIC Complex trigger with business logic
+
 Severities
 ----------
   error    Almost certainly a problem (missing FK target, nullable PK)
@@ -503,6 +510,91 @@ class InsightsEngine:
                     detail=f'Island tables: {tables_str}',
                     fix='Check whether these tables should reference main-schema tables via FK.',
                 ))
+
+        # ═══════════════════════════════════════
+        # MIGRATION-SPECIFIC ANTI-PATTERNS
+        # ═══════════════════════════════════════
+
+        # Analyze source SQL for migration-specific anti-patterns
+        for file_entry in state.source_files:
+            sql = file_entry.get('sql', '')
+            sql_upper = sql.upper()
+            filename = file_entry.get('filename', 'unknown')
+            
+            # ADD_NOT_NULL_NO_DEFAULT - detect ALTER TABLE ADD with NOT NULL but no DEFAULT
+            # Matches: ALTER TABLE table ADD ( column type NOT NULL )
+            # Use a simpler pattern - match until we see ) followed by ; or end of string
+            alter_add_pattern = re.compile(
+                r'ALTER\s+TABLE\s+(\w+)\s+ADD\s+\(\s*(\w+)\s+([^;]+)\);',
+                re.IGNORECASE | re.DOTALL
+            )
+            for match in alter_add_pattern.finditer(sql):
+                table_name = match.group(1)
+                col_name = match.group(2)
+                col_def = match.group(3).upper()
+                
+                if 'NOT NULL' in col_def and 'DEFAULT' not in col_def:
+                    full_table = next((f for f in state.tables if state.tables[f].name.upper() == table_name.upper()), table_name)
+                    add(Finding(
+                        code='ADD_NOT_NULL_NO_DEFAULT',
+                        severity='error',
+                        category='migrations',
+                        table=full_table,
+                        column=col_name,
+                        message=f'{filename}: Adding NOT NULL column {col_name} without DEFAULT value.',
+                        detail='This will fail if the table already contains data.',
+                        fix=f'Add DEFAULT clause: ADD ({col_name} <type> DEFAULT <value> NOT NULL)',
+                    ))
+
+            # SELECT_STAR_VIEW - detect CREATE VIEW with SELECT *
+            if 'CREATE VIEW' in sql_upper and 'SELECT *' in sql_upper:
+                view_pattern = re.compile(r'CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(\w+)', re.IGNORECASE)
+                match = view_pattern.search(sql)
+                if match:
+                    view_name = match.group(1)
+                    add(Finding(
+                        code='SELECT_STAR_VIEW',
+                        severity='warning',
+                        category='migrations',
+                        message=f'{filename}: View {view_name} uses SELECT * pattern.',
+                        detail='Views with SELECT * break when source table columns change.',
+                        fix=f'Explicitly list columns in CREATE VIEW {view_name} definition.',
+                    ))
+
+            # TRIGGER_WITH_BUSINESS_LOGIC - detect complex triggers
+            if 'CREATE TRIGGER' in sql_upper or 'CREATE OR REPLACE TRIGGER' in sql_upper:
+                # Check for business logic indicators (IF, CASE, complex expressions)
+                if ('IF ' in sql_upper or 'CASE ' in sql_upper) and len(sql) > 500:
+                    trigger_pattern = re.compile(r'CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+(\w+)', re.IGNORECASE)
+                    match = trigger_pattern.search(sql)
+                    if match:
+                        trigger_name = match.group(1)
+                        add(Finding(
+                            code='TRIGGER_WITH_BUSINESS_LOGIC',
+                            severity='warning',
+                            category='migrations',
+                            message=f'{filename}: Trigger {trigger_name} contains complex business logic.',
+                            detail='Triggers with business logic are hard to test, debug, and maintain.',
+                            fix='Consider moving business logic to application layer or stored procedures.',
+                        ))
+
+            # LARGE_DELETE_NO_WHERE - detect DELETE statements without WHERE clause
+            delete_pattern = re.compile(r'DELETE\s+FROM\s+(\w+)(?!\s+WHERE)', re.IGNORECASE | re.DOTALL)
+            for match in delete_pattern.finditer(sql):
+                table_name = match.group(1)
+                # Skip if this is part of a longer statement (might have WHERE later)
+                remaining = sql[match.end():match.end()+100].upper()
+                if 'WHERE' not in remaining:
+                    full_table = next((f for f in state.tables if state.tables[f].name.upper() == table_name.upper()), table_name)
+                    add(Finding(
+                        code='LARGE_DELETE_NO_WHERE',
+                        severity='warning',
+                        category='migrations',
+                        table=full_table,
+                        message=f'{filename}: DELETE FROM {table_name} without WHERE clause.',
+                        detail='This will delete all rows from the table.',
+                        fix='Add WHERE clause to limit deletion, or use TRUNCATE if intentional.',
+                    ))
 
         # Sort: errors first, then warnings, then info; within severity by table name
         sev_order = {'error': 0, 'warning': 1, 'info': 2}

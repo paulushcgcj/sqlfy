@@ -165,6 +165,8 @@ class SchemaState:
         Ordered list of migrations applied to produce this state.
     stats
         Quick summary counts.
+    source_files
+        Optional list of source migration files for anti-pattern detection.
     """
     version:           str
     generated_at:      str
@@ -175,6 +177,7 @@ class SchemaState:
     relationships:     list[RelationshipState]
     migration_history: list[MigrationStep]
     stats:             dict[str, int]
+    source_files:      list[dict] = field(default_factory=list)
 
     # ── Serialisation ─────────────────────────────────────────────────────
 
@@ -282,6 +285,7 @@ class SchemaStateBuilder:
             relationships=relationships,
             migration_history=mig_history,
             stats=stats,
+            source_files=source_files or [],
         )
 
     # ── Table builder ──────────────────────────────────────────────────────

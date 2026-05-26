@@ -535,10 +535,13 @@ def cmd_insights(args: argparse.Namespace) -> None:
     candidates, unresolved FK targets, nullable PKs/FKs, circular
     references, wide tables, orphaned sequences, duplicate indexes,
     and disconnected islands.
+    
+    Also detects migration-specific anti-patterns: ADD NOT NULL without
+    DEFAULT, SELECT * in views, complex triggers, and DELETE without WHERE.
     """
     files = load_files(args.migrations_dir, args.json_input)
     graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
-    state = SchemaStateBuilder.from_graph(graph)
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
 
     report = InsightsEngine.analyse(state)
 
