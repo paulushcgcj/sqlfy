@@ -329,6 +329,17 @@ The TypeScript deserialiser in `cli.ts` maps `snake_case` keys to `camelCase` fo
 
 ## LLM Usage
 
+> [!IMPORTANT]
+> **Vector embeddings require an API key.**
+> The `ask` and `chat` subcommands support a `--embed` flag that switches from
+> BM25 retrieval to dense vector search using [Voyage AI](https://voyageai.com)
+> (model `voyage-3`, accessed via the Anthropic API).
+> Set `ANTHROPIC_API_KEY` in your environment before using `--embed`.
+> Without the flag, all retrieval is local BM25 — no key needed.
+>
+> TODO: evaluate whether to replace with a local embedding model (e.g. `nomic-embed-text`
+> via Ollama) to remove the external dependency entirely.
+
 Each chunk is self-contained and human-readable. Example table chunk:
 
 ```
@@ -383,7 +394,9 @@ Paste the **Schema Summary** chunk as system context and individual **table chun
 - [x] Schema diff command (`sqlfy diff`)
 - [x] Graph output command (`sqlfy graph` — DOT, Mermaid, ASCII summary)
 - [x] Schema insights (`sqlfy insights` — orphan tables, missing PKs, FK candidates, circular refs, islands)
+- [x] Deterministic graph queries (`sqlfy query` — tables, columns, fk-path, refs, orphans, islands, cycles, missing-pk, impact, indexes)
 - [ ] PostgreSQL dialect parity
+- [ ] Vector embeddings: evaluate replacing Voyage AI (`ANTHROPIC_API_KEY`) with a local model (e.g. Ollama `nomic-embed-text`) — see LLM Usage note above
 
 ---
 
