@@ -1550,6 +1550,209 @@ def cmd_deps(args: argparse.Namespace) -> int:
 
 
 # ─────────────────────────────────────────────
+# SUBCOMMAND: lineage
+# ─────────────────────────────────────────────
+
+def cmd_lineage(args: argparse.Namespace) -> None:
+    """
+    Column-level lineage and data flow analysis.
+    
+    Traces column dependencies across tables, views, and stored procedures
+    using SQLLineage integration. Detects:
+      - Downstream dependencies (which columns depend on this one)
+      - Upstream dependencies (which columns this one depends on)
+      - Unused columns (defined but never referenced)
+      - God columns (heavily referenced across the schema)
+    
+    Examples:
+      sqlfy lineage APP.USERS.EMAIL --downstream
+      sqlfy lineage APP.USERS.EMAIL --upstream --format json
+      sqlfy lineage --unused-columns
+      sqlfy lineage --god-columns --min-refs 30
+      sqlfy lineage APP.USERS.EMAIL --format mermaid --max-depth 5
+    """
+    from .analysis.lineage import (
+        extract_column_lineage,
+        find_downstream,
+        find_upstream,
+        find_unused_columns,
+        find_god_columns,
+        format_lineage_text,
+        format_lineage_json,
+        format_lineage_mermaid,
+    )
+    
+    files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
+    
+    # Extract column lineage
+    lineage = extract_column_lineage(graph, files)
+    
+    fmt = getattr(args, 'format', 'text')
+    
+    # Handle different query modes
+    if getattr(args, 'unused_columns', False):
+        # Find unused columns
+        unused = find_unused_columns(graph, lineage)
+        
+        if fmt == 'json':
+            output = json.dumps({
+                'unused_columns': [
+                    {
+                        'column': col.full_name,
+                        'table': col.table,
+                        'column_name': col.column,
+                        'created_in': version,
+                    }
+                    for col, version in unused
+                ]
+            }, indent=2)
+        else:
+            lines = [
+                f"Unused Columns Report",
+                "=" * 60,
+                "",
+                f"Found {len(unused)} unused column(s):",
+                "",
+            ]
+            
+            if unused:
+                for col, version in unused:
+                    lines.append(f"  {col.full_name}")
+                    lines.append(f"    Created: {version}")
+                    lines.append(f"    Status: Never referenced in views/procedures")
+                    lines.append("")
+            else:
+                lines.append("  (none)")
+            
+            output = "\n".join(lines)
+        
+        write_output(output, args.out)
+        print(f'  {len(unused)} unused column(s)', file=sys.stderr)
+    
+    elif getattr(args, 'god_columns', False):
+        # Find god columns
+        min_refs = getattr(args, 'min_refs', 20)
+        god_cols = find_god_columns(lineage, min_refs=min_refs)
+        
+        if fmt == 'json':
+            output = json.dumps({
+                'god_columns': [
+                    {
+                        'column': col.full_name,
+                        'table': col.table,
+                        'column_name': col.column,
+                        'reference_count': refs,
+                    }
+                    for col, refs in god_cols
+                ]
+            }, indent=2)
+        else:
+            lines = [
+                f"God Columns Report (min_refs={min_refs})",
+                "=" * 60,
+                "",
+                f"Found {len(god_cols)} god column(s):",
+                "",
+            ]
+            
+            if god_cols:
+                for col, refs in god_cols:
+                    lines.append(f"  {col.full_name}")
+                    lines.append(f"    Total references: {refs}")
+                    
+                    if col.id in lineage:
+                        col_lineage = lineage[col.id]
+                        lines.append(f"    Downstream columns: {len(col_lineage.downstream)}")
+                        if col_lineage.is_pk:
+                            lines.append(f"    Type: Primary Key")
+                        elif col_lineage.is_fk:
+                            lines.append(f"    Type: Foreign Key")
+                    
+                    lines.append("")
+                
+                lines.append("")
+                lines.append("Recommendation:")
+                lines.append("  - Ensure these columns have indexes")
+                lines.append("  - Monitor query performance")
+                lines.append("  - Consider caching strategies")
+            else:
+                lines.append("  (none)")
+            
+            output = "\n".join(lines)
+        
+        write_output(output, args.out)
+        print(f'  {len(god_cols)} god column(s)', file=sys.stderr)
+    
+    elif args.column:
+        # Analyze specific column
+        column = args.column.upper()
+        
+        if column not in lineage:
+            print(f"Error: Column not found: {column}", file=sys.stderr)
+            print(f"Hint: Use format TABLE.COLUMN (e.g., APP.USERS.EMAIL)", file=sys.stderr)
+            sys.exit(1)
+        
+        # Determine direction
+        direction = 'upstream' if getattr(args, 'upstream', False) else 'downstream'
+        
+        if fmt == 'json':
+            col_lineage = lineage[column]
+            output = json.dumps(col_lineage.to_dict(), indent=2)
+        elif fmt == 'mermaid':
+            max_depth = getattr(args, 'max_depth', 3)
+            output = format_lineage_mermaid(column, lineage, direction=direction, max_depth=max_depth)
+        else:
+            output = format_lineage_text(column, lineage, direction=direction)
+        
+        write_output(output, args.out)
+        
+        # Summary to stderr
+        col_lineage = lineage[column]
+        if direction == 'downstream':
+            print(f'  {len(col_lineage.downstream)} downstream column(s)', file=sys.stderr)
+        else:
+            print(f'  {len(col_lineage.upstream)} upstream column(s)', file=sys.stderr)
+    
+    else:
+        # No specific query - show overall lineage stats
+        if fmt == 'json':
+            output = format_lineage_json(lineage)
+        else:
+            lines = [
+                "Column Lineage Summary",
+                "=" * 60,
+                "",
+                f"Total columns analyzed: {len(lineage)}",
+                "",
+            ]
+            
+            # Count columns by type
+            pk_count = sum(1 for c in lineage.values() if c.is_pk)
+            fk_count = sum(1 for c in lineage.values() if c.is_fk)
+            
+            # Count columns with dependencies
+            with_upstream = sum(1 for c in lineage.values() if c.upstream)
+            with_downstream = sum(1 for c in lineage.values() if c.downstream)
+            
+            lines.append(f"  Primary key columns: {pk_count}")
+            lines.append(f"  Foreign key columns: {fk_count}")
+            lines.append(f"  Columns with upstream deps: {with_upstream}")
+            lines.append(f"  Columns with downstream deps: {with_downstream}")
+            lines.append("")
+            lines.append("Usage:")
+            lines.append("  sqlfy lineage TABLE.COLUMN            # Analyze specific column")
+            lines.append("  sqlfy lineage --unused-columns        # Find unused columns")
+            lines.append("  sqlfy lineage --god-columns          # Find heavily used columns")
+            
+            output = "\n".join(lines)
+        
+        write_output(output, args.out)
+        print(f'  {len(lineage)} column(s) analyzed', file=sys.stderr)
+
+
+# ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
 
@@ -1801,6 +2004,27 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Write output to file instead of stdout')
     p.set_defaults(func=cmd_deps)
 
+    # lineage
+    p = sub.add_parser('lineage', help='Column-level lineage and data flow analysis')
+    shared(p)
+    p.add_argument('column', nargs='?', metavar='TABLE.COLUMN',
+                   help='Column to analyze (e.g., APP.USERS.EMAIL)')
+    p.add_argument('--downstream', action='store_true', default=True,
+                   help='Show downstream dependencies (default)')
+    p.add_argument('--upstream', action='store_true',
+                   help='Show upstream dependencies (sources)')
+    p.add_argument('--unused-columns', action='store_true',
+                   help='Find columns that are never referenced')
+    p.add_argument('--god-columns', action='store_true',
+                   help='Find heavily referenced columns')
+    p.add_argument('--min-refs', type=int, default=20, metavar='N',
+                   help='Minimum reference count for god columns (default: 20)')
+    p.add_argument('--format', choices=['text', 'json', 'mermaid'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--max-depth', type=int, default=3, metavar='N',
+                   help='Maximum depth for Mermaid diagrams (default: 3)')
+    p.set_defaults(func=cmd_lineage)
+
     return parser
 
 
@@ -1823,7 +2047,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate', 'deps'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate', 'deps', 'lineage'}
 
 
 def main() -> None:

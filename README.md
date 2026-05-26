@@ -157,6 +157,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `export` | Export schema as self-contained HTML documentation |
 | `query` | Deterministic graph queries (no LLM) |
 | `impact` | Analyze impact of schema object changes using graph traversal |
+| `lineage` | Column-level lineage and data flow analysis |
 | `domains` | Detect semantic business domains using community detection |
 | `stability` | Calculate schema stability metrics and churn rates |
 | `validate` | Validate migration ordering and detect issues |
@@ -721,6 +722,93 @@ sqlfy impact ./migrations APP.USERS                 # Impact of USER table
 sqlfy impact ./migrations APP.USERS.EMAIL --depth 3
 sqlfy impact ./migrations APP.ORDERS --direction in --format json
 ```
+
+#### `sqlfy lineage`
+
+```bash
+sqlfy lineage <migrations-dir> [TABLE.COLUMN] [--downstream|--upstream] [--unused-columns] 
+              [--god-columns] [--min-refs N] [--format text|json|mermaid] [--max-depth N]
+              [--at VERSION] [--out FILE]
+```
+
+Column-level lineage and data flow analysis. Traces column dependencies across tables, views, and stored procedures using SQLLineage integration.
+
+**Modes:**
+- **Analyze specific column:** `sqlfy lineage TABLE.COLUMN` — Show upstream/downstream dependencies
+- **Find unused columns:** `sqlfy lineage --unused-columns` — Columns defined but never referenced
+- **Find god columns:** `sqlfy lineage --god-columns --min-refs N` — Heavily referenced columns (default: 20+ refs)
+- **Show overall stats:** `sqlfy lineage` — Summary of all column lineage
+
+| Flag | Default | Description |
+|---|---|---|
+| `TABLE.COLUMN` | — | Column to analyze (e.g., `APP.USERS.EMAIL`) |
+| `--downstream` | `true` | Show downstream dependencies (columns that depend on this one) |
+| `--upstream` | `false` | Show upstream dependencies (columns this one depends on) |
+| `--unused-columns` | — | Find columns that are never referenced |
+| `--god-columns` | — | Find heavily referenced columns |
+| `--min-refs` | `20` | Minimum reference count for god columns |
+| `--format` | `text` | Output format: `text`, `json`, or `mermaid` |
+| `--max-depth` | `3` | Maximum depth for Mermaid diagrams |
+
+**Examples:**
+```bash
+# Analyze specific column
+sqlfy lineage ./migrations APP.USERS.EMAIL --downstream
+  APP.USERS.EMAIL
+    → APP.USER_ORDERS.CUSTOMER_EMAIL (via JOIN on user_id)
+    → APP.REPORTS.CONTACT_INFO (via CTE user_details)
+  
+  Downstream: 2 columns
+
+# Find upstream dependencies
+sqlfy lineage ./migrations APP.USER_ORDERS.CUSTOMER_EMAIL --upstream
+  APP.USER_ORDERS.CUSTOMER_EMAIL
+    ← APP.USERS.EMAIL (source via JOIN)
+
+# Find unused columns
+sqlfy lineage ./migrations --unused-columns
+  Unused Columns Report
+  ══════════════════════════════════════════════════════════
+  
+  Found 3 unused column(s):
+  
+    APP.USERS.LEGACY_FIELD
+      Created: V2
+      Status: Never referenced in views/procedures
+    
+    APP.PRODUCTS.DEPRECATED_SKU
+      Created: V5
+      Status: Never referenced in views/procedures
+
+# Find god columns (heavily referenced)
+sqlfy lineage ./migrations --god-columns --min-refs 30
+  God Columns Report (min_refs=30)
+  ══════════════════════════════════════════════════════════
+  
+  Found 2 god column(s):
+  
+    APP.USERS.USER_ID
+      Total references: 47
+      Downstream columns: 15
+      Type: Primary Key
+    
+    APP.PRODUCTS.PRODUCT_ID
+      Total references: 31
+      Downstream columns: 8
+      Type: Primary Key
+
+# Generate Mermaid diagram
+sqlfy lineage ./migrations APP.USERS.EMAIL --format mermaid --max-depth 5 > lineage.mmd
+
+# JSON output for programmatic access
+sqlfy lineage ./migrations APP.USERS.EMAIL --format json > lineage.json
+```
+
+**Use Cases:**
+- **Column rename impact:** Identify all views/procedures that reference a column before renaming
+- **Dead code detection:** Find unused columns that can be safely removed
+- **Performance optimization:** Identify heavily used columns that should be indexed
+- **Data flow understanding:** Trace how data flows from source tables through views and aggregations
 
 #### `sqlfy domains`
 
