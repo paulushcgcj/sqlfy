@@ -159,6 +159,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `impact` | Analyze impact of schema object changes using graph traversal |
 | `domains` | Detect semantic business domains using community detection |
 | `stability` | Calculate schema stability metrics and churn rates |
+| `validate` | Validate migration ordering and detect issues |
 
 **Common flags available on most commands:**
 - `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
@@ -881,6 +882,117 @@ Stable Tables (12):
       2 modifications
       4.0% churn rate
       Stability score: 92/100
+```
+
+#### `sqlfy validate`
+
+```bash
+sqlfy validate <migrations-dir> [--format text|json] [--strict] [--fix-numbering] [--out FILE]
+```
+
+Validate migration folder structure and ordering to prevent deployment failures. Detects out-of-order migrations, version gaps, duplicate versions, and invalid filename formats.
+
+| Flag | Description |
+|---|---|
+| `--strict` | Exit with code 1 on warnings (not just errors) — recommended for CI/CD |
+| `--fix-numbering` | Show renumbering suggestions to fix ordering issues |
+
+**Detection Categories:**
+
+1. **Out-of-Order Migrations** (Error)  
+   Filename sort differs from version sort (e.g., V10__aaa.sql before V2__zzz.sql alphabetically)
+
+2. **Duplicate Versions** (Error)  
+   Two or more files with the same version number (e.g., two V5 files)
+
+3. **Version Gaps** (Warning)  
+   Missing sequential versions in simple sequences (e.g., V1, V2, V5 — missing V3, V4)  
+   _Note:_ Only detected for simple integer versions, not dotted versions (1.2.3)
+
+4. **Invalid Filename Format** (Warning)  
+   File doesn't match Flyway naming standard (V<version>__<description>.sql)
+
+**Supported Filename Formats:**
+- `V1__description.sql` — Simple versioned migration
+- `V1.2.3__description.sql` — Dotted version
+- `V1_2_3__description.sql` — Underscore version (converted to dots)
+- `R__repeatable.sql` — Repeatable migration
+- `U1__undo.sql` — Undo migration
+
+**Exit Codes:**
+- `0` — No issues (or warnings in non-strict mode)
+- `1` — Errors found (or warnings in strict mode)
+
+**Use Cases:**
+- **CI/CD Gate** — Prevent deployment of misconfigured migrations
+- **Pre-commit Hook** — Catch ordering issues before push
+- **Team Onboarding** — Validate migration folder structure
+- **Migration Refactoring** — Detect issues after reorganization
+
+**Examples:**
+```bash
+sqlfy validate ./migrations                        # Basic validation
+sqlfy validate ./migrations --strict               # Treat warnings as errors
+sqlfy validate ./migrations --fix-numbering        # Show renumbering suggestions
+sqlfy validate ./migrations --format json          # JSON output for automation
+sqlfy validate ./migrations --out validation.json  # Write to file
+```
+
+**Example Output (with issues):**
+```
+╔══════════════════════════════════════════╗
+║   MIGRATION ORDERING VALIDATION          ║
+╚══════════════════════════════════════════╝
+
+Total migrations: 15
+
+❌ 1 error(s):
+
+  [OUT_OF_ORDER] Migrations are not in version order by filename
+    File: V10__add_email_index.sql
+    → Expected V2__add_orders.sql at position 2, found V10__add_email_index.sql
+
+⚠  2 warning(s):
+
+  [VERSION_GAP] Gap in version sequence: V2 → V10
+    → Missing versions: V3, V4, V5, V6, V7, V8, V9
+
+  [INVALID_FILENAME] Non-standard migration filename (not Flyway format)
+    File: create_users.sql
+    → Use Flyway format: V<version>__<description>.sql
+```
+
+**Example with `--fix-numbering`:**
+```
+📋 Renumbering suggestions:
+  V10__add_email_index.sql → V3__add_email_index.sql
+  V15__add_foreign_keys.sql → V4__add_foreign_keys.sql
+```
+
+**Example Output (no issues):**
+```
+╔══════════════════════════════════════════╗
+║   MIGRATION ORDERING VALIDATION          ║
+╚══════════════════════════════════════════╝
+
+Total migrations: 20
+
+✓ All migrations validated successfully
+```
+
+**CI/CD Integration Example (GitHub Actions):**
+```yaml
+- name: Validate Migration Order
+  run: sqlfy validate ./migrations --strict
+```
+
+**Pre-commit Hook Example:**
+```bash
+#!/bin/bash
+sqlfy validate ./migrations --strict || {
+  echo "Migration validation failed. Run 'sqlfy validate ./migrations --fix-numbering' for suggestions."
+  exit 1
+}
 ```
 
 ### Legacy style (backward compatible)

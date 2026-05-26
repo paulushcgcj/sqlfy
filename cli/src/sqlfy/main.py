@@ -52,6 +52,7 @@ from .analysis.differ import SchemaDiffer, diff_files
 from .analysis.insights import InsightsEngine
 from .analysis.asker import Asker, ChatSession
 from .analysis.query import QueryEngine
+from .analysis import ordering
 
 
 # ─────────────────────────────────────────────
@@ -1423,6 +1424,58 @@ def cmd_stability(args: argparse.Namespace) -> None:
     write_output(output, args.out)
 
 
+def cmd_validate(args: argparse.Namespace) -> int:
+    """
+    Validate migration ordering.
+    
+    Detects:
+    - Out-of-order migrations (filename sort != version sort)
+    - Version gaps (missing V3/V4 between V2 and V5)
+    - Duplicate versions (two V1 files)
+    - Invalid filename formats
+    
+    Returns:
+        0 if valid, 1 if errors found (or warnings in --strict mode)
+    """
+    migrations_dir = Path(args.migrations_dir)
+    
+    if not migrations_dir.is_dir():
+        print(f"Error: migrations directory not found: {migrations_dir}", file=sys.stderr)
+        return 1
+    
+    # Validate migrations
+    report = ordering.validate_migrations(migrations_dir)
+    
+    # Format output
+    fmt = getattr(args, 'format', 'text')
+    show_suggestions = True  # Always show suggestions in CLI mode
+    
+    if fmt == 'json':
+        output = ordering.format_json(report)
+    else:
+        output = ordering.format_text(report, show_suggestions=show_suggestions)
+    
+    # Print output
+    write_output(output, getattr(args, 'out', None))
+    
+    # Print renumbering suggestions if requested
+    if getattr(args, 'fix_numbering', False):
+        suggestions = ordering.suggest_renumbering(migrations_dir)
+        if suggestions:
+            print('\n📋 Renumbering suggestions:')
+            for s in suggestions:
+                print(f'  {s["old"]} → {s["new"]}')
+        else:
+            print('\n✓ No renumbering needed')
+    
+    # Exit code
+    if report.has_errors:
+        return 1
+    if getattr(args, 'strict', False) and report.has_warnings:
+        return 1
+    return 0
+
+
 # ─────────────────────────────────────────────
 # ARGUMENT PARSER
 # ─────────────────────────────────────────────
@@ -1645,6 +1698,19 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help='Churn rate threshold for stable classification (default: 10.0)')
     p.set_defaults(func=cmd_stability)
 
+    # validate
+    p = sub.add_parser('validate', help='Validate migration ordering and detect issues')
+    p.add_argument('migrations_dir', help='Path to directory containing migration files')
+    p.add_argument('--format', choices=['text', 'json'], default='text',
+                   help='Output format (default: text)')
+    p.add_argument('--strict', action='store_true',
+                   help='Exit with code 1 on warnings (not just errors)')
+    p.add_argument('--fix-numbering', action='store_true',
+                   help='Show renumbering suggestions to fix ordering')
+    p.add_argument('--out', metavar='FILE',
+                   help='Write output to file instead of stdout')
+    p.set_defaults(func=cmd_validate)
+
     return parser
 
 
@@ -1667,7 +1733,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 # ENTRY POINT
 # ─────────────────────────────────────────────
 
-KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability'}
+KNOWN_SUBCOMMANDS = {'dump', 'manifest', 'chunks', 'diff', 'graph', 'graph-migrations', 'rollback-analysis', 'insights', 'health', 'simulate', 'integrity', 'cache', 'ask', 'chat', 'export', 'query', 'impact', 'lint', 'domains', 'stability', 'validate'}
 
 
 def main() -> None:
@@ -1677,7 +1743,10 @@ def main() -> None:
     if first_positional in KNOWN_SUBCOMMANDS:
         # Subcommand mode
         args = _subcommand_parser().parse_args(argv)
-        args.func(args)
+        result = args.func(args)
+        # If the command returns an exit code, use it
+        if isinstance(result, int):
+            sys.exit(result)
     else:
         # Legacy mode
         args = _legacy_parser().parse_args(argv)
