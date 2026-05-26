@@ -85,7 +85,11 @@ def load_files(
         if not p.is_dir():
             print(f'Error: "{p}" is not a directory.', file=sys.stderr)
             sys.exit(1)
-        sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == ".sql")
+        # Recurse through nested folders to find migration SQL files.
+        sql_files = sorted(
+            (f for f in p.rglob('*') if f.is_file() and f.suffix.lower() == '.sql'),
+            key=lambda path: (path.name, str(path.relative_to(p))),
+        )
         if not sql_files:
             print(f"No .sql files found in {p}", file=sys.stderr)
             sys.exit(1)
@@ -103,7 +107,10 @@ def load_files(
                 else:
                     # Cache miss — read and cache
                     sql_content = f.read_text(encoding="utf-8")
-                    result = {"filename": f.name, "sql": sql_content}
+                    result = {
+                        "filename": str(f.relative_to(p)),
+                        "sql": sql_content,
+                    }
                     save_cached(f, result)
                     files.append(result)
             
@@ -114,7 +121,10 @@ def load_files(
                 )
         else:
             files = [
-                {"filename": f.name, "sql": f.read_text(encoding="utf-8")}
+                {
+                    "filename": str(f.relative_to(p)),
+                    "sql": f.read_text(encoding="utf-8"),
+                }
                 for f in sql_files
             ]
         
@@ -389,8 +399,20 @@ def cmd_diff(args: argparse.Namespace) -> None:
             if not p.is_dir():
                 print(f'Error: "{path}" is not a directory or .json state file.', file=sys.stderr)
                 sys.exit(1)
-            sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == '.sql')
-            files = [{'filename': f.name, 'sql': f.read_text(encoding='utf-8')} for f in sql_files]
+            sql_files = sorted(
+                (f for f in p.rglob('*') if f.is_file() and f.suffix.lower() == '.sql'),
+                key=lambda migration_path: (
+                    migration_path.name,
+                    str(migration_path.relative_to(p)),
+                ),
+            )
+            files = [
+                {
+                    'filename': str(f.relative_to(p)),
+                    'sql': f.read_text(encoding='utf-8'),
+                }
+                for f in sql_files
+            ]
             print(f'Loaded {len(files)} migration(s) from {path}', file=sys.stderr)
             return SchemaStateBuilder.from_graph(reconstruct(files))
 
