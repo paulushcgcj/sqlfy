@@ -248,11 +248,12 @@ def cmd_dump(args: argparse.Namespace) -> None:
     indexes, sequences, relationships, and migration history.
     """
     files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, 'dialect', 'oracle')
 
     graph = (
-        reconstruct_at(files, version=args.at)
+        reconstruct_at(files, version=args.at, dialect=dialect)
         if args.at
-        else reconstruct(files)
+        else reconstruct(files, dialect=dialect)
     )
 
     state = SchemaStateBuilder.from_graph(graph)
@@ -280,11 +281,12 @@ def cmd_manifest(args: argparse.Namespace) -> None:
     migration count, generation timestamp, and SQLFY version.
     """
     files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, 'dialect', 'oracle')
     
     graph = (
-        reconstruct_at(files, version=args.at)
+        reconstruct_at(files, version=args.at, dialect=dialect)
         if getattr(args, 'at', None)
-        else reconstruct(files)
+        else reconstruct(files, dialect=dialect)
     )
     
     state = SchemaStateBuilder.from_graph(graph)
@@ -383,6 +385,7 @@ def cmd_diff(args: argparse.Namespace) -> None:
         result = diff_files(args.state_a, args.state_b)
     else:
         # Reconstruct on the fly from migration directories
+        dialect = getattr(args, 'dialect', 'oracle')
         def load_dir(path: str):
             from pathlib import Path
             p = Path(path)
@@ -392,7 +395,7 @@ def cmd_diff(args: argparse.Namespace) -> None:
             sql_files = sorted(f for f in p.iterdir() if f.suffix.lower() == '.sql')
             files = [{'filename': f.name, 'sql': f.read_text(encoding='utf-8')} for f in sql_files]
             print(f'Loaded {len(files)} migration(s) from {path}', file=sys.stderr)
-            return SchemaStateBuilder.from_graph(reconstruct(files))
+            return SchemaStateBuilder.from_graph(reconstruct(files, dialect=dialect))
 
         state_a = load_dir(args.state_a)
         state_b = load_dir(args.state_b)
@@ -414,7 +417,8 @@ def cmd_diff(args: argparse.Namespace) -> None:
 def cmd_chunks(args: argparse.Namespace) -> None:
     """Output LLM vector chunks from the schema."""
     files  = load_files(args.migrations_dir, args.json_input)
-    graph  = reconstruct_at(files, args.at) if args.at else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph  = reconstruct_at(files, args.at, dialect=dialect) if args.at else reconstruct(files, dialect=dialect)
     chunks = build_chunks(graph)
 
     fmt = (args.format or 'json').lower()
@@ -433,21 +437,22 @@ def cmd_chunks(args: argparse.Namespace) -> None:
 def legacy_main(args: argparse.Namespace) -> None:
     """Backward-compatible mode — original flag-based interface."""
     files = load_files(args.migrations_dir, getattr(args, 'json_input', None))
+    dialect = getattr(args, 'dialect', 'oracle')
 
     if getattr(args, 'all', False):
-        graph  = reconstruct(files)
+        graph  = reconstruct(files, dialect=dialect)
         chunks = build_chunks(graph)
         output = json.dumps(
             {'graph': graph_to_dict(graph), 'chunks': chunks_to_list(chunks)},
             indent=2, ensure_ascii=False
         )
     elif getattr(args, 'chunks', False):
-        graph  = reconstruct(files)
+        graph  = reconstruct(files, dialect=dialect)
         chunks = build_chunks(graph)
         output = (json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False)
                   if getattr(args, 'json', False) else format_human_chunks(chunks))
     else:
-        graph  = reconstruct(files)
+        graph  = reconstruct(files, dialect=dialect)
         output = (json.dumps(graph_to_dict(graph), indent=2, ensure_ascii=False)
                   if getattr(args, 'json', False) else format_human_graph(graph))
 
@@ -474,7 +479,8 @@ def cmd_graph(args: argparse.Namespace) -> None:
       all        — Generate json, html, and report together
     """
     files = load_files(args.migrations_dir, args.json_input)
-    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
     state = SchemaStateBuilder.from_graph(graph)
 
     fmt   = (args.format or 'dot').lower()
@@ -601,7 +607,8 @@ def cmd_insights(args: argparse.Namespace) -> None:
     DEFAULT, SELECT * in views, complex triggers, and DELETE without WHERE.
     """
     files = load_files(args.migrations_dir, args.json_input)
-    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
 
     report = InsightsEngine.analyse(state)
@@ -641,7 +648,8 @@ def cmd_health(args: argparse.Namespace) -> None:
     from .analysis.health import HealthAnalyzer
     
     files = load_files(args.migrations_dir, args.json_input)
-    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     
     # Run insights analysis first
@@ -680,9 +688,10 @@ def cmd_simulate(args: argparse.Namespace) -> None:
     from .analysis.simulator import SchemaSimulator
     
     files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, 'dialect', 'oracle')
     
     # Create simulator at base version
-    simulator = SchemaSimulator(files, base_version=getattr(args, 'at', None))
+    simulator = SchemaSimulator(files, base_version=getattr(args, 'at', None), dialect=dialect)
     
     # Get SQL to simulate
     if getattr(args, 'sql', None):
@@ -829,7 +838,8 @@ def cmd_ask(args: argparse.Namespace) -> None:
     Requires: ANTHROPIC_API_KEY environment variable.
     """
     files = load_files(args.migrations_dir, args.json_input)
-    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
 
     try:
         asker = Asker(
@@ -871,7 +881,8 @@ def cmd_chat(args: argparse.Namespace) -> None:
     Requires: ANTHROPIC_API_KEY environment variable.
     """
     files = load_files(args.migrations_dir, args.json_input)
-    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
 
     try:
         asker = Asker(
@@ -937,7 +948,8 @@ def cmd_export(args: argparse.Namespace) -> None:
     to the repo as living documentation.
     """
     files = load_files(args.migrations_dir, args.json_input)
-    graph = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
     state = SchemaStateBuilder.from_graph(graph)
 
     report = None
@@ -985,7 +997,8 @@ def cmd_query(args: argparse.Namespace) -> None:
       indexes     List all indexes
     """
     files  = load_files(args.migrations_dir, args.json_input)
-    graph  = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph  = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
     state  = SchemaStateBuilder.from_graph(graph)
     engine = QueryEngine(state)
     qt     = args.query_type
@@ -1085,7 +1098,8 @@ def cmd_impact(args: argparse.Namespace) -> None:
       - Grouping by object type
     """
     files = load_files(args.migrations_dir, args.json_input)
-    graph_data = reconstruct_at(files, args.at) if getattr(args, 'at', None) else reconstruct(files)
+    dialect = getattr(args, 'dialect', 'oracle')
+    graph_data = reconstruct_at(files, args.at, dialect=dialect) if getattr(args, 'at', None) else reconstruct(files, dialect=dialect)
     
     # Build NetworkX graph
     from .core import build_networkx_graph
@@ -1308,6 +1322,8 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         p.add_argument('--json-input', metavar='FILE')
         p.add_argument('--at', metavar='VERSION')
         p.add_argument('--out', metavar='FILE')
+        p.add_argument('--dialect', default='oracle',
+                       help='SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)')
 
     def rag_shared(p):
         shared(p)
@@ -1502,6 +1518,8 @@ def _legacy_parser() -> argparse.ArgumentParser:
     parser.add_argument('--json',   action='store_true')
     parser.add_argument('--out',    metavar='FILE')
     parser.add_argument('--at',     metavar='VERSION')
+    parser.add_argument('--dialect', default='oracle',
+                       help='SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)')
     return parser
 
 

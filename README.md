@@ -16,7 +16,31 @@ SQLfy reads a set of Flyway migration files in version order, parses each DDL st
 - A structured **table explorer** with columns, types, constraints, indexes, and comments
 - Pre-formatted **LLM context chunks** ready to be embedded into a RAG pipeline or pasted into a prompt
 
-Primary target dialect is **OracleDB**. PostgreSQL support is planned.
+Primary target dialect is **OracleDB**. **PostgreSQL**, **MySQL**, and **SQLite** are also supported via the `--dialect` flag.
+
+### Multi-Dialect Support
+
+SQLfy supports multiple SQL dialects with automatic type normalization:
+
+| Dialect | Invoke with | Type Normalization Examples |
+|---|---|---|
+| **Oracle** _(default)_ | `--dialect oracle` | `VARCHAR2` → `VARCHAR`, `NUMBER` → `NUMERIC` |
+| **PostgreSQL** | `--dialect postgres` | `SERIAL` → `INTEGER`, `TEXT` → `VARCHAR` |
+| **MySQL** | `--dialect mysql` | `TINYINT` → `SMALLINT`, `DATETIME` → `TIMESTAMP` |
+| **SQLite** | `--dialect sqlite` | `TEXT` → `VARCHAR`, `REAL` → `FLOAT` |
+
+**Usage:**
+```bash
+sqlfy dump ./postgres-migrations --dialect postgres
+sqlfy graph ./mysql-migrations --dialect mysql --format mermaid
+sqlfy insights ./sqlite-migrations --dialect sqlite
+```
+
+**How it works:**
+- The `--dialect` flag is passed to [sqlglot](https://github.com/tobymao/sqlglot) for parsing
+- Types are normalized to canonical forms (e.g., `SERIAL` → `INTEGER`, `VARCHAR2` → `VARCHAR`)
+- Auto-increment columns are detected per-dialect (`SERIAL`, `AUTO_INCREMENT`, `IDENTITY`)
+- Output formats work consistently across all dialects
 
 ---
 
@@ -134,6 +158,12 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `query` | Deterministic graph queries (no LLM) |
 | `impact` | Analyze impact of schema object changes using graph traversal |
 
+**Common flags available on most commands:**
+- `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
+- `--at VERSION` — Point-in-time snapshot at a specific Flyway version
+- `--out FILE` — Write output to file instead of stdout
+- `--format` — Output format (varies by command)
+
 #### `sqlfy dump`
 
 ```bash
@@ -147,6 +177,7 @@ Output the Schema State Dictionary — a clean, versioned, serializable snapshot
 |---|---|---|
 | `migrations_dir` | — | Directory containing Flyway `V*__*.sql` files |
 | `--json-input FILE` | — | JSON file `[{ filename, sql }]` (Tauri bridge) |
+| `--dialect` | `oracle` | SQL dialect: `oracle`, `postgres`, `mysql`, `sqlite` |
 | `--format` | `json` | `json`, `yaml`, or `summary` (human-readable) |
 | `--at VERSION` | — | Point-in-time snapshot at a specific Flyway version (e.g. `2`) |
 | `--out FILE` | stdout | Write output to file |
@@ -158,6 +189,7 @@ sqlfy dump ./migrations --format yaml      # YAML output
 sqlfy dump ./migrations --format summary   # Human-readable
 sqlfy dump ./migrations --at 2             # Point-in-time at V2
 sqlfy dump ./migrations --out state.json   # Write to file
+sqlfy dump ./postgres-migrations --dialect postgres  # PostgreSQL migrations
 ```
 
 #### `sqlfy manifest`
