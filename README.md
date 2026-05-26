@@ -68,9 +68,20 @@ sqlfy ./samples      # human-readable schema summary
 | Subcommand | Description |
 |---|---|
 | `dump` | Output the Schema State Dictionary (JSON, YAML, or human-readable summary) |
+| `manifest` | Output graph manifest/metadata with high-level summary |
 | `chunks` | Output LLM vector chunks |
 | `diff` | Compare two Schema State Dictionaries or migration directories |
-| `graph` | Graph representation _(coming soon)_ |
+| `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report) |
+| `insights` | Analyse schema and report findings (orphan tables, missing PKs, etc.) |
+| `health` | Generate migration folder health report with quality score |
+| `simulate` | Simulate schema evolution with hypothetical migrations |
+| `integrity` | Check migration file integrity using SHA256 hashes |
+| `cache` | Manage file-based caching system |
+| `ask` | Ask a natural language question about the schema (RAG) |
+| `chat` | Interactive multi-turn schema chat session |
+| `export` | Export schema as self-contained HTML documentation |
+| `query` | Deterministic graph queries (no LLM) |
+| `impact` | Analyze impact of schema object changes using graph traversal |
 
 #### `sqlfy dump`
 
@@ -78,6 +89,8 @@ sqlfy ./samples      # human-readable schema summary
 sqlfy dump <migrations-dir> [--format json|yaml|summary] [--at VERSION] [--out FILE]
 sqlfy dump --json-input FILE  [--format json|yaml|summary] [--out FILE]
 ```
+
+Output the Schema State Dictionary — a clean, versioned, serializable snapshot of the final DB state including tables, columns, constraints, indexes, sequences, relationships, and migration history.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -87,10 +100,36 @@ sqlfy dump --json-input FILE  [--format json|yaml|summary] [--out FILE]
 | `--at VERSION` | — | Point-in-time snapshot at a specific Flyway version (e.g. `2`) |
 | `--out FILE` | stdout | Write output to file |
 
+**Examples:**
+```bash
+sqlfy dump ./migrations                    # JSON to stdout
+sqlfy dump ./migrations --format yaml      # YAML output
+sqlfy dump ./migrations --format summary   # Human-readable
+sqlfy dump ./migrations --at 2             # Point-in-time at V2
+sqlfy dump ./migrations --out state.json   # Write to file
+```
+
+#### `sqlfy manifest`
+
+```bash
+sqlfy manifest <migrations-dir> [--at VERSION] [--out FILE]
+```
+
+Output graph manifest/metadata with high-level summary including schema version, fingerprint, node/edge counts, dialect, migration count, generation timestamp, and SQLfy version.
+
 #### `sqlfy chunks`
 
 ```bash
 sqlfy chunks <migrations-dir> [--format json|text] [--at VERSION] [--out FILE]
+```
+
+Output LLM vector chunks from the schema. Each chunk is self-contained and embedding-ready.
+
+**Examples:**
+```bash
+sqlfy chunks ./migrations                   # Human-readable chunks
+sqlfy chunks ./migrations --format json     # JSON array
+sqlfy chunks ./migrations --out chunks.json # Write to file
 ```
 
 #### `sqlfy diff`
@@ -99,27 +138,64 @@ sqlfy chunks <migrations-dir> [--format json|text] [--at VERSION] [--out FILE]
 sqlfy diff <state-a> <state-b> [--format json|text] [--out FILE]
 ```
 
+Compare two Schema State Dictionaries or migration directories. Detects added/removed/modified tables, columns, constraints, and relationships.
+
 Both arguments accept either a `.json` state file (from `sqlfy dump`) or a migrations directory reconstructed on the fly.
+
+**Examples:**
+```bash
+sqlfy diff state_v2.json state_v5.json              # Diff two state files
+sqlfy diff state_v2.json state_v5.json --format json
+sqlfy diff ./migrations-v1 ./migrations-v2          # Diff two directories
+```
 
 #### `sqlfy graph`
 
 ```bash
-sqlfy graph <migrations-dir> [--format dot|mermaid|summary] [--title TEXT] [--at VERSION] [--out FILE]
+sqlfy graph <migrations-dir> [--format FORMAT] [--title TEXT] [--at VERSION] [--out FILE]
+              [--output-dir PATH] [--resolution FLOAT] [--min-cohesion FLOAT] [--no-split]
 ```
+
+Output a graph representation of the schema in various formats.
 
 | Format | Description |
 |---|---|
 | `dot` _(default)_ | Graphviz DOT — render with `dot -Tsvg schema.dot -o schema.svg` |
 | `mermaid` | Mermaid ERD — paste into GitHub Markdown or https://mermaid.live |
+| `excalidraw` | Excalidraw JSON — open in excalidraw.com or VSCode extension |
+| `drawio` | Draw.io XML — open in draw.io or VSCode extension |
 | `summary` | Compact ASCII adjacency list — useful for LLM prompts |
+| `json` | NetworkX node-link graph (graph.json) with community detection |
+| `html` | Interactive vis.js visualization (graph.html) |
+| `report` | Human-readable graph summary (GRAPH_REPORT.md) |
+| `all` | Generate json, html, and report together |
+
+| Flag | Description |
+|---|---|
+| `--output-dir PATH` | Output directory for json/html/report (default: `sqlfy-out`) |
+| `--resolution FLOAT` | Community detection resolution: >1 = more communities, <1 = fewer (default: 1.0) |
+| `--min-cohesion FLOAT` | Minimum cohesion score to keep a community (default: 0.1) |
+| `--no-split` | Disable oversized community splitting |
+
+**Examples:**
+```bash
+sqlfy graph ./migrations                              # DOT format
+sqlfy graph ./migrations --format mermaid --out erd.md
+sqlfy graph ./migrations --format excalidraw --out schema.json
+sqlfy graph ./migrations --format drawio --out schema.drawio
+sqlfy graph ./migrations --format json --output-dir ./out
+sqlfy graph ./migrations --format html --output-dir ./out
+sqlfy graph ./migrations --format all                 # All formats
+```
 
 #### `sqlfy insights`
 
 ```bash
-sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] [--strict] [--at VERSION] [--out FILE]
+sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] 
+               [--strict] [--at VERSION] [--out FILE]
 ```
 
-Analyses the schema and reports categorised findings.
+Analyse the schema and report Graphify-style insights. Detects orphan tables, missing PKs, unindexed tables, missing FK candidates, unresolved FK targets, nullable PKs/FKs, circular references, wide tables, orphaned sequences, duplicate indexes, and disconnected islands. Also detects migration-specific anti-patterns like ADD NOT NULL without DEFAULT, SELECT * in views, complex triggers, and DELETE without WHERE.
 
 | Flag | Description |
 |---|---|
@@ -148,6 +224,256 @@ Analyses the schema and reports categorised findings.
 | `UNIQUE_WITHOUT_INDEX` | info | modelling |
 | `ISLAND` | warning | connectivity |
 
+**Examples:**
+```bash
+sqlfy insights ./migrations                        # Full report
+sqlfy insights ./migrations --severity error       # Errors only
+sqlfy insights ./migrations --format json --out findings.json
+sqlfy insights ./migrations --strict               # Exit 1 if errors found
+```
+
+#### `sqlfy health`
+
+```bash
+sqlfy health <migrations-dir> [--format text|json] [--strict] [--at VERSION] [--out FILE]
+```
+
+Generate migration folder health report with high-level summary of migration quality including safe vs unsafe migrations, irreversible operations, and health score (0-100).
+
+| Flag | Description |
+|---|---|
+| `--format text` _(default)_ | Human-readable health report |
+| `--format json` | Machine-readable JSON |
+| `--strict` | Exit with code 1 if health score is critical |
+
+**Examples:**
+```bash
+sqlfy health ./migrations                          # Health report
+sqlfy health ./migrations --format json            # JSON format
+sqlfy health ./migrations --strict                 # Exit 1 if critical
+```
+
+#### `sqlfy simulate`
+
+```bash
+sqlfy simulate <migrations-dir> [--sql SQL | --file PATH] [--format text|json] 
+               [--diff] [--strict] [--at VERSION] [--out FILE]
+```
+
+Simulate schema evolution with hypothetical migrations. Test DDL changes before committing by applying what-if SQL on top of existing state, comparing simulated vs actual state, and validating migration safety.
+
+| Flag | Description |
+|---|---|
+| `--sql SQL` | Inline SQL to simulate |
+| `--file PATH` | Path to SQL file to simulate |
+| `--diff` | Show diff between base and simulated state |
+| `--strict` | Exit with error if simulation is unsafe |
+
+**Examples:**
+```bash
+sqlfy simulate ./migrations --sql "ALTER TABLE APP.USERS ADD COLUMN EMAIL VARCHAR2(255)"
+sqlfy simulate ./migrations --file ./test-migration.sql --diff
+sqlfy simulate ./migrations --file ./test.sql --strict --format json
+```
+
+#### `sqlfy integrity`
+
+```bash
+sqlfy integrity <migrations-dir> [--strict] [--update-manifest]
+```
+
+Check migration file integrity using SHA256 hashes. Detect tampering or edits to migration files by comparing current file hashes against a manifest of previously recorded hashes.
+
+| Flag | Description |
+|---|---|
+| `--strict` | Exit with error if modified migrations detected |
+| `--update-manifest` | Accept modifications and update manifest |
+
+**Examples:**
+```bash
+sqlfy integrity ./migrations                       # Check integrity
+sqlfy integrity ./migrations --strict              # Exit 1 if modified
+sqlfy integrity ./migrations --update-manifest     # Update after review
+```
+
+#### `sqlfy cache`
+
+```bash
+sqlfy cache <clear|info>
+```
+
+Manage the file-based caching system.
+
+| Subcommand | Description |
+|---|---|
+| `clear` | Delete all cache entries |
+| `info` | Show cache statistics (entry count, total size) |
+
+**Examples:**
+```bash
+sqlfy cache info                                   # Show cache stats
+sqlfy cache clear                                  # Clear all cache
+```
+
+#### `sqlfy ask`
+
+```bash
+sqlfy ask <migrations-dir> <question> [--format text|json] [--embed] [--api-key KEY]
+          [-k N] [--no-sources] [--no-cache] [--at VERSION] [--out FILE]
+```
+
+Ask a natural language question about the schema (single question). Uses RAG to retrieve the most relevant schema chunks, then passes them as context to Claude for a grounded, accurate answer.
+
+**Requires:** `ANTHROPIC_API_KEY` environment variable.
+
+| Flag | Description |
+|---|---|
+| `question` | The question to ask (positional, can be multiple words) |
+| `--embed` | Use dense vector search (Voyage AI) instead of BM25 |
+| `--api-key KEY` | Override environment variable |
+| `-k N` | Number of chunks to retrieve (default: 6) |
+| `--no-sources` | Hide source chunk references in output |
+| `--no-cache` | Skip chunk cache (rebuild from scratch) |
+
+**Examples:**
+```bash
+sqlfy ask ./migrations "What tables store user data?"
+sqlfy ask ./migrations "How do orders relate to users?" --format json
+sqlfy ask ./migrations "Show me all foreign keys" --embed -k 10
+```
+
+#### `sqlfy chat`
+
+```bash
+sqlfy chat <migrations-dir> [--embed] [--api-key KEY] [-k N] [--at VERSION]
+```
+
+Start an interactive multi-turn chat session about the schema. Follow-up questions maintain context from previous turns. Type `exit`, `quit`, or Ctrl-C to end. Type `reset` to clear conversation history.
+
+**Requires:** `ANTHROPIC_API_KEY` environment variable.
+
+**Examples:**
+```bash
+sqlfy chat ./migrations                            # Start chat session
+sqlfy chat ./migrations --embed -k 10              # With embeddings
+```
+
+#### `sqlfy export`
+
+```bash
+sqlfy export <migrations-dir> [--title TEXT] [--insights] [--at VERSION] [--out FILE]
+```
+
+Export schema as a self-contained HTML documentation file with no external dependencies. Includes searchable/filterable table list with column details, inline Mermaid ERD diagram, optional schema insights panel, migration history timeline, and dark/light mode toggle.
+
+| Flag | Description |
+|---|---|
+| `--title TEXT` | Document title (default: "Schema Documentation — V{version}") |
+| `--insights` | Include insights panel in the HTML output |
+| `--out FILE` | Output filename (default: `schema_docs.html`) |
+
+**Examples:**
+```bash
+sqlfy export ./migrations                          # Basic HTML export
+sqlfy export ./migrations --insights --out docs.html
+sqlfy export ./migrations --title "My Schema" --at 5
+```
+
+#### `sqlfy query`
+
+```bash
+sqlfy query <migrations-dir> <query-type> [OPTIONS] [--format text|json|csv] [--out FILE]
+```
+
+Run a deterministic graph-traversal query against the schema. No LLM, no API calls — instant results.
+
+| Query Type | Description |
+|---|---|
+| `tables` | List/filter tables by pattern, schema, properties |
+| `columns` | List/filter columns by name, type, flags |
+| `fk-path` | Shortest FK path between two tables (BFS) |
+| `refs` | Tables referencing or referenced by a table |
+| `orphans` | Tables with no FK relationships |
+| `islands` | Disconnected clusters of tables |
+| `cycles` | Circular FK references |
+| `missing-pk` | Tables without a primary key |
+| `missing-fk` | Columns that look like FKs but have no constraint |
+| `impact` | Tables affected by dropping a given table |
+| `indexes` | List all indexes |
+
+| Flag | Description |
+|---|---|
+| `--pattern REGEX` | Name regex filter |
+| `--schema NAME` | Schema filter |
+| `--table TABLE` | Table name (full) |
+| `--type-like TYPE` | Column type substring |
+| `--from-table TABLE` | fk-path: source table |
+| `--to-table TABLE` | fk-path: target table |
+| `--direction in\|out\|both` | refs: direction (default: both) |
+| `--has-pk BOOL` | Filter by PK presence (true/false) |
+| `--is-orphan BOOL` | Filter by orphan status |
+| `--is-pk BOOL` | Filter columns: is primary key |
+| `--is-fk BOOL` | Filter columns: is foreign key |
+| `--is-unique BOOL` | Filter columns: is unique |
+| `--nullable BOOL` | Filter columns: is nullable |
+| `--has-default BOOL` | Filter columns: has default |
+| `--min-cols N` | Min column count |
+| `--max-cols N` | Max column count |
+| `--created-in VER` | Filter by created version |
+| `--unique-only` | indexes: unique only |
+
+**Examples:**
+```bash
+# Tables
+sqlfy query ./migrations tables                     # All tables
+sqlfy query ./migrations tables --pattern "order"   # Name match
+sqlfy query ./migrations tables --has-pk false      # No PK
+sqlfy query ./migrations tables --is-orphan true    # Orphan tables
+
+# Columns
+sqlfy query ./migrations columns --type-like VARCHAR
+sqlfy query ./migrations columns --is-fk true --nullable false
+
+# FK path
+sqlfy query ./migrations fk-path --from-table APP.ORDER_ITEMS --to-table APP.USERS
+
+# References
+sqlfy query ./migrations refs --table APP.USERS --direction out
+
+# Analysis
+sqlfy query ./migrations orphans                    # Orphan tables
+sqlfy query ./migrations islands                    # Disconnected clusters
+sqlfy query ./migrations cycles                     # Circular FKs
+sqlfy query ./migrations missing-pk                 # No PK
+sqlfy query ./migrations impact --table APP.USERS   # Drop impact
+
+# Indexes
+sqlfy query ./migrations indexes --table APP.ORDERS
+sqlfy query ./migrations indexes --unique-only
+```
+
+#### `sqlfy impact`
+
+```bash
+sqlfy impact <migrations-dir> <object-id> [--depth N] [--direction in|out] 
+             [--format text|json] [--at VERSION] [--out FILE]
+```
+
+Analyze impact of changes to a schema object using graph traversal. Finds all objects (tables, views, columns, etc.) that would be affected by changes to the specified object. Supports direct dependencies (depth 1), transitive dependencies (depth > 1), critical path identification, and grouping by object type.
+
+| Flag | Description |
+|---|---|
+| `object-id` | Schema object to analyze (e.g., APP.USERS, APP.USERS.EMAIL) |
+| `--depth N` | Maximum traversal depth (default: 5) |
+| `--direction in\|out` | Traversal direction: out=affected by, in=depends on (default: out) |
+
+**Examples:**
+```bash
+sqlfy impact ./migrations APP.USERS                 # Impact of USER table
+sqlfy impact ./migrations APP.USERS.EMAIL --depth 3
+sqlfy impact ./migrations APP.ORDERS --direction in --format json
+```
+
 ### Legacy style (backward compatible)
 
 ```bash
@@ -165,50 +491,178 @@ sqlfy [migrations_dir] [--json-input FILE] [--json] [--chunks] [--all] [--at VER
 ### Examples
 
 ```bash
+# ──────────────────────────────────────────────────────────────
+# Schema State & Metadata
+# ──────────────────────────────────────────────────────────────
+
 # Schema State Dictionary (JSON)
 sqlfy dump ./migrations
+sqlfy dump ./migrations --format yaml              # YAML output
+sqlfy dump ./migrations --format summary           # Human-readable
+sqlfy dump ./migrations --at 2                     # Point-in-time at V2
+sqlfy dump ./migrations --out state.json           # Write to file
 
-# YAML output
-sqlfy dump ./migrations --format yaml
+# Schema manifest
+sqlfy manifest ./migrations                        # Metadata summary
 
-# Human-readable summary
-sqlfy dump ./migrations --format summary
-
-# Point-in-time snapshot at V2
-sqlfy dump ./migrations --at 2
-
-# Write to file
-sqlfy dump ./migrations --out state.json
+# ──────────────────────────────────────────────────────────────
+# LLM Chunks & Export
+# ──────────────────────────────────────────────────────────────
 
 # LLM vector chunks
 sqlfy chunks ./migrations
-sqlfy chunks ./migrations --out chunks.json
+sqlfy chunks ./migrations --format json --out chunks.json
 
-# Diff two pre-built state files
-sqlfy diff state_v2.json state_v5.json
-sqlfy diff state_v2.json state_v5.json --format json
+# HTML documentation
+sqlfy export ./migrations --insights --out docs.html
 
-# Diff two migration directories on the fly
-sqlfy diff ./migrations-v1 ./migrations-v2
-
-# Graph output
-sqlfy graph ./migrations
-sqlfy graph ./migrations --format mermaid --out schema.md
-sqlfy graph ./migrations --format dot --out schema.dot
-sqlfy graph ./migrations --format summary
+# ──────────────────────────────────────────────────────────────
+# Schema Analysis
+# ──────────────────────────────────────────────────────────────
 
 # Schema insights
 sqlfy insights ./migrations
-sqlfy insights ./migrations --severity error
+sqlfy insights ./migrations --severity error       # Errors only
 sqlfy insights ./migrations --format json --out findings.json
-sqlfy insights ./migrations --strict
+sqlfy insights ./migrations --strict               # Exit 1 if errors
 
-# Combined graph + chunks (Tauri bridge format — legacy)
-sqlfy ./migrations --all
+# Health report
+sqlfy health ./migrations
+sqlfy health ./migrations --strict --format json
 
-# From a JSON input file
-sqlfy --json-input /tmp/sqlfy-input.json --all
+# ──────────────────────────────────────────────────────────────
+# Comparison & Impact
+# ──────────────────────────────────────────────────────────────
+
+# Diff two state files
+sqlfy diff state_v2.json state_v5.json
+sqlfy diff state_v2.json state_v5.json --format json
+
+# Diff two directories
+sqlfy diff ./migrations-v1 ./migrations-v2
+
+# Impact analysis
+sqlfy impact ./migrations APP.USERS
+sqlfy impact ./migrations APP.USERS.EMAIL --depth 3
+
+# ──────────────────────────────────────────────────────────────
+# Graph Visualization
+# ──────────────────────────────────────────────────────────────
+
+# Graph output
+sqlfy graph ./migrations                           # DOT format
+sqlfy graph ./migrations --format mermaid --out schema.md
+sqlfy graph ./migrations --format excalidraw --out schema.json
+sqlfy graph ./migrations --format drawio --out schema.drawio
+sqlfy graph ./migrations --format json --output-dir ./out
+sqlfy graph ./migrations --format html --output-dir ./out
+sqlfy graph ./migrations --format all              # All formats
+
+# ──────────────────────────────────────────────────────────────
+# Structured Queries (no LLM)
+# ──────────────────────────────────────────────────────────────
+
+# Query tables
+sqlfy query ./migrations tables --pattern "order"
+sqlfy query ./migrations tables --has-pk false
+
+# Query columns
+sqlfy query ./migrations columns --type-like VARCHAR --is-fk true
+
+# FK path
+sqlfy query ./migrations fk-path --from-table APP.ORDER_ITEMS --to-table APP.USERS
+
+# Query analysis
+sqlfy query ./migrations orphans                   # Orphan tables
+sqlfy query ./migrations islands                   # Disconnected clusters
+sqlfy query ./migrations cycles                    # Circular FKs
+sqlfy query ./migrations missing-pk                # Tables without PK
+
+# ──────────────────────────────────────────────────────────────
+# Schema Evolution & Safety
+# ──────────────────────────────────────────────────────────────
+
+# Simulate changes
+sqlfy simulate ./migrations --sql "ALTER TABLE APP.USERS ADD COLUMN EMAIL VARCHAR2(255)"
+sqlfy simulate ./migrations --file ./test-migration.sql --diff
+
+# Check integrity
+sqlfy integrity ./migrations
+sqlfy integrity ./migrations --strict
+
+# ──────────────────────────────────────────────────────────────
+# Natural Language (RAG)
+# ──────────────────────────────────────────────────────────────
+
+# Ask questions
+sqlfy ask ./migrations "What tables store user data?"
+sqlfy ask ./migrations "How do orders relate to users?" --embed
+
+# Interactive chat
+sqlfy chat ./migrations
+sqlfy chat ./migrations --embed -k 10
+
+# ──────────────────────────────────────────────────────────────
+# Cache Management
+# ──────────────────────────────────────────────────────────────
+
+sqlfy cache info                                   # Show cache stats
+sqlfy cache clear                                  # Clear all cache
+
+# ──────────────────────────────────────────────────────────────
+# Legacy Mode (backward compatible)
+# ──────────────────────────────────────────────────────────────
+
+sqlfy ./migrations --all                           # Combined graph + chunks
+sqlfy --json-input /tmp/sqlfy-input.json --all     # From JSON input
 ```
+
+---
+
+## CLI Features Overview
+
+### 🔍 Schema Analysis & Insights
+- **Schema State Dictionary**: Versioned, serializable snapshot of final DB state (JSON/YAML/human-readable)
+- **Insights Engine**: Detects 15+ schema anti-patterns (missing PKs, orphan tables, circular FKs, etc.)
+- **Health Reports**: Migration quality scoring (0-100) with safe/unsafe operation counts
+- **Impact Analysis**: Graph traversal to find all objects affected by schema changes
+- **Integrity Checks**: SHA256-based tamper detection for migration files
+
+### 📊 Graph & Visualization
+- **Multiple Export Formats**: DOT (Graphviz), Mermaid, Excalidraw, Draw.io, JSON, HTML
+- **Community Detection**: Louvain algorithm for automatic table clustering
+- **Interactive HTML**: Vis.js-powered visualization with zoom/pan/search
+- **Self-Contained Reports**: Single-file HTML documentation with no external dependencies
+
+### 🔎 Query & Search
+- **Deterministic Queries**: 11 query types (tables, columns, FK paths, orphans, islands, cycles, etc.)
+- **No LLM Required**: Instant graph traversal results
+- **Multiple Output Formats**: Text, JSON, CSV
+- **Rich Filtering**: Pattern matching, type filtering, property-based selection
+
+### 🤖 Natural Language (RAG)
+- **Single-Shot Q&A**: Ask questions about your schema with `sqlfy ask`
+- **Interactive Chat**: Multi-turn conversations with `sqlfy chat`
+- **Hybrid Retrieval**: BM25 (local, no API key) or dense embeddings (Voyage AI via Anthropic)
+- **Source Attribution**: See which schema chunks were used to answer each question
+
+### 🛠️ Schema Evolution & Safety
+- **What-If Simulator**: Test hypothetical migrations before applying
+- **Schema Diff**: Compare two states or migration directories
+- **Point-in-Time**: Reconstruct schema at any migration version (`--at`)
+- **Migration History**: Track all changes per table/column/constraint
+
+### ⚡ Performance & Caching
+- **File-Based Cache**: Automatic caching of parsed migration files
+- **Chunk Cache**: Pre-computed LLM chunks for faster RAG queries
+- **Cache Management**: `sqlfy cache info` / `sqlfy cache clear`
+- **Incremental Processing**: Only re-parse changed files
+
+### 📤 Export & Documentation
+- **HTML Documentation**: Searchable, filterable schema docs with dark/light mode
+- **LLM Chunks**: Pre-formatted context for embedding or direct prompting
+- **Manifest Generation**: High-level metadata (version, fingerprint, stats)
+- **Multiple Dialects**: Oracle (primary), PostgreSQL (planned)
 
 ---
 
@@ -392,9 +846,19 @@ Paste the **Schema Summary** chunk as system context and individual **table chun
 - [x] YAML export of SchemaState (`sqlfy dump --format yaml`)
 - [x] Point-in-time reconstruction via `--at`
 - [x] Schema diff command (`sqlfy diff`)
-- [x] Graph output command (`sqlfy graph` — DOT, Mermaid, ASCII summary)
+- [x] Graph output command (`sqlfy graph` — DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report)
 - [x] Schema insights (`sqlfy insights` — orphan tables, missing PKs, FK candidates, circular refs, islands)
-- [x] Deterministic graph queries (`sqlfy query` — tables, columns, fk-path, refs, orphans, islands, cycles, missing-pk, impact, indexes)
+- [x] Health report (`sqlfy health` — migration quality score)
+- [x] Schema simulator (`sqlfy simulate` — test what-if migrations)
+- [x] Migration integrity checks (`sqlfy integrity` — SHA256 hashing)
+- [x] File-based caching (`sqlfy cache`)
+- [x] Natural language queries (`sqlfy ask` — single-shot RAG)
+- [x] Interactive chat (`sqlfy chat` — multi-turn conversations)
+- [x] HTML documentation export (`sqlfy export`)
+- [x] Deterministic graph queries (`sqlfy query` — tables, columns, fk-path, refs, orphans, islands, cycles, missing-pk, indexes)
+- [x] Impact analysis (`sqlfy impact` — graph traversal for change impact)
+- [x] Manifest generation (`sqlfy manifest` — metadata summary)
+- [x] Community detection in graph exports (NetworkX + Louvain algorithm)
 - [ ] PostgreSQL dialect parity
 - [ ] Vector embeddings: evaluate replacing Voyage AI (`ANTHROPIC_API_KEY`) with a local model (e.g. Ollama `nomic-embed-text`) — see LLM Usage note above
 
