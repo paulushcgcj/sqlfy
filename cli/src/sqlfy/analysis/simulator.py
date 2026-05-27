@@ -233,7 +233,24 @@ class SchemaSimulator:
                 reconstructor.apply_all(self.base_files)
             
             # Simulate hypothetical migration
-            sim_filename = f"V{int(self.base_version) + 1}__simulated.sql"
+            # Compute a next version that handles both integer and dotted semantic versions.
+            try:
+                next_version = str(int(self.base_version) + 1)
+            except (ValueError, TypeError):
+                # Fallback: if dotted (e.g. 1.0.2) increment the last numeric element
+                if isinstance(self.base_version, str) and '.' in self.base_version:
+                    parts = self.base_version.split('.')
+                    try:
+                        parts[-1] = str(int(parts[-1]) + 1)
+                        next_version = '.'.join(parts)
+                    except ValueError:
+                        # As a last resort, append .1
+                        next_version = f"{self.base_version}.1"
+                else:
+                    # Unknown format — just append .1
+                    next_version = f"{self.base_version}.1"
+
+            sim_filename = f"V{next_version}__simulated.sql"
             result = reconstructor.apply_file(sim_filename, sql)
             
             # Check for errors
