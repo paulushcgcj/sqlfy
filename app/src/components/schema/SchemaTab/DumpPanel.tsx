@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react';
-import type { FC } from 'react';
+
+import { browserDump, browserDumpYaml, browserDumpSummary } from './browser-fallbacks';
 
 import type { DumpFormat, DumpOptions } from '@/bridge/cli';
 import type { MigrationFile, SchemaGraph } from '@/core/types';
+import type { FC } from 'react';
 
 import { dumpWithOptions, CLI_AVAILABLE, CLI_MODE_LABEL } from '@/bridge/cli';
 import { downloadBlob, copyToClipboard } from '@/utils/io';
-import { browserDump, browserDumpYaml, browserDumpSummary } from './browser-fallbacks';
+
 import './index.scss';
 
 interface DumpPanelProps {
@@ -107,16 +109,21 @@ const DumpPanel: FC<DumpPanelProps> = ({ files, graph }) => {
         <button
           className="schema-dl-btn"
           onClick={() =>
-            dumpOutput && downloadBlob(dumpOutput, `schema_state.${extMap[dumpFormat]}`, mimeMap[dumpFormat])
+            dumpOutput &&
+            downloadBlob(dumpOutput, `schema_state.${extMap[dumpFormat]}`, mimeMap[dumpFormat])
           }
           disabled={!dumpOutput}
         >
           ⬇ Download
         </button>
-        <span className="schema-hint">{CLI_MODE_LABEL ?? (isCliLocal ? '⚡ CLI' : '🌐 Browser fallback')}</span>
+        <span className="schema-hint">
+          {CLI_MODE_LABEL ?? (isCliLocal ? '⚡ CLI' : '🌐 Browser fallback')}
+        </span>
       </div>
 
-      {dumpError && <div className="schema-error">⚠ CLI error (showing browser fallback): {dumpError}</div>}
+      {dumpError && (
+        <div className="schema-error">⚠ CLI error (showing browser fallback): {dumpError}</div>
+      )}
 
       {dumpLoading && <div className="schema-loading">Running sqlfy dump…</div>}
 

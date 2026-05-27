@@ -1,8 +1,9 @@
 import { useState } from 'react';
 
-import { runDiff, CLI_AVAILABLE } from '@/bridge/cli';
-import type { MigrationFile, SchemaGraph } from '@/core/types';
 import type { DiffVersionsResult } from '@/bridge/cli';
+import type { MigrationFile, SchemaGraph } from '@/core/types';
+
+import { runDiff, CLI_AVAILABLE } from '@/bridge/cli';
 
 import './index.scss';
 
@@ -40,12 +41,18 @@ export default function DiffPanel({ files, graph }: DiffPanelProps) {
 
   return (
     <div className="diff-panel">
-      <p className="diff-panel__intro">Compare two schema states or migration versions and inspect structural changes.</p>
+      <p className="diff-panel__intro">
+        Compare two schema states or migration versions and inspect structural changes.
+      </p>
 
       <div className="diff-panel__controls">
         <label>
           Base version
-          <select value={baseVersion} onChange={(e) => setBaseVersion(e.target.value)} className="diff-version-select">
+          <select
+            value={baseVersion}
+            onChange={(e) => setBaseVersion(e.target.value)}
+            className="diff-version-select"
+          >
             <option value="">Current state</option>
             {versions.map((m) => (
               <option key={m.version} value={m.version}>
@@ -57,7 +64,11 @@ export default function DiffPanel({ files, graph }: DiffPanelProps) {
 
         <label>
           Target version
-          <select value={targetVersion} onChange={(e) => setTargetVersion(e.target.value)} className="diff-version-select">
+          <select
+            value={targetVersion}
+            onChange={(e) => setTargetVersion(e.target.value)}
+            className="diff-version-select"
+          >
             <option value="">Current state</option>
             {versions.map((m) => (
               <option key={m.version} value={m.version}>
@@ -67,14 +78,20 @@ export default function DiffPanel({ files, graph }: DiffPanelProps) {
           </select>
         </label>
 
-        <button className="diff-run-btn" onClick={handleDiff} disabled={!canRun} aria-busy={loading}>
+        <button
+          className="diff-run-btn"
+          onClick={handleDiff}
+          disabled={!canRun}
+          aria-busy={loading}
+        >
           {loading ? '⏳ Diffing…' : '▶ Diff'}
         </button>
       </div>
 
       {!CLI_AVAILABLE && (
         <div className="diff-panel__no-cli" role="alert">
-          Diff requires the Python CLI — not available in pure-browser mode. Run the app in Tauri or the Vite dev server.
+          Diff requires the Python CLI — not available in pure-browser mode. Run the app in Tauri or
+          the Vite dev server.
         </div>
       )}
 
@@ -122,4 +139,3 @@ export default function DiffPanel({ files, graph }: DiffPanelProps) {
     </div>
   );
 }
-

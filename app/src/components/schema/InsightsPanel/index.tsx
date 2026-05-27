@@ -13,10 +13,10 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import type { FC } from 'react';
 
 import type { InsightFinding, InsightsResult, InsightsOptions } from '@/bridge/cli';
 import type { MigrationFile } from '@/core/types';
+import type { FC } from 'react';
 
 import { IS_TAURI, CLI_AVAILABLE, CLI_MODE_LABEL, runInsights } from '@/bridge/cli';
 import './index.scss';
@@ -223,9 +223,9 @@ const InsightsPanel: FC<InsightsPanelProps> = ({ files }) => {
             <strong>CLI required</strong>
           </p>
           <p>
-            Insights analysis requires the Python CLI. Run the app with{' '}
-            <code>npx tauri dev</code> or <code>npm run dev</code> and ensure{' '}
-            <code>sqlfy</code> is installed (<code>pip install -e cli/</code>).
+            Insights analysis requires the Python CLI. Run the app with <code>npx tauri dev</code>{' '}
+            or <code>npm run dev</code> and ensure <code>sqlfy</code> is installed (
+            <code>pip install -e cli/</code>).
           </p>
         </div>
       </div>

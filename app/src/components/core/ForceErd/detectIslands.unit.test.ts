@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { getComponents } from './detectIslands';
 
 describe('detectIslands:getComponents', () => {

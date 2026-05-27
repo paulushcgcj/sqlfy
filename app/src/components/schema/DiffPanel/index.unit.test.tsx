@@ -2,8 +2,9 @@ import { render, fireEvent, waitFor, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import DiffPanel from './index';
-import type { MigrationFile, SchemaGraph } from '@/core/types';
+
 import type { DiffVersionsResult } from '@/bridge/cli';
+import type { MigrationFile, SchemaGraph } from '@/core/types';
 
 // Mock the CLI bridge
 vi.mock('@/bridge/cli', () => ({
@@ -46,7 +47,12 @@ const mockDiffResult: DiffVersionsResult = {
   },
   table_changes: [
     { full_name: 'APP.NEW_TABLE', change: 'added', breaking: false },
-    { full_name: 'APP.USERS', change: 'modified', breaking: false, column_changes: [{ name: 'EMAIL', change: 'added', breaking: false }] },
+    {
+      full_name: 'APP.USERS',
+      change: 'modified',
+      breaking: false,
+      column_changes: [{ name: 'EMAIL', change: 'added', breaking: false }],
+    },
   ],
   sequence_changes: [],
   relationship_changes: [],
@@ -70,7 +76,9 @@ describe('DiffPanel', () => {
 
     const { container } = render(<DiffPanel files={mockFiles} graph={mockGraph} />);
 
-    const selects = container.querySelectorAll('.diff-version-select') as NodeListOf<HTMLSelectElement>;
+    const selects = container.querySelectorAll(
+      '.diff-version-select',
+    ) as NodeListOf<HTMLSelectElement>;
     fireEvent.change(selects[0], { target: { value: '1' } });
     fireEvent.change(selects[1], { target: { value: '2' } });
 

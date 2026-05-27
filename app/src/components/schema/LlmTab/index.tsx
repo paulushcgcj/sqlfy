@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { downloadBlob, copyToClipboard } from '@/utils/io';
 
 import type { VectorChunk } from '@/core/types';
 import type { FC } from 'react';
+
+import { downloadBlob, copyToClipboard } from '@/utils/io';
 import './index.scss';
 
 /** Props for the {@link LlmTab} component. */

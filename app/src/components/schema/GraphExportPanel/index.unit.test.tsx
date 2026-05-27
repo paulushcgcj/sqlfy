@@ -122,10 +122,12 @@ describe('GraphExportPanel', () => {
       vi.mocked(cli.runGraphExport).mockResolvedValue(MERMAID_OUTPUT);
       render(<GraphExportPanel files={mockFiles} />);
       fireEvent.click(screen.getByText(/Generate Mermaid ERD/));
-      await waitFor(() => expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
-        format: 'mermaid',
-        resolution: 'medium',
-      }));
+      await waitFor(() =>
+        expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
+          format: 'mermaid',
+          resolution: 'medium',
+        }),
+      );
     });
 
     it('calls runGraphExport with dot format when dot is selected', async () => {
@@ -136,10 +138,12 @@ describe('GraphExportPanel', () => {
         .find((b) => b.textContent?.includes('Graphviz DOT'));
       fireEvent.click(dotBtn!);
       fireEvent.click(screen.getByText(/Generate Graphviz DOT/));
-      await waitFor(() => expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
-        format: 'dot',
-        resolution: 'medium',
-      }));
+      await waitFor(() =>
+        expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
+          format: 'dot',
+          resolution: 'medium',
+        }),
+      );
     });
   });
 
@@ -169,7 +173,9 @@ describe('GraphExportPanel', () => {
       fireEvent.click(screen.getByText(/Generate Mermaid ERD/));
       await waitFor(() => screen.getByText(/⎘ Copy/));
       fireEvent.click(screen.getByText(/⎘ Copy/));
-      await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(MERMAID_OUTPUT));
+      await waitFor(() =>
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(MERMAID_OUTPUT),
+      );
     });
 
     it('shows mermaid.live link for mermaid format', async () => {
@@ -229,9 +235,7 @@ describe('GraphExportPanel', () => {
     it('shows app.diagrams.net link for drawio format', async () => {
       vi.mocked(cli.runGraphExport).mockResolvedValue('<mxGraphModel/>');
       render(<GraphExportPanel files={mockFiles} />);
-      const dioBtn = screen
-        .getAllByRole('button')
-        .find((b) => b.textContent?.includes('Draw.io'));
+      const dioBtn = screen.getAllByRole('button').find((b) => b.textContent?.includes('Draw.io'));
       fireEvent.click(dioBtn!);
       fireEvent.click(screen.getByText(/Generate Draw\.io/));
       await waitFor(() => screen.getByRole('link', { name: /Open Draw\.io/i }));
@@ -265,11 +269,13 @@ describe('GraphExportPanel', () => {
         target: { value: 'My Schema' },
       });
       fireEvent.click(screen.getByText(/Generate Mermaid ERD/));
-      await waitFor(() => expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
-        format: 'mermaid',
-        resolution: 'medium',
-        title: 'My Schema',
-      }));
+      await waitFor(() =>
+        expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
+          format: 'mermaid',
+          resolution: 'medium',
+          title: 'My Schema',
+        }),
+      );
     });
 
     it('passes at-version to runGraphExport', async () => {
@@ -278,11 +284,13 @@ describe('GraphExportPanel', () => {
       fireEvent.click(screen.getByText(/Advanced options/));
       fireEvent.change(screen.getByPlaceholderText('e.g. 2'), { target: { value: '2' } });
       fireEvent.click(screen.getByText(/Generate Mermaid ERD/));
-      await waitFor(() => expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
-        format: 'mermaid',
-        resolution: 'medium',
-        atVersion: 2,
-      }));
+      await waitFor(() =>
+        expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
+          format: 'mermaid',
+          resolution: 'medium',
+          atVersion: 2,
+        }),
+      );
     });
 
     it('passes no-split flag to runGraphExport', async () => {
@@ -292,11 +300,13 @@ describe('GraphExportPanel', () => {
       const checkbox = screen.getByRole('checkbox');
       fireEvent.click(checkbox);
       fireEvent.click(screen.getByText(/Generate Mermaid ERD/));
-      await waitFor(() => expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
-        format: 'mermaid',
-        resolution: 'medium',
-        noSplit: true,
-      }));
+      await waitFor(() =>
+        expect(cli.runGraphExport).toHaveBeenCalledWith(mockFiles, {
+          format: 'mermaid',
+          resolution: 'medium',
+          noSplit: true,
+        }),
+      );
     });
   });
 

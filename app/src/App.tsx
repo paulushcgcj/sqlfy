@@ -3,19 +3,28 @@ import { useState, Activity } from 'react';
 import { parse, IS_TAURI } from './bridge/cli';
 import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
 import AskPanel from './components/schema/AskPanel';
-import GraphExportPanel from './components/schema/GraphExportPanel';
-import SimulatePanel from './components/schema/SimulatePanel';
 import DiffPanel from './components/schema/DiffPanel';
+import GraphExportPanel from './components/schema/GraphExportPanel';
 import GraphTab from './components/schema/GraphTab';
 import InsightsPanel from './components/schema/InsightsPanel';
 import LlmTab from './components/schema/LlmTab';
 import MigrationsTab from './components/schema/MigrationsTab';
 import SchemaTab from './components/schema/SchemaTab';
+import SimulatePanel from './components/schema/SimulatePanel';
 import { SAMPLE_MIGRATIONS } from './data/samples';
 
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
 
-type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema' | 'insights' | 'graph-export' | 'simulate' | 'diff';
+type Tab =
+  | 'migrations'
+  | 'graph'
+  | 'llm'
+  | 'ask'
+  | 'schema'
+  | 'insights'
+  | 'graph-export'
+  | 'simulate'
+  | 'diff';
 
 export default function App() {
   const [files, setFiles] = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
@@ -171,7 +180,13 @@ export default function App() {
         </Activity>
 
         <Activity mode={activeTab === 'graph' ? 'visible' : 'hidden'}>
-          {graph && <GraphTab graph={graph} selectedTable={selectedTable} onSelectTable={setSelectedTable} />}
+          {graph && (
+            <GraphTab
+              graph={graph}
+              selectedTable={selectedTable}
+              onSelectTable={setSelectedTable}
+            />
+          )}
         </Activity>
 
         <Activity mode={activeTab === 'llm' ? 'visible' : 'hidden'}>

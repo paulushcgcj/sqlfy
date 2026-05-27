@@ -1,4 +1,5 @@
 import { validateMigrations } from './validateMigrations';
+
 import type { MigrationFile } from '@/core/types';
 
 function files(...names: string[]): MigrationFile[] {
@@ -15,9 +16,7 @@ describe('validateMigrations', () => {
     });
 
     it('passes dotted versioning V1.2.3', () => {
-      const r = validateMigrations(
-        files('V1__a.sql', 'V1.1__b.sql', 'V1.2__c.sql', 'V2__d.sql'),
-      );
+      const r = validateMigrations(files('V1__a.sql', 'V1.1__b.sql', 'V1.2__c.sql', 'V2__d.sql'));
       expect(r.hasErrors).toBe(false);
       expect(r.hasWarnings).toBe(false);
     });

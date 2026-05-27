@@ -1,8 +1,9 @@
 import { useState } from 'react';
 
-import { CLI_AVAILABLE, runSimulate } from '@/bridge/cli';
-import type { MigrationFile } from '@/core/types';
 import type { SimulateResult } from '@/bridge/cli';
+import type { MigrationFile } from '@/core/types';
+
+import { CLI_AVAILABLE, runSimulate } from '@/bridge/cli';
 
 import './index.scss';
 
@@ -72,7 +73,7 @@ export default function SimulatePanel({ files }: SimulatePanelProps) {
           className="sim-panel__textarea"
           placeholder="-- e.g. ALTER TABLE APP.USERS ADD (email VARCHAR2(255));"
           value={sql}
-          onChange={e => setSql(e.target.value)}
+          onChange={(e) => setSql(e.target.value)}
           rows={6}
           spellCheck={false}
         />
@@ -91,7 +92,7 @@ export default function SimulatePanel({ files }: SimulatePanelProps) {
           min={1}
           placeholder="latest"
           value={atVersion}
-          onChange={e => setAtVersion(e.target.value)}
+          onChange={(e) => setAtVersion(e.target.value)}
         />
 
         <button
@@ -131,7 +132,7 @@ function SimulateResults({ result }: { result: SimulateResult }) {
   const { is_safe, is_breaking, health, errors, warnings, diff, base_version } = result;
 
   const hasDiffChanges = diff
-    ? DIFF_ROWS.some(r => diff.stats[r.addedKey] > 0 || diff.stats[r.removedKey] > 0)
+    ? DIFF_ROWS.some((r) => diff.stats[r.addedKey] > 0 || diff.stats[r.removedKey] > 0)
     : false;
 
   const modified =
@@ -161,9 +162,7 @@ function SimulateResults({ result }: { result: SimulateResult }) {
       {/* Errors */}
       {errors.length > 0 && (
         <div className="sim-results__errors">
-          <h4 className="sim-results__section-title">
-            Errors ({errors.length})
-          </h4>
+          <h4 className="sim-results__section-title">Errors ({errors.length})</h4>
           <ul className="sim-results__list">
             {errors.map((e, i) => (
               <li key={i} className="sim-results__list-item sim-results__list-item--error">

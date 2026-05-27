@@ -3,8 +3,8 @@ import { vi } from 'vitest';
 
 import MigrationsTab from './index';
 
-import type { MigrationFile } from '@/core/types';
 import type { HealthResult } from '@/bridge/cli';
+import type { MigrationFile } from '@/core/types';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -28,10 +28,28 @@ const mockHealthResult: HealthResult = {
   },
   findings: { errors: 0, warnings: 2, infos: 0, by_code: {} },
   migrations: [
-    { filename: 'V1__create_users.sql', status: 'safe', errors: 0, warnings: 0, has_drop_table: false, has_drop_column: false },
-    { filename: 'V2__add_orders.sql', status: 'irreversible', errors: 0, warnings: 1, has_drop_table: false, has_drop_column: true },
+    {
+      filename: 'V1__create_users.sql',
+      status: 'safe',
+      errors: 0,
+      warnings: 0,
+      has_drop_table: false,
+      has_drop_column: false,
+    },
+    {
+      filename: 'V2__add_orders.sql',
+      status: 'irreversible',
+      errors: 0,
+      warnings: 1,
+      has_drop_table: false,
+      has_drop_column: true,
+    },
   ],
-  health_score: { score: 75, grade: 'good', breakdown: { base: 100, error_penalty: 0, warning_penalty: -15, irreversible_penalty: -10 } },
+  health_score: {
+    score: 75,
+    grade: 'good',
+    breakdown: { base: 100, error_penalty: 0, warning_penalty: -15, irreversible_penalty: -10 },
+  },
   recommendation: 'Review 2 warnings.',
 };
 
@@ -39,7 +57,7 @@ const mockHealthResult: HealthResult = {
 
 const orderedFiles: MigrationFile[] = [
   { filename: 'V1__create_users.sql', sql: 'CREATE TABLE users (id NUMBER);' },
-  { filename: 'V2__add_orders.sql',   sql: 'CREATE TABLE orders (id NUMBER);' },
+  { filename: 'V2__add_orders.sql', sql: 'CREATE TABLE orders (id NUMBER);' },
 ];
 
 const outOfOrderFiles: MigrationFile[] = [
@@ -58,7 +76,9 @@ const gapFiles: MigrationFile[] = [
 describe('MigrationsTab', () => {
   describe('basic rendering', () => {
     it('renders the migration filename in the input', () => {
-      const { getByDisplayValue } = render(<MigrationsTab files={orderedFiles} onChange={() => {}} />);
+      const { getByDisplayValue } = render(
+        <MigrationsTab files={orderedFiles} onChange={() => {}} />,
+      );
       expect(getByDisplayValue('V1__create_users.sql')).toBeDefined();
     });
 
@@ -90,8 +110,12 @@ describe('MigrationsTab', () => {
     });
 
     it('dismisses the banner when × is clicked', () => {
-      const { getByRole, queryByRole } = render(<MigrationsTab files={gapFiles} onChange={() => {}} />);
-      const dismissBtn = getByRole('alert').querySelector('.validation-banner__dismiss') as HTMLElement;
+      const { getByRole, queryByRole } = render(
+        <MigrationsTab files={gapFiles} onChange={() => {}} />,
+      );
+      const dismissBtn = getByRole('alert').querySelector(
+        '.validation-banner__dismiss',
+      ) as HTMLElement;
       fireEvent.click(dismissBtn);
       expect(queryByRole('alert')).toBeNull();
     });
@@ -120,7 +144,9 @@ describe('MigrationsTab', () => {
 
     it('expands health panel after health check', async () => {
       mockRunHealth.mockResolvedValue(mockHealthResult);
-      const { getByText, getByRole } = render(<MigrationsTab files={orderedFiles} onChange={() => {}} />);
+      const { getByText, getByRole } = render(
+        <MigrationsTab files={orderedFiles} onChange={() => {}} />,
+      );
       await act(async () => {
         fireEvent.click(getByText('🩺 Health Check'));
       });
@@ -133,7 +159,9 @@ describe('MigrationsTab', () => {
 
     it('toggles health panel when badge is clicked', async () => {
       mockRunHealth.mockResolvedValue(mockHealthResult);
-      const { getByText, queryByText } = render(<MigrationsTab files={orderedFiles} onChange={() => {}} />);
+      const { getByText, queryByText } = render(
+        <MigrationsTab files={orderedFiles} onChange={() => {}} />,
+      );
       await act(async () => {
         fireEvent.click(getByText('🩺 Health Check'));
       });
@@ -145,7 +173,9 @@ describe('MigrationsTab', () => {
 
     it('shows error message when runHealth throws', async () => {
       mockRunHealth.mockRejectedValue(new Error('CLI unavailable'));
-      const { getByText, getByRole } = render(<MigrationsTab files={orderedFiles} onChange={() => {}} />);
+      const { getByText, getByRole } = render(
+        <MigrationsTab files={orderedFiles} onChange={() => {}} />,
+      );
       await act(async () => {
         fireEvent.click(getByText('🩺 Health Check'));
       });

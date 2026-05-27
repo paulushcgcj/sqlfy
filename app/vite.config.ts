@@ -1,7 +1,7 @@
-import { readBody, spawnCli } from './src/dev/cliUtils';
-
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+
+import { readBody, spawnCli } from './src/dev/cliUtils';
 
 import type { Plugin } from 'vite';
 
@@ -24,11 +24,10 @@ function sqlifyCliPlugin(): Plugin {
         if (req.method !== 'POST') return next();
 
         const body = await readBody(req);
-        const { stdout, stderr, code } = await spawnCli(
-          ['-m', 'sqlfy.main'],
-          body,
-          ['--all', '--json'],
-        );
+        const { stdout, stderr, code } = await spawnCli(['-m', 'sqlfy.main'], body, [
+          '--all',
+          '--json',
+        ]);
 
         if (code === 0) {
           res.writeHead(200, { 'Content-Type': 'application/json' });

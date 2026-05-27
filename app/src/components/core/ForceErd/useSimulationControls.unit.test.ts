@@ -1,11 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
 import { useSimulationControls } from './useSimulationControls';
 
 describe('useSimulationControls', () => {
   it('returns fitView and reheat functions and tolerates null refs', () => {
     const { result } = renderHook(() =>
-      useSimulationControls({ svgRef: { current: null }, zoomRef: { current: null }, simRef: { current: null }, height: 300 }),
+      useSimulationControls({
+        svgRef: { current: null },
+        zoomRef: { current: null },
+        simRef: { current: null },
+        height: 300,
+      }),
     );
 
     expect(typeof result.current.fitView).toBe('function');
@@ -23,7 +29,12 @@ describe('useSimulationControls', () => {
     const simRef = { current: { alpha, restart } as any };
 
     const { result } = renderHook(() =>
-      useSimulationControls({ svgRef: { current: null }, zoomRef: { current: null }, simRef, height: 400 }),
+      useSimulationControls({
+        svgRef: { current: null },
+        zoomRef: { current: null },
+        simRef,
+        height: 400,
+      }),
     );
 
     act(() => {

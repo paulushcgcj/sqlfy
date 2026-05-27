@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { useCallback } from 'react';
+
 import type { RefObject } from 'react';
 
 export function useSimulationControls(params: {

@@ -11,6 +11,7 @@
  */
 
 import DumpPanel from './DumpPanel';
+
 import type { MigrationFile, SchemaGraph } from '@/core/types';
 import type { FC } from 'react';
 import './index.scss';

@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { describe, it, expect } from 'vitest';
+
 import { createForceSimulation } from './useForceSimulation';
 
 describe('useForceSimulation:createForceSimulation', () => {

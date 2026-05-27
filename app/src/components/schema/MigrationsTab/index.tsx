@@ -1,7 +1,7 @@
+import { useEffect, useState } from 'react';
+
 import type { MigrationFile } from '@/core/types';
 import type { FC } from 'react';
-
-import { useEffect, useState } from 'react';
 
 import { runHealth, CLI_AVAILABLE, type HealthResult, type HealthGrade } from '@/bridge/cli';
 import { writeFile, folderLabel, type FolderHandle } from '@/bridge/folder';
@@ -109,9 +109,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const showValidation =
-    !validationDismissed &&
-    validation !== null &&
-    (validation.hasErrors || validation.hasWarnings);
+    !validationDismissed && validation !== null && (validation.hasErrors || validation.hasWarnings);
 
   const showHealthBtn = CLI_AVAILABLE && files.length > 0;
 
@@ -172,7 +170,9 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
         >
           <div className="validation-banner__hdr">
             <span className="validation-banner__title">
-              {validation.hasErrors ? '✕ Migration Ordering Errors' : '⚠ Migration Ordering Warnings'}
+              {validation.hasErrors
+                ? '✕ Migration Ordering Errors'
+                : '⚠ Migration Ordering Warnings'}
             </span>
             <button
               className="validation-banner__dismiss"
@@ -186,9 +186,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
             {validation.issues.map((issue, i) => (
               <li key={i} className={`vissue vissue--${issue.severity}`}>
                 <span className="vissue__msg">{issue.message}</span>
-                {issue.suggestion && (
-                  <span className="vissue__hint">💡 {issue.suggestion}</span>
-                )}
+                {issue.suggestion && <span className="vissue__hint">💡 {issue.suggestion}</span>}
               </li>
             ))}
           </ul>
@@ -249,9 +247,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
             </div>
           </div>
 
-          {health.recommendation && (
-            <p className="health-panel__rec">{health.recommendation}</p>
-          )}
+          {health.recommendation && <p className="health-panel__rec">{health.recommendation}</p>}
 
           {/* Per-migration status list */}
           <table className="health-migrations-table">
@@ -269,11 +265,27 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
                   <td className="hrow__file">{m.filename}</td>
                   <td>
                     <span className={`hrow__status hrow__status--${m.status}`}>
-                      {m.status === 'safe' ? '✓ safe' : m.status === 'irreversible' ? '⚠ irreversible' : '✕ unsafe'}
+                      {m.status === 'safe'
+                        ? '✓ safe'
+                        : m.status === 'irreversible'
+                          ? '⚠ irreversible'
+                          : '✕ unsafe'}
                     </span>
                   </td>
-                  <td>{m.errors > 0 ? <span className="hrow__num hrow__num--err">{m.errors}</span> : '—'}</td>
-                  <td>{m.warnings > 0 ? <span className="hrow__num hrow__num--warn">{m.warnings}</span> : '—'}</td>
+                  <td>
+                    {m.errors > 0 ? (
+                      <span className="hrow__num hrow__num--err">{m.errors}</span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td>
+                    {m.warnings > 0 ? (
+                      <span className="hrow__num hrow__num--warn">{m.warnings}</span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -291,17 +303,18 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
               onChange={(e) => updateFile(i, 'filename', e.target.value)}
             />
             {/* Per-file health status dot */}
-            {health && (() => {
-              const mh = health.migrations.find((m) => m.filename === file.filename);
-              if (!mh) return null;
-              return (
-                <span
-                  className={`file-health-dot file-health-dot--${mh.status}`}
-                  title={`Health: ${mh.status}`}
-                  aria-label={`Migration status: ${mh.status}`}
-                />
-              );
-            })()}
+            {health &&
+              (() => {
+                const mh = health.migrations.find((m) => m.filename === file.filename);
+                if (!mh) return null;
+                return (
+                  <span
+                    className={`file-health-dot file-health-dot--${mh.status}`}
+                    title={`Health: ${mh.status}`}
+                    aria-label={`Migration status: ${mh.status}`}
+                  />
+                );
+              })()}
             <button className="rm" onClick={() => removeFile(i)}>
               ×
             </button>

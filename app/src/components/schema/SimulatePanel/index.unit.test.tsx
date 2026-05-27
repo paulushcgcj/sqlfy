@@ -3,8 +3,8 @@ import { vi } from 'vitest';
 
 import SimulatePanel from './index';
 
-import type { MigrationFile } from '@/core/types';
 import type { SimulateResult } from '@/bridge/cli';
+import type { MigrationFile } from '@/core/types';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -121,9 +121,7 @@ describe('SimulatePanel', () => {
 
   it('displays safe result with health badge', async () => {
     mockRunSimulate.mockResolvedValue(safeSqlResult);
-    const { getByLabelText, getByRole, getByText } = render(
-      <SimulatePanel files={sampleFiles} />,
-    );
+    const { getByLabelText, getByRole, getByText } = render(<SimulatePanel files={sampleFiles} />);
     fireEvent.change(getByLabelText('SQL to simulate'), {
       target: { value: 'ALTER TABLE users ADD (email VARCHAR2(255));' },
     });
@@ -139,9 +137,7 @@ describe('SimulatePanel', () => {
 
   it('displays unsafe + breaking badges for destructive SQL', async () => {
     mockRunSimulate.mockResolvedValue(breakingSqlResult);
-    const { getByLabelText, getByRole, getByText } = render(
-      <SimulatePanel files={sampleFiles} />,
-    );
+    const { getByLabelText, getByRole, getByText } = render(<SimulatePanel files={sampleFiles} />);
     fireEvent.change(getByLabelText('SQL to simulate'), {
       target: { value: 'DROP TABLE users;' },
     });
@@ -156,9 +152,7 @@ describe('SimulatePanel', () => {
 
   it('shows diff stats table when changes are present', async () => {
     mockRunSimulate.mockResolvedValue(safeSqlResult);
-    const { getByLabelText, getByRole, getByText } = render(
-      <SimulatePanel files={sampleFiles} />,
-    );
+    const { getByLabelText, getByRole, getByText } = render(<SimulatePanel files={sampleFiles} />);
     fireEvent.change(getByLabelText('SQL to simulate'), {
       target: { value: 'ALTER TABLE users ADD (email VARCHAR2(255));' },
     });
@@ -192,9 +186,7 @@ describe('SimulatePanel', () => {
       },
     };
     mockRunSimulate.mockResolvedValue(noChangesResult);
-    const { getByLabelText, getByRole, getByText } = render(
-      <SimulatePanel files={sampleFiles} />,
-    );
+    const { getByLabelText, getByRole, getByText } = render(<SimulatePanel files={sampleFiles} />);
     fireEvent.change(getByLabelText('SQL to simulate'), {
       target: { value: 'ALTER TABLE users ADD (email VARCHAR2(255));' },
     });
@@ -207,9 +199,7 @@ describe('SimulatePanel', () => {
 
   it('shows collapsible warnings section when warnings present', async () => {
     mockRunSimulate.mockResolvedValue(safeSqlResult);
-    const { getByLabelText, getByRole, getByText } = render(
-      <SimulatePanel files={sampleFiles} />,
-    );
+    const { getByLabelText, getByRole, getByText } = render(<SimulatePanel files={sampleFiles} />);
     fireEvent.change(getByLabelText('SQL to simulate'), {
       target: { value: 'ALTER TABLE users ADD (email VARCHAR2(255));' },
     });
@@ -259,9 +249,7 @@ describe('SimulatePanel', () => {
 
   it('shows error message when runSimulate throws', async () => {
     mockRunSimulate.mockRejectedValue(new Error('CLI not found'));
-    const { getByLabelText, getByRole, getByText } = render(
-      <SimulatePanel files={sampleFiles} />,
-    );
+    const { getByLabelText, getByRole, getByText } = render(<SimulatePanel files={sampleFiles} />);
     fireEvent.change(getByLabelText('SQL to simulate'), {
       target: { value: 'ALTER TABLE users ADD (x NUMBER);' },
     });

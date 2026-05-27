@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { downloadBlob, copyToClipboard } from './io';
 
 describe('downloadBlob', () => {
@@ -32,7 +33,9 @@ describe('copyToClipboard', () => {
   });
 
   it('returns false when clipboard API throws', async () => {
-    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('denied'));
+    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('denied'),
+    );
     expect(await copyToClipboard('hello')).toBe(false);
   });
 });

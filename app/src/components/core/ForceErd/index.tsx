@@ -1,14 +1,16 @@
 import * as d3 from 'd3';
 import { useCallback, useEffect, useRef } from 'react';
-import { usePrefersDark } from '@/hooks/usePrefersDark';
 import { type FC } from 'react';
+
 import { getComponents } from './detectIslands';
-import { setupZoom } from './useZoom';
-import { createForceSimulation } from './useForceSimulation';
 import { setupDrag } from './useDrag';
+import { createForceSimulation } from './useForceSimulation';
 import { useSimulationControls } from './useSimulationControls';
+import { setupZoom } from './useZoom';
 
 import type { SchemaGraph } from '@/core/types';
+
+import { usePrefersDark } from '@/hooks/usePrefersDark';
 
 import './index.scss';
 

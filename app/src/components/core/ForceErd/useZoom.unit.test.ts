@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { setupZoom } from './useZoom';
 
 describe('useZoom:setupZoom', () => {

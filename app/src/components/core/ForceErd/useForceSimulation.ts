@@ -15,7 +15,8 @@ export function createForceSimulation(options: {
   height: number;
   pal: any;
 }) {
-  const { nodeData, linkData, nodeSel, linkSel, islandPaths, nodeById, width, height, pal } = options;
+  const { nodeData, linkData, nodeSel, linkSel, islandPaths, nodeById, width, height, pal } =
+    options;
 
   const sim = d3
     .forceSimulation(nodeData)

@@ -33,8 +33,8 @@ export const CLI_AVAILABLE = IS_TAURI || import.meta.env.DEV;
 export const CLI_MODE_LABEL: string | null = IS_TAURI
   ? '⚡ Tauri CLI'
   : import.meta.env.DEV
-  ? '⚡ Dev CLI'
-  : null;
+    ? '⚡ Dev CLI'
+    : null;
 
 // ── CLI path config ──────────────────────────────────────────────────────────
 //
@@ -163,7 +163,14 @@ export async function parse(files: MigrationFile[]): Promise<ParseResult> {
 // GENERIC CLI COMMAND RUNNER
 // ─────────────────────────────────────────────
 
-export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export' | 'health' | 'simulate' | 'diff-versions';
+export type CliSubcommand =
+  | 'dump'
+  | 'insights'
+  | 'graph'
+  | 'export'
+  | 'health'
+  | 'simulate'
+  | 'diff-versions';
 
 /**
  * Run an arbitrary CLI subcommand and return stdout as a string.
@@ -199,7 +206,9 @@ async function runCliCommandTauri(
     let command;
     if (import.meta.env.DEV) {
       // Dev: invoke CLI as module with PYTHONPATH to support relative imports
-      const args = [subcommand, '--json-input', tmp, ...extraArgs].map(arg => `"${arg}"`).join(' ');
+      const args = [subcommand, '--json-input', tmp, ...extraArgs]
+        .map((arg) => `"${arg}"`)
+        .join(' ');
       const shellCmd = `PYTHONPATH="${DEV_PYTHONPATH}" ${DEV_CLI_CMD} ${DEV_CLI_ARGS.join(' ')} ${args}`;
       command = Command.create('sh', ['-c', shellCmd]);
     } else {
@@ -405,7 +414,10 @@ export interface GraphExportOptions {
  * Returns the raw CLI output as a string (text, JSON, XML, or HTML depending
  * on the chosen format).
  */
-export function runGraphExport(files: MigrationFile[], options: GraphExportOptions): Promise<string> {
+export function runGraphExport(
+  files: MigrationFile[],
+  options: GraphExportOptions,
+): Promise<string> {
   const args: string[] = ['--format', options.format];
   if (options.title?.trim()) args.push('--title', options.title.trim());
   if (options.resolution) args.push('--resolution', options.resolution);
@@ -567,8 +579,18 @@ export interface DiffTableChange {
   readonly change: 'added' | 'removed' | 'modified';
   readonly breaking: boolean;
   readonly column_changes?: DiffColumnChange[];
-  readonly constraint_changes?: Array<{ name: string | null; change: string; type: string; columns: string[] }>;
-  readonly index_changes?: Array<{ name: string; change: string; columns: string[]; unique: boolean }>;
+  readonly constraint_changes?: Array<{
+    name: string | null;
+    change: string;
+    type: string;
+    columns: string[];
+  }>;
+  readonly index_changes?: Array<{
+    name: string;
+    change: string;
+    columns: string[];
+    unique: boolean;
+  }>;
 }
 
 /** Full result from `sqlfy diff-versions --format json`. */

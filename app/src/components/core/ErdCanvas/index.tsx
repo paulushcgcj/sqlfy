@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
-import { usePrefersDark } from '@/hooks/usePrefersDark';
 
 import type { SchemaGraph } from '@/core/types';
 import type { FC } from 'react';
 
 import { computeLayout } from '@/core/core';
+import { usePrefersDark } from '@/hooks/usePrefersDark';
 import './index.scss';
 
 /** Props for the {@link ErdCanvas} component. */
