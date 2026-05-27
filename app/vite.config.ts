@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 import type { Plugin } from 'vite';
 
@@ -125,7 +125,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    tsconfig: './tsconfig.test.json',
     setupFiles: ['./src/config/tests/setup.ts'],
     include: ['src/**/*.unit.test.{ts,tsx}'],
   },

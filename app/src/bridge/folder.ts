@@ -14,6 +14,18 @@ import { IS_TAURI } from './cli';
 
 import type { MigrationFile } from '@/core/types';
 
+// ── Type declarations for File System Access API ────────────────────────────
+
+declare global {
+  interface Window {
+    showDirectoryPicker?: (options?: {
+      mode?: 'read' | 'readwrite';
+    }) => Promise<FileSystemDirectoryHandle>;
+  }
+}
+
+const showDirectoryPicker = globalThis.window?.showDirectoryPicker;
+
 // ── Handle ───────────────────────────────────────────────────────────────────
 
 /** Opaque reference to a folder; varies by runtime. */
@@ -42,11 +54,11 @@ export async function pickFolder(): Promise<FolderHandle | null> {
       title: 'Select migrations folder',
     });
     if (!result) return null;
-    return { type: 'tauri', path: result as string };
+    return { type: 'tauri', path: result };
   }
 
   // Browser — File System Access API
-  if (!('showDirectoryPicker' in globalThis)) {
+  if (!showDirectoryPicker) {
     throw new Error(
       'Your browser does not support the File System Access API.\n' +
         'Please use Chrome, Edge, or Opera — or run the Tauri desktop app.',
@@ -85,7 +97,7 @@ export async function readMigrations(handle: FolderHandle): Promise<MigrationFil
   const files: MigrationFile[] = [];
   for await (const entry of handle.dir.values()) {
     if (entry.kind === 'file' && entry.name.endsWith('.sql')) {
-      const fileHandle = entry as FileSystemFileHandle;
+      const fileHandle = entry;
       const file = await fileHandle.getFile();
       files.push({ filename: entry.name, sql: await file.text() });
     }

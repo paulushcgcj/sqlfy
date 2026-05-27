@@ -63,6 +63,6 @@ describe('AskPanel', () => {
 
   it('renders example questions when no prompt has been assembled', () => {
     const { getByText } = render(<AskPanel graph={mockGraph} />);
-    expect(getByText('Which tables cascade delete from users?')).toBeDefined();
+    expect(getByText('Which tables have cascading deletes?')).toBeDefined();
   });
 });

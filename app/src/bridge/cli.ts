@@ -1,6 +1,4 @@
 /**
- * sqlfy — src/bridge/cli.ts
- *
  * Tauri ↔ Python CLI bridge.
  *
  * When running inside Tauri:
@@ -232,9 +230,35 @@ async function runCliCommandDevServer(
 // NAMED COMMAND SHORTCUTS
 // ─────────────────────────────────────────────
 
-/** Output the Schema State Dictionary as JSON. */
+export type DumpFormat = 'json' | 'yaml' | 'summary';
+
+export interface DumpOptions {
+  format: DumpFormat;
+  atVersion?: number;
+}
+
+/** Output the Schema State Dictionary in the specified format. */
+export function dumpWithOptions(files: MigrationFile[], options: DumpOptions): Promise<string> {
+  const args = ['--format', options.format];
+  if (options.atVersion !== undefined) {
+    args.push('--at', options.atVersion.toString());
+  }
+  return runCliCommand('dump', files, args);
+}
+
+/** Output the Schema State Dictionary as JSON (legacy shortcut). */
 export function dump(files: MigrationFile[]): Promise<string> {
-  return runCliCommand('dump', files, ['--format', 'json']);
+  return dumpWithOptions(files, { format: 'json' });
+}
+
+/** Output the Schema State Dictionary as YAML. */
+export function dumpYaml(files: MigrationFile[]): Promise<string> {
+  return dumpWithOptions(files, { format: 'yaml' });
+}
+
+/** Output the Schema State Dictionary as a summary. */
+export function dumpSummary(files: MigrationFile[]): Promise<string> {
+  return dumpWithOptions(files, { format: 'summary' });
 }
 
 /** Run schema insights analysis, returning JSON. */

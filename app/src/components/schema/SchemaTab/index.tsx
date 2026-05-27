@@ -1,6 +1,4 @@
 /**
- * sqlfy — src/components/schema/SchemaTab/index.tsx
- *
  * Schema CLI panel — surfaces every CLI command available in `sqlfy`:
  *
  *  • Dump   — full Schema State Dictionary (JSON)
@@ -14,12 +12,13 @@
 
 import { useState, useCallback } from 'react';
 
+import type { DumpFormat, DumpOptions } from '@/bridge/cli';
 import type { MigrationFile, SchemaGraph, Edge } from '@/core/types';
 import type { FC } from 'react';
 
 import {
   IS_TAURI,
-  dump as cliDump,
+  dumpWithOptions,
   graphMermaid,
   graphDot,
   graphSummary,
@@ -103,6 +102,123 @@ function browserDump(graph: SchemaGraph): string {
     })),
   };
   return JSON.stringify(state, null, 2);
+}
+
+/** Generate a YAML dump of the schema state from the parsed graph. */
+function browserDumpYaml(graph: SchemaGraph): string {
+  const lines: string[] = [];
+  const version = graph.migHist.at(-1)?.version ?? '?';
+
+  lines.push(`version: "${version}"`, '');
+
+  lines.push('migration_history:');
+  for (const m of graph.migHist) {
+    const desc = m.description;
+    lines.push(`  - version: "${m.version}"`, `    description: "${desc}"`);
+  }
+  lines.push('');
+
+  lines.push('tables:');
+  for (const [key, t] of graph.tables) {
+    const modifiedInList = t.modifiedIn.map((v) => `"${v}"`).join(', ');
+    lines.push(
+      `  ${key}:`,
+      `    name: "${t.name}"`,
+      `    schema: ${t.schema ?? 'null'}`,
+      `    full: "${t.full}"`,
+      `    created_in: "${t.createdIn}"`,
+      `    modified_in: [${modifiedInList}]`,
+      `    columns:`,
+    );
+    for (const c of t.columns) {
+      const refStr = c.references
+        ? `{ table: "${c.references.table}", column: "${c.references.column}" }`
+        : 'null';
+      lines.push(
+        `      - name: "${c.name}"`,
+        `        type: "${c.type}"`,
+        `        nullable: ${c.nullable}`,
+        `        default: ${c.default ?? 'null'}`,
+        `        primary_key: ${c.primaryKey}`,
+        `        unique: ${c.unique}`,
+        `        references: ${refStr}`,
+      );
+    }
+  }
+  lines.push('');
+
+  lines.push('sequences:');
+  for (const [key, s] of graph.seqs) {
+    lines.push(
+      `  ${key}:`,
+      `    name: "${s.name}"`,
+      `    full: "${s.full}"`,
+      `    start_with: ${s.startWith}`,
+      `    increment_by: ${s.incrementBy}`,
+      `    created_in: "${s.createdIn}"`,
+    );
+  }
+  lines.push('');
+
+  lines.push('edges:');
+  for (const e of graph.edges) {
+    const fromColsList = e.fromCols.map((c) => `"${c}"`).join(', ');
+    const toColsList = e.toCols.map((c) => `"${c}"`).join(', ');
+    const constraintStr = e.constraintName ? `"${e.constraintName}"` : 'null';
+    const onDeleteStr = e.onDelete ? `"${e.onDelete}"` : 'null';
+    lines.push(
+      `  - id: "${e.id}"`,
+      `    from_table: "${e.fromTable}"`,
+      `    from_cols: [${fromColsList}]`,
+      `    to_table: "${e.toTable}"`,
+      `    to_cols: [${toColsList}]`,
+      `    constraint_name: ${constraintStr}`,
+      `    on_delete: ${onDeleteStr}`,
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/** Generate a summary dump of the schema state from the parsed graph. */
+function browserDumpSummary(graph: SchemaGraph): string {
+  const lines: string[] = [];
+  const version = graph.migHist.at(-1)?.version ?? '?';
+
+  lines.push(`Schema State Summary — Version ${version}`, '='.repeat(60), '');
+
+  lines.push(`Migration History: ${graph.migHist.length} migrations`);
+  for (const m of graph.migHist) {
+    lines.push(`  V${m.version}: ${m.description}`);
+  }
+  lines.push('');
+
+  lines.push(`Tables: ${graph.tables.size}`);
+  for (const [, t] of graph.tables) {
+    const pkCount = t.columns.filter((c) => c.primaryKey).length;
+    const fkCount = t.columns.filter((c) => c.references !== null).length;
+    const idxCount = t.indexes.length;
+    lines.push(
+      `  ${t.full}: ${t.columns.length} cols, ${pkCount} PK, ${fkCount} FK, ${idxCount} idx (V${t.createdIn})`,
+    );
+  }
+  lines.push('');
+
+  lines.push(`Sequences: ${graph.seqs.size}`);
+  for (const [, s] of graph.seqs) {
+    lines.push(`  ${s.full}: START ${s.startWith} INC ${s.incrementBy} (V${s.createdIn})`);
+  }
+  lines.push('');
+
+  lines.push(`Foreign Key Relationships: ${graph.edges.length}`);
+  for (const e of graph.edges) {
+    const fromTable = graph.tables.get(e.fromTable)?.full ?? e.fromTable;
+    const toTable = graph.tables.get(e.toTable)?.full ?? e.toTable;
+    const constraint = e.constraintName ?? 'unnamed';
+    lines.push(`  ${fromTable} → ${toTable} (${constraint})`);
+  }
+
+  return lines.join('\n');
 }
 
 /** Generate a Mermaid ERD diagram from the parsed graph. */
@@ -336,6 +452,8 @@ const SchemaTab: FC<SchemaTabProps> = ({ graph, files }) => {
   const [dumpLoading, setDumpLoading] = useState(false);
   const [dumpError, setDumpError] = useState<string | null>(null);
   const [dumpCopied, setDumpCopied] = useState(false);
+  const [dumpFormat, setDumpFormat] = useState<DumpFormat>('json');
+  const [dumpAtVersion, setDumpAtVersion] = useState<number | undefined>(undefined);
 
   // ── Graph state ──
   const [graphOutput, setGraphOutput] = useState<string | null>(null);
@@ -355,16 +473,30 @@ const SchemaTab: FC<SchemaTabProps> = ({ graph, files }) => {
     setDumpLoading(true);
     setDumpError(null);
     try {
-      const out = isCli ? await cliDump(files) : browserDump(graph);
+      let out: string;
+      if (isCli) {
+        const options: DumpOptions = { format: dumpFormat };
+        if (dumpAtVersion !== undefined) {
+          options.atVersion = dumpAtVersion;
+        }
+        out = await dumpWithOptions(files, options);
+      } else {
+        // Browser fallback
+        if (dumpFormat === 'json') out = browserDump(graph);
+        else if (dumpFormat === 'yaml') out = browserDumpYaml(graph);
+        else out = browserDumpSummary(graph);
+      }
       setDumpOutput(out);
     } catch (err) {
       setDumpError((err as Error).message);
       // Fall back to browser implementation
-      setDumpOutput(browserDump(graph));
+      if (dumpFormat === 'json') setDumpOutput(browserDump(graph));
+      else if (dumpFormat === 'yaml') setDumpOutput(browserDumpYaml(graph));
+      else setDumpOutput(browserDumpSummary(graph));
     } finally {
       setDumpLoading(false);
     }
-  }, [files, graph]);
+  }, [files, graph, dumpFormat, dumpAtVersion]);
 
   const handleGraph = useCallback(async () => {
     setGraphLoading(true);
@@ -419,9 +551,45 @@ const SchemaTab: FC<SchemaTabProps> = ({ graph, files }) => {
   // ── Render helpers ──
 
   function renderDump() {
+    const extMap: Record<DumpFormat, string> = { json: 'json', yaml: 'yaml', summary: 'txt' };
+    const mimeMap: Record<DumpFormat, string> = {
+      json: 'application/json',
+      yaml: 'application/x-yaml',
+      summary: 'text/plain',
+    };
+
     return (
       <div className="schema-panel">
         <div className="schema-panel-actions">
+          <select
+            className="schema-fmt-select"
+            value={dumpFormat}
+            onChange={(e) => {
+              setDumpFormat(e.target.value as DumpFormat);
+              setDumpOutput(null);
+            }}
+          >
+            <option value="json">JSON</option>
+            <option value="yaml">YAML</option>
+            <option value="summary">Summary</option>
+          </select>
+          <select
+            className="schema-version-select"
+            value={dumpAtVersion ?? ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              setDumpAtVersion(val === '' ? undefined : parseInt(val, 10));
+              setDumpOutput(null);
+            }}
+            title="Export state at specific migration version"
+          >
+            <option value="">Current state</option>
+            {graph.migHist.map((m) => (
+              <option key={m.version} value={m.version}>
+                V{m.version}: {m.description}
+              </option>
+            ))}
+          </select>
           <button className="schema-run-btn" onClick={handleDump} disabled={dumpLoading}>
             {dumpLoading ? '⏳ Running…' : '▶ Run dump'}
           </button>
@@ -435,11 +603,12 @@ const SchemaTab: FC<SchemaTabProps> = ({ graph, files }) => {
           <button
             className="schema-dl-btn"
             onClick={() =>
-              dumpOutput && download(dumpOutput, 'schema_state.json', 'application/json')
+              dumpOutput &&
+              download(dumpOutput, `schema_state.${extMap[dumpFormat]}`, mimeMap[dumpFormat])
             }
             disabled={!dumpOutput}
           >
-            ⬇ Download JSON
+            ⬇ Download
           </button>
           <span className="schema-hint">{isCli ? '⚡ CLI' : '🌐 Browser fallback'}</span>
         </div>
