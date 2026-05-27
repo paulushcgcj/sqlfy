@@ -163,7 +163,7 @@ export async function parse(files: MigrationFile[]): Promise<ParseResult> {
 // GENERIC CLI COMMAND RUNNER
 // ─────────────────────────────────────────────
 
-export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export' | 'health';
+export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export' | 'health' | 'simulate';
 
 /**
  * Run an arbitrary CLI subcommand and return stdout as a string.
@@ -468,6 +468,77 @@ export interface HealthResult {
 export async function runHealth(files: MigrationFile[]): Promise<HealthResult> {
   const raw = await runCliCommand('health', files, ['--format', 'json']);
   return JSON.parse(raw) as HealthResult;
+}
+
+// ── Simulate types ────────────────────────────────────────────────────────────
+
+/** Diff statistics between the base schema version and the simulated state. */
+export interface SimulateDiffStats {
+  readonly tables_added: number;
+  readonly tables_removed: number;
+  readonly tables_modified: number;
+  readonly columns_added: number;
+  readonly columns_removed: number;
+  readonly columns_modified: number;
+  readonly sequences_added: number;
+  readonly sequences_removed: number;
+  readonly relationships_added: number;
+  readonly relationships_removed: number;
+  readonly is_breaking: boolean;
+}
+
+/** Full result from `sqlfy simulate --format json`. */
+export interface SimulateResult {
+  readonly timestamp: string;
+  /** Migration version used as the simulation base (e.g. `"8"`). */
+  readonly base_version: string;
+  /** The DDL that was simulated. */
+  readonly sql: string;
+  /** Whether the CLI was able to apply the DDL without parse/apply errors. */
+  readonly success: boolean;
+  /** `false` when the change contains destructive or unsafe operations. */
+  readonly is_safe: boolean;
+  /** `true` when at least one breaking change was detected. */
+  readonly is_breaking: boolean;
+  /** Parse or validation errors from the CLI. */
+  readonly errors: string[];
+  /** Non-fatal advisory warnings. */
+  readonly warnings: string[];
+  readonly diff: {
+    readonly stats: SimulateDiffStats;
+    readonly is_breaking: boolean;
+  };
+  readonly health: {
+    readonly score: number;
+    readonly grade: HealthGrade;
+    readonly errors: number;
+    readonly warnings: number;
+  };
+}
+
+/** Options for {@link runSimulate}. */
+export interface SimulateOptions {
+  /** Simulate against a specific migration version instead of the latest. */
+  atVersion?: number;
+}
+
+/**
+ * Run `sqlfy simulate --format json` and return a typed {@link SimulateResult}.
+ *
+ * The `--format json` flag keeps stdout as pure JSON (no text diff suffix),
+ * which includes `diff.stats` covering all structural changes.
+ *
+ * Requires CLI availability (`CLI_AVAILABLE`). Not available in pure-browser mode.
+ */
+export async function runSimulate(
+  files: MigrationFile[],
+  sql: string,
+  options?: SimulateOptions,
+): Promise<SimulateResult> {
+  const args: string[] = ['--sql', sql, '--format', 'json'];
+  if (options?.atVersion !== undefined) args.push('--at', String(options.atVersion));
+  const raw = await runCliCommand('simulate', files, args);
+  return JSON.parse(raw) as SimulateResult;
 }
 
 // ─────────────────────────────────────────────

@@ -1755,6 +1755,12 @@ The TypeScript deserialiser in `cli.ts` maps `snake_case` keys to `camelCase` fo
 - Advanced options: diagram title, layout resolution, `--no-split` subgraph behavior, and point-in-time `--at` version
 - Uses the CLI sidecar in Tauri or the dev-server proxy; browser fallback produces a limited in-process Mermaid/DOT rendering
 
+### ⑧ Simulate tab
+- Test hypothetical DDL changes against the current schema without modifying any files
+- Enter any SQL statement (DDL), optionally specify a base migration version (`--at`), and run a sandboxed simulation
+- Results show: safety badge (✓ Safe / ✕ Unsafe), breaking-change flag, health score, schema diff stats (tables/columns/sequences/relationships added or removed), and collapsible warnings list
+- Requires CLI (Tauri or Vite dev server) — not available in pure-browser mode
+
 ---
 ---
 

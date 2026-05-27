@@ -4,6 +4,7 @@ import { parse, IS_TAURI } from './bridge/cli';
 import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
 import AskPanel from './components/schema/AskPanel';
 import GraphExportPanel from './components/schema/GraphExportPanel';
+import SimulatePanel from './components/schema/SimulatePanel';
 import GraphTab from './components/schema/GraphTab';
 import InsightsPanel from './components/schema/InsightsPanel';
 import LlmTab from './components/schema/LlmTab';
@@ -13,7 +14,7 @@ import { SAMPLE_MIGRATIONS } from './data/samples';
 
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
 
-type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema' | 'insights' | 'graph-export';
+type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema' | 'insights' | 'graph-export' | 'simulate';
 
 export default function App() {
   const [files, setFiles] = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
@@ -128,6 +129,12 @@ export default function App() {
         >
           ⑦ Graph Export
         </button>
+        <button
+          className={`tab${activeTab === 'simulate' ? ' active' : ''}`}
+          onClick={() => switchTab('simulate')}
+        >
+          ⑧ Simulate
+        </button>
         <button className="parse-btn" onClick={handleParse} disabled={parsing}>
           {parsing ? '⏳ Parsing…' : '▶ Parse →'}
         </button>
@@ -178,6 +185,10 @@ export default function App() {
 
         <Activity mode={activeTab === 'graph-export' ? 'visible' : 'hidden'}>
           {graph && <GraphExportPanel files={files} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'simulate' ? 'visible' : 'hidden'}>
+          <SimulatePanel files={files} />
         </Activity>
       </div>
     </div>
