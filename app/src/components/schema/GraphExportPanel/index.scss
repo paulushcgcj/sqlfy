@@ -1,0 +1,294 @@
+@use '../../../styles/tokens' as t;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GraphExportPanel — component-scoped styles
+// All colours via CSS custom properties (var(--xx)).
+// ─────────────────────────────────────────────────────────────────────────────
+
+.gep {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__title {
+    font-size: t.$fs-title-lg;
+    font-weight: t.$fw-semibold;
+    color: var(--text);
+    margin: 0;
+  }
+
+  &__cli-badge {
+    font-size: t.$fs-sub;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: t.$accent;
+    color: #fff;
+    font-family: t.$font-mono;
+  }
+
+  // ── Format grid ─────────────────────────────────────────────────────────────
+
+  &__formats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  &__fmt-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border-sub);
+    border-radius: 6px;
+    background: var(--bg-card);
+    cursor: pointer;
+    text-align: left;
+    gap: 2px;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+
+    &:hover {
+      border-color: t.$accent;
+      background: t.$accent-06;
+    }
+
+    &.active {
+      border-color: t.$accent;
+      background: t.$accent-10;
+    }
+  }
+
+  &__fmt-label {
+    font-size: t.$fs-body-lg;
+    font-weight: t.$fw-semibold;
+    color: var(--text);
+  }
+
+  &__fmt-badge {
+    font-size: t.$fs-meta;
+    color: t.$accent;
+    font-weight: t.$fw-medium;
+  }
+
+  &__fmt-desc {
+    font-size: t.$fs-sub;
+    color: var(--text-3);
+  }
+
+  // ── Advanced options ─────────────────────────────────────────────────────────
+
+  &__advanced {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__adv-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: t.$fs-body;
+    padding: 4px 0;
+    text-align: left;
+
+    &:hover {
+      color: t.$accent;
+    }
+  }
+
+  &__adv-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-sub);
+    border-radius: 6px;
+    margin-top: 8px;
+    background: var(--bg-card);
+  }
+
+  &__adv-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: t.$fs-body-lg;
+    color: var(--text-2);
+
+    > span:first-child {
+      min-width: 90px;
+    }
+
+    &.gep__adv-check {
+      cursor: pointer;
+    }
+  }
+
+  &__adv-input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--border-sub);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: t.$fs-body;
+    font-family: t.$font-mono;
+
+    &:focus {
+      outline: none;
+      border-color: t.$accent;
+    }
+  }
+
+  &__adv-select {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--border-sub);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: t.$fs-body;
+
+    &:focus {
+      outline: none;
+      border-color: t.$accent;
+    }
+  }
+
+  // ── Run button ───────────────────────────────────────────────────────────────
+
+  &__run-btn {
+    padding: 10px 20px;
+    background: t.$accent;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: t.$fs-body-lg;
+    font-weight: t.$fw-semibold;
+    cursor: pointer;
+    align-self: flex-start;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:not(:disabled):hover {
+      background: t.$accent-hover;
+    }
+  }
+
+  // ── States ───────────────────────────────────────────────────────────────────
+
+  &__error {
+    padding: 10px 14px;
+    background: t.$error-08;
+    border: 1px solid t.$color-error;
+    border-radius: 6px;
+    color: t.$color-error;
+    font-size: t.$fs-body-lg;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  &__loading {
+    font-size: t.$fs-body;
+    color: var(--text-3);
+    padding: 8px 0;
+  }
+
+  &__idle {
+    color: var(--text-3);
+    font-size: t.$fs-body-lg;
+    padding: 24px;
+    text-align: center;
+    border: 1px dashed var(--border-sub);
+    border-radius: 8px;
+
+    strong {
+      color: var(--text-2);
+    }
+  }
+
+  &__no-cli {
+    padding: 24px;
+    border: 1px dashed var(--border-sub);
+    border-radius: 8px;
+    color: var(--text-3);
+    font-size: t.$fs-body-lg;
+    text-align: center;
+
+    p {
+      margin: 4px 0;
+    }
+
+    code {
+      font-family: t.$font-mono;
+      color: t.$accent;
+    }
+  }
+
+  // ── Result ───────────────────────────────────────────────────────────────────
+
+  &__result {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__action-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border-sub);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: t.$fs-body;
+    cursor: pointer;
+    text-decoration: none;
+
+    &:hover {
+      border-color: t.$accent;
+      color: t.$accent;
+    }
+  }
+
+  &__html-preview {
+    width: 100%;
+    height: 500px;
+    border: 1px solid var(--border-sub);
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  &__code {
+    flex: 1;
+    padding: 12px;
+    background: t.$color-code-bg;
+    border: 1px solid var(--border-sub);
+    border-radius: 6px;
+    font-family: t.$font-mono;
+    font-size: t.$fs-preview;
+    color: t.$color-code-text;
+    overflow: auto;
+    white-space: pre;
+    max-height: 500px;
+  }
+}

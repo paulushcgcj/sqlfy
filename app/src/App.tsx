@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { parse, IS_TAURI } from './bridge/cli';
 import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
 import AskPanel from './components/schema/AskPanel';
+import GraphExportPanel from './components/schema/GraphExportPanel';
 import GraphTab from './components/schema/GraphTab';
 import InsightsPanel from './components/schema/InsightsPanel';
 import LlmTab from './components/schema/LlmTab';
@@ -12,7 +13,7 @@ import { SAMPLE_MIGRATIONS } from './data/samples';
 
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
 
-type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema' | 'insights';
+type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema' | 'insights' | 'graph-export';
 
 export default function App() {
   const [files, setFiles] = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
@@ -62,6 +63,7 @@ export default function App() {
     if (tab === 'ask' && !graph) return;
     if (tab === 'schema' && !graph) return;
     if (tab === 'insights' && !graph) return;
+    if (tab === 'graph-export' && !graph) return;
     setActiveTab(tab);
   }
 
@@ -120,6 +122,12 @@ export default function App() {
         >
           ⑥ Insights
         </button>
+        <button
+          className={`tab${activeTab === 'graph-export' ? ' active' : ''}${!graph ? ' disabled' : ''}`}
+          onClick={() => switchTab('graph-export')}
+        >
+          ⑦ Graph Export
+        </button>
         <button className="parse-btn" onClick={handleParse} disabled={parsing}>
           {parsing ? '⏳ Parsing…' : '▶ Parse →'}
         </button>
@@ -154,6 +162,7 @@ export default function App() {
         {activeTab === 'ask' && graph && <AskPanel graph={graph} />}
         {activeTab === 'schema' && graph && <SchemaTab graph={graph} files={files} />}
         {activeTab === 'insights' && graph && <InsightsPanel files={files} />}
+        {activeTab === 'graph-export' && graph && <GraphExportPanel files={files} />}
       </div>
     </div>
   );

@@ -348,6 +348,59 @@ export function graphSummary(files: MigrationFile[]): Promise<string> {
   return runCliCommand('graph', files, ['--format', 'summary']);
 }
 
+// ── Graph export types ──────────────────────────────────────────────────────
+
+/**
+ * All formats supported by `sqlfy graph --format`.
+ *
+ * - `dot`        — Graphviz DOT (render with `dot -Tsvg`)
+ * - `mermaid`    — Mermaid ERD (GitHub Markdown compatible)
+ * - `excalidraw` — Excalidraw JSON (hand-drawn aesthetic)
+ * - `drawio`     — Draw.io XML (professional diagrams)
+ * - `summary`    — ASCII adjacency list (LLM-friendly)
+ * - `json`       — NetworkX node-link format (programmatic analysis)
+ * - `html`       — Interactive vis.js visualisation (standalone)
+ * - `report`     — Human-readable Markdown report
+ */
+export type GraphFormat =
+  | 'dot'
+  | 'mermaid'
+  | 'excalidraw'
+  | 'drawio'
+  | 'summary'
+  | 'json'
+  | 'html'
+  | 'report';
+
+/** Options forwarded to `sqlfy graph`. */
+export interface GraphExportOptions {
+  /** Output format. */
+  format: GraphFormat;
+  /** Optional diagram title. */
+  title?: string;
+  /** Layout resolution hint. Defaults to `'medium'`. */
+  resolution?: 'low' | 'medium' | 'high';
+  /** When `true`, passes `--no-split` to disable subgraph splitting. */
+  noSplit?: boolean;
+  /** Export the graph at a specific migration version (`--at VERSION`). */
+  atVersion?: number;
+}
+
+/**
+ * Run `sqlfy graph` with full format and option support.
+ *
+ * Returns the raw CLI output as a string (text, JSON, XML, or HTML depending
+ * on the chosen format).
+ */
+export function runGraphExport(files: MigrationFile[], options: GraphExportOptions): Promise<string> {
+  const args: string[] = ['--format', options.format];
+  if (options.title?.trim()) args.push('--title', options.title.trim());
+  if (options.resolution) args.push('--resolution', options.resolution);
+  if (options.noSplit) args.push('--no-split');
+  if (options.atVersion !== undefined) args.push('--at', String(options.atVersion));
+  return runCliCommand('graph', files, args);
+}
+
 // ─────────────────────────────────────────────
 // DESERIALISERS  (Python snake_case → TS camelCase)
 // ─────────────────────────────────────────────
