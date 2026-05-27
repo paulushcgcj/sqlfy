@@ -10,11 +10,9 @@ import * as cli from '@/bridge/cli';
 // Mock the CLI bridge
 vi.mock('@/bridge/cli', () => ({
   IS_TAURI: false,
+  CLI_AVAILABLE: true,
+  CLI_MODE_LABEL: '⚡ Dev CLI',
   dumpWithOptions: vi.fn(),
-  graphMermaid: vi.fn(),
-  graphDot: vi.fn(),
-  graphSummary: vi.fn(),
-  insights: vi.fn(),
 }));
 
 const mockGraph: SchemaGraph = {

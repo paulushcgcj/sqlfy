@@ -21,10 +21,8 @@
 
 import { useState, useRef } from 'react';
 
-import type { SchemaGraph } from '@/core/types';
+import type { VectorChunk } from '@/core/types';
 import type { FC, KeyboardEvent } from 'react';
-
-import { buildChunks } from '@/core/core';
 import './index.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,10 +44,10 @@ interface Hit {
 /** Props for the {@link AskPanel} component. */
 export interface AskPanelProps {
   /**
-   * The parsed schema graph used to build retrieval chunks.
-   * When `null` the panel renders an empty-state prompt to parse first.
+   * Precomputed retrieval chunks from the app-level `chunks` state.
+   * When empty, the panel renders an empty-state prompt to parse first.
    */
-  readonly graph: SchemaGraph | null;
+  readonly chunks: VectorChunk[];
 }
 
 // ─── BM25 retrieval ───────────────────────────────────────────────────────────
@@ -96,7 +94,7 @@ function _tokenise(text: string): string[] {
   );
 }
 
-function retrieve(question: string, chunks: ReturnType<typeof buildChunks>, k = 6): Hit[] {
+function retrieve(question: string, chunks: VectorChunk[], k = 6): Hit[] {
   const qTokens = _tokenise(question);
   const N = chunks.length;
 
@@ -197,14 +195,13 @@ const EXAMPLES = [
  * @param props - {@link AskPanelProps}
  * @returns The Q&A panel, or an empty-state prompt if `graph` is `null`.
  */
-const AskPanel: FC<AskPanelProps> = ({ graph }) => {
+const AskPanel: FC<AskPanelProps> = ({ chunks }) => {
   const [input, setInput] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  if (!graph) {
+  if (!chunks || chunks.length === 0) {
     return (
       <div className="no-data" style={{ height: '100%' }}>
         <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
@@ -224,8 +221,6 @@ const AskPanel: FC<AskPanelProps> = ({ graph }) => {
   function assemble() {
     const question = input.trim();
     if (!question) return;
-
-    const chunks = buildChunks(graph!);
     const hits = retrieve(question, chunks);
     const built = buildPrompt(question, hits);
 

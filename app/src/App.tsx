@@ -60,7 +60,7 @@ export default function App() {
   function switchTab(tab: Tab) {
     if (tab === 'graph' && !graph) return;
     if (tab === 'llm' && !chunks) return;
-    if (tab === 'ask' && !graph) return;
+    if (tab === 'ask' && !chunks) return;
     if (tab === 'schema' && !graph) return;
     if (tab === 'insights' && !graph) return;
     if (tab === 'graph-export' && !graph) return;
@@ -165,7 +165,7 @@ export default function App() {
         </Activity>
 
         <Activity mode={activeTab === 'ask' ? 'visible' : 'hidden'}>
-          {graph && <AskPanel graph={graph} />}
+          {chunks && <AskPanel chunks={chunks} />}
         </Activity>
 
         <Activity mode={activeTab === 'schema' ? 'visible' : 'hidden'}>

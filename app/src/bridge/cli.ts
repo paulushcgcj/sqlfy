@@ -23,6 +23,19 @@ import { applyMigrations, buildChunks } from '@/core/core';
 // ── Tauri detection ──────────────────────────────────────────────────────────
 export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+// Convenience: whether a Python CLI is available in this runtime
+export const CLI_AVAILABLE = IS_TAURI || import.meta.env.DEV;
+
+/**
+ * Human-readable label for the active CLI execution path.
+ * Returns null in pure-browser production builds.
+ */
+export const CLI_MODE_LABEL: string | null = IS_TAURI
+  ? '⚡ Tauri CLI'
+  : import.meta.env.DEV
+  ? '⚡ Dev CLI'
+  : null;
+
 // ── CLI path config ──────────────────────────────────────────────────────────
 //
 // DEV  → PYTHONPATH=../../cli/src python3 -m sqlfy

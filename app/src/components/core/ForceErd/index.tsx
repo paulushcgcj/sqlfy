@@ -1,6 +1,12 @@
 import * as d3 from 'd3';
 import { useCallback, useEffect, useRef } from 'react';
+import { usePrefersDark } from '@/hooks/usePrefersDark';
 import { type FC } from 'react';
+import { getComponents } from './detectIslands';
+import { setupZoom } from './useZoom';
+import { createForceSimulation } from './useForceSimulation';
+import { setupDrag } from './useDrag';
+import { useSimulationControls } from './useSimulationControls';
 
 import type { SchemaGraph } from '@/core/types';
 
@@ -102,7 +108,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<d3.Simulation<NodeDatum, LinkDatum> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const isDark = globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = usePrefersDark();
   const pal = palette(isDark);
 
   // ── Build graph data ──────────────────────────────────────────────
@@ -163,44 +169,12 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     const root = svg.append('g').attr('class', 'root');
 
     // ── Zoom & pan ────────────────────────────────────────────────────
-    const zoom = d3
-      .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 3])
-      .on('zoom', (event) => root.attr('transform', event.transform));
-    svg.call(zoom);
-    svg.on('dblclick.zoom', null);
-    zoomRef.current = zoom;
+    // Extracted to helper to keep D3 behaviour testable and concise.
+    // setupZoom returns a cleanup function which we call on effect teardown.
+    const cleanupZoom = setupZoom(svgRef.current!, root, zoomRef as any);
 
     // ── Island background blobs (convex hull per component) ───────────
-    const adjList = new Map<string, Set<string>>();
-    nodeData.forEach((n) => adjList.set(n.id, new Set()));
-    edges.forEach((e) => {
-      adjList.get(e.fromTable)?.add(e.toTable);
-      adjList.get(e.toTable)?.add(e.fromTable);
-    });
-
-    function getComponents(): string[][] {
-      const visited = new Set<string>();
-      const comps: string[][] = [];
-      for (const n of nodeData) {
-        if (visited.has(n.id)) continue;
-        const comp: string[] = [];
-        const stack = [n.id];
-        while (stack.length) {
-          const cur = stack.pop()!;
-          if (visited.has(cur)) continue;
-          visited.add(cur);
-          comp.push(cur);
-          adjList.get(cur)?.forEach((nb) => {
-            if (!visited.has(nb)) stack.push(nb);
-          });
-        }
-        comps.push(comp);
-      }
-      return comps;
-    }
-
-    const components = getComponents();
+    const components = getComponents(nodeData, edges);
     const islandGroup = root.append('g').attr('class', 'islands');
     const islandPaths = islandGroup
       .selectAll<SVGPathElement, string[]>('path')
@@ -375,92 +349,32 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
 
     svg.on('click', () => highlightNeighbours(null));
 
-    // ── Drag ──────────────────────────────────────────────────────────
-    const drag = d3
-      .drag<SVGGElement, NodeDatum>()
-      .on('start', (ev: d3.D3DragEvent<SVGGElement, NodeDatum, NodeDatum>, d) => {
-        if (!ev.active) simRef.current?.alphaTarget(ALPHA).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-      })
-      .on('drag', (ev: d3.D3DragEvent<SVGGElement, NodeDatum, NodeDatum>, d) => {
-        d.fx = ev.x;
-        d.fy = ev.y;
-      })
-      .on('end', (ev: d3.D3DragEvent<SVGGElement, NodeDatum, NodeDatum>, _d) => {
-        if (!ev.active) simRef.current?.alphaTarget(0);
-      });
-
-    nodeSel.call(drag);
+    // ── Drag: extracted to helper for testability and reuse
+    const cleanupDrag = setupDrag(nodeSel, simRef as any);
 
     // ── Force simulation ──────────────────────────────────────────────
-    const sim = d3
-      .forceSimulation<NodeDatum>(nodeData)
-      .force(
-        'link',
-        d3
-          .forceLink<NodeDatum, LinkDatum>(linkData)
-          .id((d) => d.id)
-          .distance(LINK_D)
-          .strength(0.4),
-      )
-      .force('charge', d3.forceManyBody().strength(CHARGE))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide(NODE_W * 0.72))
-      .force('x', d3.forceX(width / 2).strength(0.04))
-      .force('y', d3.forceY(height / 2).strength(0.04));
+    const { sim, stop } = createForceSimulation({
+      nodeData,
+      linkData,
+      nodeSel,
+      linkSel,
+      islandPaths,
+      nodeById,
+      width,
+      height,
+      pal,
+    });
 
     simRef.current = sim;
 
-    // ── Tick ──────────────────────────────────────────────────────────
-    sim.on('tick', () => {
-      linkSel.attr('d', (l) => {
-        const s = l.source as NodeDatum;
-        const t = l.target as NodeDatum;
-        const sx = (s.x ?? 0) + NODE_W / 2;
-        const sy = (s.y ?? 0) + NODE_H;
-        const tx = (t.x ?? 0) + NODE_W / 2;
-        const ty = t.y ?? 0;
-        const dx = tx - sx;
-        const dy = ty - sy;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const ex = tx - (dx / len) * (R + 2);
-        const ey = ty - (dy / len) * (R + 2);
-        const mx = (sx + ex) / 2 - dy * 0.15;
-        const my = (sy + ey) / 2 + dx * 0.15;
-        return `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`;
-      });
-
-      nodeSel.attr(
-        'transform',
-        (d) => `translate(${(d.x ?? 0) - NODE_W / 2}, ${(d.y ?? 0) - NODE_H / 2})`,
-      );
-
-      islandPaths.attr('d', (comp) => {
-        const pts = comp
-          .map((id) => nodeById.get(id))
-          .filter((n): n is NodeDatum => !!n)
-          .flatMap((n) => [
-            [(n.x ?? 0) - NODE_W * 0.7, (n.y ?? 0) - NODE_H * 0.7],
-            [(n.x ?? 0) + NODE_W * 0.7, (n.y ?? 0) - NODE_H * 0.7],
-            [(n.x ?? 0) - NODE_W * 0.7, (n.y ?? 0) + NODE_H * 0.7],
-            [(n.x ?? 0) + NODE_W * 0.7, (n.y ?? 0) + NODE_H * 0.7],
-          ]) as [number, number][];
-        const hull = d3.polygonHull(pts);
-        if (!hull) return '';
-        const line = d3.line().curve(d3.curveCatmullRomClosed);
-        return line(hull) ?? '';
-      });
-    });
-
     return () => {
-      sim.stop();
+      stop?.();
       tooltip.remove();
+      cleanupDrag?.();
+      cleanupZoom?.();
     };
-    // Full rebuild only when the graph changes. selectedTable + onSelectTable are
-    // handled by the sync effect below and direct closure respectively.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph]);
+    // Rebuild when the graph or theme (dark mode) changes so colours/tooltip update.
+  }, [graph, isDark]);
 
   // ── Sync selected node highlight ─────────────────────────────────────
   useEffect(() => {
@@ -481,24 +395,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
   }, [selectedTable, isDark]);
 
   // ── Fit-to-view ───────────────────────────────────────────────────────
-  const fitView = useCallback(() => {
-    const svg = d3.select(svgRef.current!);
-    const root = svg.select<SVGGElement>('.root');
-    const bbox = (root.node() as SVGGElement).getBBox();
-    if (!bbox.width || !bbox.height) return;
-    const W = svgRef.current!.clientWidth;
-    const scale = 0.85 * Math.min(W / bbox.width, height / bbox.height);
-    const tx = W / 2 - scale * (bbox.x + bbox.width / 2);
-    const ty = height / 2 - scale * (bbox.y + bbox.height / 2);
-    zoomRef.current?.transform(
-      d3.select(svgRef.current!).transition().duration(500),
-      d3.zoomIdentity.translate(tx, ty).scale(scale),
-    );
-  }, [height]);
-
-  const reheat = useCallback(() => {
-    simRef.current?.alpha(0.4).restart();
-  }, []);
+  const { fitView, reheat } = useSimulationControls({ svgRef, zoomRef, simRef, height });
 
   // ── Render ────────────────────────────────────────────────────────────
   return (

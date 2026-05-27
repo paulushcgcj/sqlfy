@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 
 import type { FC } from 'react';
 
-import { IS_TAURI, runGraphExport } from '@/bridge/cli';
+import { IS_TAURI, CLI_AVAILABLE, CLI_MODE_LABEL, runGraphExport } from '@/bridge/cli';
+import { downloadBlob, copyToClipboard } from '@/utils/io';
 
 import type { GraphExportOptions, GraphFormat } from '@/bridge/cli';
 import type { MigrationFile } from '@/core/types';
@@ -11,8 +12,8 @@ import './index.scss';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CLI_AVAILABLE = IS_TAURI || import.meta.env.DEV;
 const CLI_MODE_LABEL = IS_TAURI ? '⚡ Tauri CLI' : import.meta.env.DEV ? '⚡ Dev CLI' : null;
+const CLI_AVAILABLE = IS_TAURI || import.meta.env.DEV;
 
 interface FormatMeta {
   label: string;
@@ -138,18 +139,13 @@ const GraphExportPanel: FC<GraphExportPanelProps> = ({ files }) => {
   const handleDownload = useCallback(() => {
     if (!content) return;
     const meta = FORMAT_META[format];
-    const blob = new Blob([content], { type: meta.mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `schema-graph.${meta.ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(content, `schema-graph.${meta.ext}`, meta.mime);
   }, [content, format]);
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
-    await navigator.clipboard.writeText(content);
+    const ok = await copyToClipboard(content);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [content]);

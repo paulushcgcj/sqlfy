@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { downloadBlob, copyToClipboard } from '@/utils/io';
 
 import type { VectorChunk } from '@/core/types';
 import type { FC } from 'react';
@@ -40,17 +41,12 @@ const LlmTab: FC<LlmTabProps> = ({ chunks }) => {
       null,
       2,
     );
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'schema_vector_chunks.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(json, 'schema_vector_chunks.json', 'application/json');
   }
 
-  function copyContent() {
-    navigator.clipboard.writeText(selected.content);
+  async function copyContent() {
+    const ok = await copyToClipboard(selected.content);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }

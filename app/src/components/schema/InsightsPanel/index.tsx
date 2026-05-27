@@ -18,7 +18,7 @@ import type { FC } from 'react';
 import type { InsightFinding, InsightsResult, InsightsOptions } from '@/bridge/cli';
 import type { MigrationFile } from '@/core/types';
 
-import { IS_TAURI, runInsights } from '@/bridge/cli';
+import { IS_TAURI, CLI_AVAILABLE, CLI_MODE_LABEL, runInsights } from '@/bridge/cli';
 import './index.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,10 +65,7 @@ function getGrade(score: number): [string, string] {
 
 // ─── CLI availability detection ───────────────────────────────────────────────
 
-/** True when a CLI backend is reachable (Tauri desktop or Vite dev-server). */
-const CLI_AVAILABLE = IS_TAURI || import.meta.env.DEV;
-
-const CLI_MODE_LABEL = IS_TAURI ? '⚡ Tauri CLI' : import.meta.env.DEV ? '⚡ Dev CLI' : null;
+// `CLI_AVAILABLE` and `CLI_MODE_LABEL` are exported from the bridge module.
 
 // ─── FindingCard ──────────────────────────────────────────────────────────────
 

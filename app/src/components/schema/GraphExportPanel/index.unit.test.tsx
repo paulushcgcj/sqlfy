@@ -11,6 +11,8 @@ import * as cli from '@/bridge/cli';
 
 vi.mock('@/bridge/cli', () => ({
   IS_TAURI: false,
+  CLI_AVAILABLE: true,
+  CLI_MODE_LABEL: '⚡ Dev CLI',
   runGraphExport: vi.fn(),
 }));
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { usePrefersDark } from '@/hooks/usePrefersDark';
 
 import type { SchemaGraph } from '@/core/types';
 import type { FC } from 'react';
@@ -38,7 +39,7 @@ const BW = 130,
 const ErdCanvas: FC<ErdCanvasProps> = ({ graph, selectedTable, onSelectTable }) => {
   const { tables, edges } = graph;
   const pos = useMemo(() => computeLayout(tables, edges), [tables, edges]);
-  const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const isDark = usePrefersDark();
 
   return (
     <div className="erd-wrap">
