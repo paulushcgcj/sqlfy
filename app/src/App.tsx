@@ -4,6 +4,7 @@ import { parse, IS_TAURI } from './bridge/cli';
 import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
 import AskPanel from './components/schema/AskPanel';
 import GraphTab from './components/schema/GraphTab';
+import InsightsPanel from './components/schema/InsightsPanel';
 import LlmTab from './components/schema/LlmTab';
 import MigrationsTab from './components/schema/MigrationsTab';
 import SchemaTab from './components/schema/SchemaTab';
@@ -11,7 +12,7 @@ import { SAMPLE_MIGRATIONS } from './data/samples';
 
 import type { MigrationFile, SchemaGraph, VectorChunk } from './core/types';
 
-type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema';
+type Tab = 'migrations' | 'graph' | 'llm' | 'ask' | 'schema' | 'insights';
 
 export default function App() {
   const [files, setFiles] = useState<MigrationFile[]>(SAMPLE_MIGRATIONS);
@@ -60,6 +61,7 @@ export default function App() {
     if (tab === 'llm' && !chunks) return;
     if (tab === 'ask' && !graph) return;
     if (tab === 'schema' && !graph) return;
+    if (tab === 'insights' && !graph) return;
     setActiveTab(tab);
   }
 
@@ -112,6 +114,12 @@ export default function App() {
         >
           ⑤ Schema
         </button>
+        <button
+          className={`tab${activeTab === 'insights' ? ' active' : ''}${!graph ? ' disabled' : ''}`}
+          onClick={() => switchTab('insights')}
+        >
+          ⑥ Insights
+        </button>
         <button className="parse-btn" onClick={handleParse} disabled={parsing}>
           {parsing ? '⏳ Parsing…' : '▶ Parse →'}
         </button>
@@ -145,6 +153,7 @@ export default function App() {
         {activeTab === 'llm' && chunks && <LlmTab chunks={chunks} />}
         {activeTab === 'ask' && graph && <AskPanel graph={graph} />}
         {activeTab === 'schema' && graph && <SchemaTab graph={graph} files={files} />}
+        {activeTab === 'insights' && graph && <InsightsPanel files={files} />}
       </div>
     </div>
   );

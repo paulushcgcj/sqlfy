@@ -261,9 +261,76 @@ export function dumpSummary(files: MigrationFile[]): Promise<string> {
   return dumpWithOptions(files, { format: 'summary' });
 }
 
-/** Run schema insights analysis, returning JSON. */
+// ── Insights types ──────────────────────────────────────────────────────────
+
+/** A single finding emitted by the CLI `insights` command. */
+export interface InsightFinding {
+  /** Finding rule code (e.g. `"ORPHAN_TABLE"`, `"NO_PK"`). */
+  code: string;
+  /** Severity level. */
+  severity: 'error' | 'warning' | 'info';
+  /** Category grouping (e.g. `"structural"`, `"referential"`, `"migrations"`). */
+  category: string;
+  /** Human-readable description of the finding. */
+  message: string;
+  /** Extended explanation (optional). */
+  detail?: string;
+  /** Suggested SQL or action to resolve the finding (optional). */
+  fix?: string;
+  /** Qualified table name affected by this finding (optional). */
+  table?: string;
+  /** Column name affected by this finding (optional). */
+  column?: string;
+}
+
+/** Typed result from the CLI `insights` command. */
+export interface InsightsResult {
+  /** Schema version at analysis time. */
+  version: string;
+  /** Short fingerprint of the schema state. */
+  fingerprint: string;
+  /** Aggregated counts. */
+  summary: {
+    errors: number;
+    warnings: number;
+    infos: number;
+    total: number;
+    healthy: boolean;
+  };
+  /** Findings grouped by severity. */
+  findings: {
+    error: InsightFinding[];
+    warning: InsightFinding[];
+    info: InsightFinding[];
+  };
+}
+
+export interface InsightsOptions {
+  /** Filter results to a minimum severity level. */
+  severity?: 'error' | 'warning' | 'info';
+  /** Analyse schema state at a specific migration version. */
+  atVersion?: number;
+}
+
+/** Run schema insights analysis, returning raw JSON string. */
 export function insights(files: MigrationFile[]): Promise<string> {
   return runCliCommand('insights', files, ['--format', 'json']);
+}
+
+/**
+ * Run schema insights analysis and return a typed {@link InsightsResult}.
+ *
+ * Calls `sqlfy insights --format json [--severity <level>] [--at <version>]`.
+ */
+export async function runInsights(
+  files: MigrationFile[],
+  options?: InsightsOptions,
+): Promise<InsightsResult> {
+  const args = ['--format', 'json'];
+  if (options?.severity) args.push('--severity', options.severity);
+  if (options?.atVersion !== undefined) args.push('--at', String(options.atVersion));
+  const raw = await runCliCommand('insights', files, args);
+  return JSON.parse(raw) as InsightsResult;
 }
 
 /** Export the schema as a Mermaid ERD string. */

@@ -407,13 +407,23 @@ function browserInsights(graph: SchemaGraph): Finding[] {
 function parseCliInsights(raw: string): Finding[] {
   try {
     const data = JSON.parse(raw) as {
-      findings?: Array<{ severity: string; rule: string; message: string; target?: string }>;
+      // New grouped format: { findings: { error: [...], warning: [...], info: [...] } }
+      findings?: {
+        error?: Array<{ severity?: string; code?: string; message?: string; table?: string; column?: string }>;
+        warning?: Array<{ severity?: string; code?: string; message?: string; table?: string; column?: string }>;
+        info?: Array<{ severity?: string; code?: string; message?: string; table?: string; column?: string }>;
+      };
     };
-    return (data.findings ?? []).map((f) => ({
+    const all = [
+      ...(data.findings?.error ?? []),
+      ...(data.findings?.warning ?? []),
+      ...(data.findings?.info ?? []),
+    ];
+    return all.map((f) => ({
       severity: (f.severity as Severity) ?? 'info',
-      rule: f.rule ?? '',
+      rule: f.code ?? '',
       message: f.message ?? '',
-      target: f.target,
+      target: [f.table, f.column].filter(Boolean).join('.') || undefined,
     }));
   } catch {
     return [];
