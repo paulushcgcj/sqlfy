@@ -369,6 +369,7 @@ Lint migration SQL files for quality and style using sqlfluff. Checks keyword ca
 | `--dialect` | `oracle` | SQL dialect: `oracle`, `postgres`, `mysql`, `sqlite` |
 | `--no-recursive` | `false` | Do not recursively scan subdirectories |
 | `--out FILE` | stdout | Write output to file |
+| `--fix` | `false` | Apply automatic fixes in-place (creates `.bak` backups) |
 
 **Quality Score:**
 - Starts at 100
@@ -396,6 +397,16 @@ capitalisation_policy = upper  # Enforce uppercase keywords
 
 [sqlfluff:rules:L014]
 extended_capitalisation_policy = upper
+```
+
+**Examples:**
+
+```bash
+# Preview-only lint report
+sqlfy lint ./migrations --format text
+
+# Apply automatic fixes in-place (creates .bak backup files)
+sqlfy lint ./migrations --fix
 ```
 
 **Examples:**

@@ -175,6 +175,47 @@ def lint_directory(
     return results
 
 
+def fix_migration(
+    sql: str,
+    filename: str,
+    dialect: str = 'oracle',
+    config_path: str | None = None,
+) -> str:
+    """
+    Apply sqlfluff automatic fixes to a migration SQL string.
+
+    Returns the fixed SQL string. Raises ValueError if sqlfluff is not
+    available or the installed version does not expose the fix API.
+    """
+    _check_sqlfluff()
+
+    try:
+        if config_path:
+            config = FluffConfig.from_path(config_path, overrides={'dialect': dialect})
+            linter = Linter(config=config)
+        else:
+            linter = Linter(dialect=dialect)
+
+        # sqlfluff Linter provides a fix_string() helper in modern versions.
+        if hasattr(linter, 'fix_string'):
+            fixed = linter.fix_string(sql, fname=filename)
+        elif hasattr(linter, 'fix'):  # older compatibility fallback
+            fixed = linter.fix(sql, fname=filename)
+        else:
+            raise ValueError('Installed sqlfluff does not support automatic fixes')
+
+        # fix_string may return a string or a tuple-like result depending on version
+        if isinstance(fixed, (list, tuple)) and fixed:
+            fixed_sql = fixed[0]
+        else:
+            fixed_sql = fixed if isinstance(fixed, str) else str(fixed)
+
+        return fixed_sql
+
+    except Exception as e:
+        raise
+
+
 def calculate_score(violations: list[LintViolation]) -> int:
     """
     Calculate quality score from violations.

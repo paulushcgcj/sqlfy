@@ -214,6 +214,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-score", type=int, default=0, metavar="N",
                    help="Fail if score < N (default: 0)")
     p.add_argument("--config", metavar="FILE", help="Path to .sqlfluff config file")
+    p.add_argument("--fix", action="store_true", help="Apply automatic fixes (in-place). BACKUPs created as .bak files")
     p.add_argument("--dialect", default="oracle")
     p.add_argument("--no-recursive", action="store_true")
     p.add_argument("--out", metavar="FILE")

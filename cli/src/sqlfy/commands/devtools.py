@@ -13,7 +13,7 @@ from ._utils import load_files, write_output
 def cmd_lint(args: argparse.Namespace) -> None:
     """Lint migration SQL files for quality and style using sqlfluff."""
     from ..analysis.linter import (
-        lint_migration, lint_directory,
+        lint_migration, lint_directory, fix_migration,
         format_text, format_json,
         format_directory_text, format_directory_json,
         SQLFLUFF_AVAILABLE,
@@ -36,18 +36,65 @@ def cmd_lint(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     if p.is_file():
-        result = lint_migration(p.read_text(encoding="utf-8"), p.name, dialect=dialect, config_path=config_path)
+        original = p.read_text(encoding="utf-8")
+        if getattr(args, "fix", False):
+            try:
+                fixed = fix_migration(original, p.name, dialect=dialect, config_path=config_path)
+            except Exception as e:
+                print(f"Error applying fixes: {e}", file=sys.stderr)
+                sys.exit(1)
+
+            if fixed != original:
+                bak = p.with_name(p.name + '.bak')
+                bak.write_text(original, encoding='utf-8')
+                p.write_text(fixed, encoding='utf-8')
+                print(f"Updated: {p} (backup: {bak})", file=sys.stderr)
+            else:
+                print(f"No changes for: {p}", file=sys.stderr)
+
+            result = lint_migration(fixed, p.name, dialect=dialect, config_path=config_path)
+        else:
+            result = lint_migration(original, p.name, dialect=dialect, config_path=config_path)
+
         write_output(format_json(result) if fmt == "json" else format_text(result), args.out)
         if result.score < min_score:
             print(f"\nError: Score {result.score} is below minimum {min_score}", file=sys.stderr)
             sys.exit(1)
     else:
-        results = lint_directory(str(p), min_score=min_score, recursive=not getattr(args, "no_recursive", False), dialect=dialect, config_path=config_path)
-        write_output(format_directory_json(results) if fmt == "json" else format_directory_text(results), args.out)
-        failed = [r for r in results if r.score < min_score]
-        if failed:
-            print(f"\nError: {len(failed)}/{len(results)} files below minimum score {min_score}", file=sys.stderr)
-            sys.exit(1)
+        # Directory path
+        if getattr(args, "fix", False):
+            # Apply fixes in-place per-file, writing a .bak for each original
+            sql_files = sorted([f for f in p.rglob("*.sql")])
+            changed = 0
+            for sql_file in sql_files:
+                try:
+                    original = sql_file.read_text(encoding='utf-8')
+                    fixed = fix_migration(original, sql_file.name, dialect=dialect, config_path=config_path)
+                    if fixed != original:
+                        bak = sql_file.with_name(sql_file.name + '.bak')
+                        bak.write_text(original, encoding='utf-8')
+                        sql_file.write_text(fixed, encoding='utf-8')
+                        changed += 1
+                        print(f"Updated: {sql_file} (backup: {bak})", file=sys.stderr)
+                except Exception as e:
+                    print(f"Error fixing {sql_file}: {e}", file=sys.stderr)
+
+            # Re-run lint to show updated results
+            results = lint_directory(str(p), min_score=min_score, recursive=not getattr(args, "no_recursive", False), dialect=dialect, config_path=config_path)
+            write_output(format_directory_json(results) if fmt == "json" else format_directory_text(results), args.out)
+            failed = [r for r in results if r.score < min_score]
+            if failed:
+                print(f"\nError: {len(failed)}/{len(results)} files below minimum score {min_score}", file=sys.stderr)
+                sys.exit(1)
+            else:
+                print(f"\nApplied fixes to {changed}/{len(sql_files)} files", file=sys.stderr)
+        else:
+            results = lint_directory(str(p), min_score=min_score, recursive=not getattr(args, "no_recursive", False), dialect=dialect, config_path=config_path)
+            write_output(format_directory_json(results) if fmt == "json" else format_directory_text(results), args.out)
+            failed = [r for r in results if r.score < min_score]
+            if failed:
+                print(f"\nError: {len(failed)}/{len(results)} files below minimum score {min_score}", file=sys.stderr)
+                sys.exit(1)
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
