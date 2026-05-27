@@ -11,7 +11,7 @@ from .commands import (
     cmd_insights, cmd_health, cmd_domains, cmd_stability,
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
     cmd_impact,
-    cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify,
+    cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety,
 )
 
 KNOWN_SUBCOMMANDS = {
@@ -19,7 +19,7 @@ KNOWN_SUBCOMMANDS = {
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
     "domains", "stability", "validate", "deps", "lineage", "drift",
-    "classify",
+    "classify", "safety",
 }
 
 
@@ -312,6 +312,27 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         help="Group output by category instead of file order",
     )
     p.set_defaults(func=cmd_classify)
+
+    # safety
+    p = sub.add_parser(
+        "safety",
+        help="Score migrations by safety level "
+             "(SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS)",
+    )
+    shared(p)
+    p.add_argument("--format", choices=["text", "json"], default="text")
+    p.add_argument(
+        "--threshold",
+        choices=["safe", "medium", "high", "dangerous"],
+        metavar="LEVEL",
+        help="Exit 1 if any migration is at or above this level",
+    )
+    p.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show per-statement breakdown for each migration",
+    )
+    p.set_defaults(func=cmd_safety)
 
     return parser
 

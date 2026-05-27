@@ -281,6 +281,35 @@ def cmd_classify(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_safety(args: argparse.Namespace) -> int:
+    """Score migrations by safety level (SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS)."""
+    from ..analysis.safety import score_migrations, format_text, format_json
+
+    files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, "dialect", "oracle")
+
+    scores = score_migrations(files, dialect=dialect)
+
+    fmt = getattr(args, "format", "text")
+    verbose = getattr(args, "verbose", False)
+    output = format_json(scores) if fmt == "json" else format_text(scores, verbose=verbose)
+    write_output(output, getattr(args, "out", None))
+
+    threshold = getattr(args, "threshold", None)
+    if threshold:
+        _order = {"safe": 0, "medium": 1, "high": 2, "dangerous": 3}
+        _score_order = {"SAFE": 0, "MEDIUM_RISK": 1, "HIGH_RISK": 2, "DANGEROUS": 3}
+        min_ord = _order.get(threshold, 0)
+        violations = [s for s in scores if _score_order[s.overall_level] >= min_ord]
+        if violations:
+            print(
+                f"\n❌ {len(violations)} migration(s) at or above threshold '{threshold}'",
+                file=sys.stderr,
+            )
+            return 1
+    return 0
+
+
 def cmd_cache(args: argparse.Namespace) -> None:
     """Manage the file-based caching system (clear or show info)."""
     from ..cache import clear_cache, _CACHE_ROOT

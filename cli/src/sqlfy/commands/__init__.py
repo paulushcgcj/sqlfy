@@ -7,7 +7,7 @@ from .evolution import cmd_diff, cmd_rollback_analysis, cmd_simulate, cmd_integr
 from .analysis import cmd_insights, cmd_health, cmd_domains, cmd_stability
 from .ai import cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES
 from .impact import cmd_impact
-from .devtools import cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify
+from .devtools import cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety
 
 __all__ = [
     "cmd_dump", "cmd_manifest", "cmd_chunks", "cmd_export", "legacy_main",
@@ -16,5 +16,5 @@ __all__ = [
     "cmd_insights", "cmd_health", "cmd_domains", "cmd_stability",
     "cmd_ask", "cmd_chat", "cmd_query", "_QUERY_TYPES",
     "cmd_impact",
-    "cmd_lint", "cmd_validate", "cmd_deps", "cmd_lineage", "cmd_cache", "cmd_classify",
+    "cmd_lint", "cmd_validate", "cmd_deps", "cmd_lineage", "cmd_cache", "cmd_classify", "cmd_safety",
 ]

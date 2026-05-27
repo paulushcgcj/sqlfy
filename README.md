@@ -163,6 +163,8 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `validate` | Validate migration ordering and detect issues |
 | `deps` | Analyze migration dependencies and detect circular dependencies |
 | `drift` | Detect schema drift between migration folders and generate repair SQL |
+| `classify` | Classify migrations by semantic category (table creation, data migration, cleanup, etc.) |
+| `safety` | Score migrations by safety level (SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS) |
 
 **Common flags available on most commands:**
 - `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
@@ -1350,6 +1352,39 @@ ERRORS:
   run: sqlfy deps ./migrations --validate --strict
 ```
 
+#### `sqlfy safety`
+
+```bash
+sqlfy safety <migrations-dir> [--format text|json] [--threshold LEVEL] [--verbose] [--out FILE]
+```
+
+Score each migration by its worst-case SQL operation risk level.
+
+| Flag | Description |
+|---|---|
+| `--format` | `text` (default) or `json` |
+| `--threshold LEVEL` | `safe`, `medium`, `high`, `dangerous` — exit 1 if any migration is at or above this level |
+| `--verbose` | Show per-statement breakdown with reason for each migration |
+| `--out FILE` | Write output to file |
+
+**Risk levels:**
+
+| Level | Triggers |
+|---|---|
+| `SAFE` | CREATE TABLE/SEQUENCE, ADD nullable COLUMN, INSERT, COMMENT |
+| `MEDIUM_RISK` | CREATE INDEX (non-concurrent), ADD CONSTRAINT, DROP INDEX/CONSTRAINT, RENAME |
+| `HIGH_RISK` | DROP COLUMN/VIEW, ADD COLUMN NOT NULL w/o DEFAULT, MODIFY type, DELETE/UPDATE with WHERE |
+| `DANGEROUS` | DROP TABLE, TRUNCATE, DELETE/UPDATE without WHERE |
+
+**Examples:**
+```bash
+sqlfy safety ./migrations                          # Scored list to stdout
+sqlfy safety ./migrations --verbose                # Per-statement breakdown
+sqlfy safety ./migrations --threshold high         # Exit 1 on HIGH_RISK or DANGEROUS
+sqlfy safety ./migrations --format json            # JSON output for CI/CD
+sqlfy safety ./migrations --threshold dangerous    # Exit 1 only on DANGEROUS
+```
+
 ### Legacy style (backward compatible)
 
 ```bash
@@ -1473,6 +1508,17 @@ sqlfy simulate ./migrations --file ./test-migration.sql --diff
 # Check integrity
 sqlfy integrity ./migrations
 sqlfy integrity ./migrations --strict
+
+# Safety scoring
+sqlfy safety ./migrations
+sqlfy safety ./migrations --verbose
+sqlfy safety ./migrations --threshold high         # Exit 1 if HIGH_RISK or DANGEROUS
+sqlfy safety ./migrations --format json
+
+# Classify migrations by semantic category
+sqlfy classify ./migrations
+sqlfy classify ./migrations --category data_migration
+sqlfy classify ./migrations --format json
 
 # ──────────────────────────────────────────────────────────────
 # Natural Language (RAG)
