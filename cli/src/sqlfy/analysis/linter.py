@@ -73,25 +73,16 @@ def lint_migration(
         ValueError: If sqlfluff is not installed
     """
     _check_sqlfluff()
-    
+
     try:
-        # Configure sqlfluff
-        config_kwargs = {
-            'dialect': dialect,
-            'exclude_rules': [],  # Can be customized via config file
-        }
-        
         if config_path:
-            config = FluffConfig.from_path(config_path, overrides=config_kwargs)
+            config = FluffConfig.from_path(config_path, overrides={'dialect': dialect})
+            linter = Linter(config=config)
         else:
-            # Use default config with basic overrides
-            config = FluffConfig.from_kwargs(config_kwargs)
-        
-        # Create linter and lint the SQL
-        linter = Linter(config=config)
+            linter = Linter(dialect=dialect)
+
         result = linter.lint_string(sql, fname=filename)
-        
-        # Extract violations
+
         violations: list[LintViolation] = []
         for violation in result.violations:
             violations.append(LintViolation(
@@ -99,18 +90,13 @@ def lint_migration(
                 message=violation.description,
                 line=violation.line_no,
                 column=violation.line_pos,
-                severity='error' if violation.rule.code.startswith('PRS') else 'warning',
+                severity='error' if violation.rule_code().startswith('PRS') else 'warning',
                 fixable=violation.fixable,
             ))
-        
-        # Calculate score
+
         score = calculate_score(violations)
-        
-        # Count rules applied (approximate - sqlfluff has 200+ rules by default)
-        rules_applied = len(config.get_section('rules') or {})
-        if rules_applied == 0:
-            rules_applied = 50  # Rough estimate of default rules
-        
+        rules_applied = len(linter.get_rulepack().rules)
+
         return LintResult(
             filename=filename,
             score=score,
@@ -118,15 +104,14 @@ def lint_migration(
             dialect=dialect,
             rules_applied=rules_applied,
         )
-    
+
     except Exception as e:
-        # Return error result if linting fails
         return LintResult(
             filename=filename,
             score=0,
             violations=[],
             dialect=dialect,
-            error=str(e),
+            error=str(e) or repr(e),
         )
 
 
