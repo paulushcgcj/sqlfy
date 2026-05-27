@@ -1425,7 +1425,15 @@ sqlfy impact ./migrations APP.USERS.EMAIL --depth 3
 # Graph Visualization
 # ──────────────────────────────────────────────────────────────
 
-# Graph output
+# Build complete knowledge graph (unified graphify-style output)
+sqlfy build-graph ./migrations                     # Creates graphify-out/ directory
+sqlfy build-graph ./migrations --output-dir ./out
+sqlfy build-graph ./migrations --at V5             # Graph at specific version
+sqlfy build-graph ./migrations --no-queries        # Skip pre-computed queries
+sqlfy build-graph ./migrations --no-viz            # Skip viz formats
+sqlfy build-graph ./migrations --min-refs 10       # God node threshold
+
+# Graph output (individual formats)
 sqlfy graph ./migrations                           # DOT format
 sqlfy graph ./migrations --format mermaid --out schema.md
 sqlfy graph ./migrations --format excalidraw --out schema.json
@@ -1505,10 +1513,13 @@ sqlfy --json-input /tmp/sqlfy-input.json --all     # From JSON input
 - **Integrity Checks**: SHA256-based tamper detection for migration files
 
 ### 📊 Graph & Visualization
+- **Unified Graph Builder**: `sqlfy build-graph` — One command to generate complete graphify-out/ directory with all graph features orchestrated
 - **Multiple Export Formats**: DOT (Graphviz), Mermaid, Excalidraw, Draw.io, JSON, HTML
-- **Community Detection**: Louvain algorithm for automatic table clustering
+- **Community Detection**: Leiden/Louvain algorithm for automatic table clustering into business domains
 - **Interactive HTML**: Vis.js-powered visualization with zoom/pan/search
 - **Self-Contained Reports**: Single-file HTML documentation with no external dependencies
+- **Pre-computed Queries**: Orphans, cycles, islands, missing PK/FK analysis in JSON format
+- **God Nodes & Columns**: Automatically identify highly-connected tables and frequently-referenced columns
 
 ### 🔎 Query & Search
 - **Deterministic Queries**: 11 query types (tables, columns, FK paths, orphans, islands, cycles, etc.)

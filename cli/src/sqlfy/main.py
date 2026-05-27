@@ -6,7 +6,7 @@ import argparse
 
 from .commands import (
     cmd_dump, cmd_manifest, cmd_chunks, cmd_export, legacy_main,
-    cmd_graph, cmd_graph_migrations,
+    cmd_graph, cmd_graph_migrations, cmd_build_graph,
     cmd_diff, cmd_rollback_analysis, cmd_simulate, cmd_integrity, cmd_drift,
     cmd_insights, cmd_health, cmd_domains, cmd_stability,
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
@@ -15,7 +15,7 @@ from .commands import (
 )
 
 KNOWN_SUBCOMMANDS = {
-    "dump", "manifest", "chunks", "diff", "graph", "graph-migrations",
+    "dump", "manifest", "chunks", "diff", "graph", "graph-migrations", "build-graph",
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
     "domains", "stability", "validate", "deps", "lineage", "drift",
@@ -77,6 +77,21 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help="Minimum cohesion score to keep a community (default: 0.1)")
     p.add_argument("--no-split", action="store_true", help="Disable oversized community splitting")
     p.set_defaults(func=cmd_graph)
+
+    # build-graph (unified knowledge graph builder)
+    p = sub.add_parser("build-graph", help="Build complete schema knowledge graph (unified graphify-style output)")
+    shared(p)
+    p.add_argument("--output-dir", metavar="PATH", help="Output directory (default: graphify-out)")
+    p.add_argument("--resolution", type=float, default=1.0, metavar="FLOAT",
+                   help="Community detection resolution (default: 1.0)")
+    p.add_argument("--min-cohesion", type=float, default=0.5, metavar="FLOAT",
+                   help="Minimum cohesion score to keep a community (default: 0.5)")
+    p.add_argument("--no-split", action="store_true", help="Disable oversized community splitting")
+    p.add_argument("--min-refs", type=int, default=20, metavar="N",
+                   help="Minimum references to classify as god node (default: 20)")
+    p.add_argument("--no-queries", action="store_true", help="Skip pre-computed query results")
+    p.add_argument("--no-viz", action="store_true", help="Skip visualization formats (mermaid/dot/excalidraw/drawio)")
+    p.set_defaults(func=cmd_build_graph)
 
     # insights
     p = sub.add_parser("insights", help="Analyse schema and report insights")
