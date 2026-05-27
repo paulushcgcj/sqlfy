@@ -163,7 +163,7 @@ export async function parse(files: MigrationFile[]): Promise<ParseResult> {
 // GENERIC CLI COMMAND RUNNER
 // ─────────────────────────────────────────────
 
-export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export' | 'health' | 'simulate';
+export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export' | 'health' | 'simulate' | 'diff-versions';
 
 /**
  * Run an arbitrary CLI subcommand and return stdout as a string.
@@ -539,6 +539,72 @@ export async function runSimulate(
   if (options?.atVersion !== undefined) args.push('--at', String(options.atVersion));
   const raw = await runCliCommand('simulate', files, args);
   return JSON.parse(raw) as SimulateResult;
+}
+
+// ── Diff-versions types ───────────────────────────────────────────────────────
+
+/** Options for {@link runDiff}. */
+export interface DiffVersionsOptions {
+  /** Base (from) migration version. Omit to use the latest state. */
+  fromVersion?: number | string;
+  /** Target (to) migration version. Omit to use the latest state. */
+  toVersion?: number | string;
+}
+
+/** A single column-level change entry in a diff result. */
+export interface DiffColumnChange {
+  readonly name: string;
+  readonly change: 'added' | 'removed' | 'modified';
+  readonly before?: Record<string, unknown>;
+  readonly after?: Record<string, unknown>;
+  readonly diffs?: string[];
+  readonly breaking: boolean;
+}
+
+/** A single table-level change entry in a diff result. */
+export interface DiffTableChange {
+  readonly full_name: string;
+  readonly change: 'added' | 'removed' | 'modified';
+  readonly breaking: boolean;
+  readonly column_changes?: DiffColumnChange[];
+  readonly constraint_changes?: Array<{ name: string | null; change: string; type: string; columns: string[] }>;
+  readonly index_changes?: Array<{ name: string; change: string; columns: string[]; unique: boolean }>;
+}
+
+/** Full result from `sqlfy diff-versions --format json`. */
+export interface DiffVersionsResult {
+  readonly version_a: string;
+  readonly version_b: string;
+  readonly fingerprint_a: string;
+  readonly fingerprint_b: string;
+  readonly stats: SimulateDiffStats;
+  readonly table_changes: DiffTableChange[];
+  readonly sequence_changes: Array<{ full_name: string; change: string; diffs?: string[] }>;
+  readonly relationship_changes: Array<{
+    change: string;
+    from: string;
+    from_cols: string[];
+    to: string;
+    to_cols: string[];
+    on_delete: string | null;
+  }>;
+}
+
+/**
+ * Run `sqlfy diff-versions --format json` and return a typed {@link DiffVersionsResult}.
+ *
+ * All diff computation is performed by the Python `SchemaDiffer` in the CLI.
+ * Requires CLI availability (`CLI_AVAILABLE`). Not available in pure-browser mode.
+ */
+export async function runDiff(
+  files: MigrationFile[],
+  options?: DiffVersionsOptions,
+): Promise<DiffVersionsResult> {
+  const args: string[] = ['--format', 'json'];
+  if (options?.fromVersion !== undefined) args.push('--from', String(options.fromVersion));
+  if (options?.toVersion !== undefined) args.push('--to', String(options.toVersion));
+  const raw = await runCliCommand('diff-versions', files, args);
+  return JSON.parse(raw) as DiffVersionsResult;
 }
 
 // ─────────────────────────────────────────────

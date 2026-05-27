@@ -164,6 +164,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `deps` | Analyze migration dependencies and detect circular dependencies |
 | `drift` | Detect schema drift between migration folders and generate repair SQL |
 | `classify` | Classify migrations by semantic category (table creation, data migration, cleanup, etc.) |
+| `cost` | Estimate migration execution cost (score, category, estimated_seconds) |
 | `safety` | Score migrations by safety level (SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS) |
 
 **Common flags available on most commands:**
@@ -370,6 +371,23 @@ sqlfy provenance ./nr-forest-client --record --out nr-forest-client/provenance.j
 sqlfy provenance ./nr-waste-plus --verify nr-waste-plus/provenance.json
 sqlfy provenance ./migrations --include-untracked --no-recursive --out ./provenance.json
 ```
+
+#### `sqlfy cost`
+
+Estimate the relative runtime and impact of migrations using heuristics. Returns a per-file `score` (0–100), `category` (low|medium|high|very_high), `estimated_seconds` (float) and a list of per-statement `operations` with reasons.
+
+Flags:
+- `--table-stats FILE` — optional JSON mapping table → {rows, avg_row_size}
+- `--throughput N` — throughput in MB/s (default: 100)
+- `--weight-profile {default|plsql|data-migration}` — tuning presets
+- `--format {text|json}` — output format
+
+Examples:
+```bash
+sqlfy cost ./migrations --format text
+sqlfy cost ./migrations --table-stats ./table-stats.json --throughput 120.0 --weight-profile plsql --format json --out cost.json
+```
+
 
 #### `sqlfy lint`
 

@@ -1,0 +1,54 @@
+.diff-panel {
+  padding: 12px;
+}
+
+.diff-panel__intro {
+  margin: 0 0 12px 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.diff-panel__controls {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.diff-version-select {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.diff-run-btn {
+  padding: 8px 12px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.diff-run-btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.diff-results {
+  margin-top: 12px;
+}
+
+.diff-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.diff-results__breaking { color: var(--danger); margin-top: 10px; }
+.diff-results__safe { color: var(--success); margin-top: 10px; }
+
+.diff-panel__no-cli { color: var(--text-2); background: var(--bg-card); padding: 8px; border-radius: 4px; }
+.diff-panel__error { color: var(--danger); margin-top: 8px; }
