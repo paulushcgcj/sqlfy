@@ -1691,7 +1691,33 @@ The TypeScript deserialiser in `cli.ts` maps `snake_case` keys to `camelCase` fo
 - **Per-table** chunks — full column inventory + constraint + relationship text in a structured, embedding-friendly format
 - **Relationship Graph** chunk — adjacency list of all FK edges for JOIN-path planning
 - One-click copy per chunk
+### ④ Ask tab
+- Natural-language Q&A against your schema using RAG (Retrieval-Augmented Generation)
+- Choose retrieval strategy: local BM25 (no keys) or dense embeddings (requires API key)
+- Shows source chunks and provenance for transparency and reproducibility
+- Useful for quick schema discovery: "Which tables lack a PRIMARY KEY?", "How do orders join to customers?"
 
+### ⑤ Schema tab
+- Table explorer and compact schema panel with per-table details:
+  - Columns with data type, nullability, defaults, and inline comments
+  - Constraint, index, and FK badges with provenance
+  - Migration history for the selected table (CREATE / ALTER operations)
+- Includes a lightweight "Run insights" action to analyse the current schema from this panel
+
+### ⑥ Insights tab
+- Dedicated schema quality analysis panel powered by the `sqlfy insights` engine:
+  - Health score (0–100) and grade (A–D)
+  - Severity filter (Error / Warning / Info), category dropdown, and keyword search
+  - Expandable finding cards with full detail and suggested fix or SQL
+  - CLI-required: runs the Python CLI (`sqlfy insights --format json`) via Tauri or the dev-server proxy
+  - Browser-only mode shows a clear "CLI required" message and documentation on how to enable the CLI
+
+### ⑦ Graph Export tab
+- Export the schema graph to multiple formats: Mermaid, DOT, Excalidraw, Draw.io, JSON, HTML, or a human-readable summary
+- Advanced options: diagram title, layout resolution, `--no-split` subgraph behavior, and point-in-time `--at` version
+- Uses the CLI sidecar in Tauri or the dev-server proxy; browser fallback produces a limited in-process Mermaid/DOT rendering
+
+---
 ---
 
 ## Supported DDL

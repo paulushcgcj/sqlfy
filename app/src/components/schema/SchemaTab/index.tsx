@@ -743,7 +743,7 @@ const SchemaTab: FC<SchemaTabProps> = ({ graph, files }) => {
             ) : (
               <div className="insights-list">
                 {insightsFindings.map((f, i) => (
-                  <div key={i} className="insight-item">
+                  <div key={`${f.severity}-${f.rule}-${i}`} className="insight-item">
                     <span className="insight-sev" data-sev={f.severity}>
                       {f.severity}
                     </span>

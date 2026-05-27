@@ -141,7 +141,7 @@ const TableDetail: FC<TableDetailProps> = ({ tableKey, graph }) => {
         <div className="sect">
           <div className="sect-title">Check Constraints</div>
           {cks.map((ck, i) => (
-            <div className="ck-row" key={i}>
+            <div className="ck-row" key={ck.name ?? `ck-${i}`}>
               <span className="ck-name">{ck.name ?? 'unnamed'}: </span>
               <span className="ck-expr">CHECK ({ck.checkExpr})</span>
             </div>

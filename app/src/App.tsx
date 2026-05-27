@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Activity } from 'react';
 
 import { parse, IS_TAURI } from './bridge/cli';
 import { pickFolder, readMigrations, type FolderHandle } from './bridge/folder';
@@ -147,22 +147,38 @@ export default function App() {
 
       {/* Content */}
       <div className="content">
-        {activeTab === 'migrations' && (
+        <Activity mode={activeTab === 'migrations' ? 'visible' : 'hidden'}>
           <MigrationsTab
             files={files}
             onChange={setFiles}
             folderHandle={folderHandle}
             onLoadFolder={handleLoadFolder}
           />
-        )}
-        {activeTab === 'graph' && graph && (
-          <GraphTab graph={graph} selectedTable={selectedTable} onSelectTable={setSelectedTable} />
-        )}
-        {activeTab === 'llm' && chunks && <LlmTab chunks={chunks} />}
-        {activeTab === 'ask' && graph && <AskPanel graph={graph} />}
-        {activeTab === 'schema' && graph && <SchemaTab graph={graph} files={files} />}
-        {activeTab === 'insights' && graph && <InsightsPanel files={files} />}
-        {activeTab === 'graph-export' && graph && <GraphExportPanel files={files} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'graph' ? 'visible' : 'hidden'}>
+          {graph && <GraphTab graph={graph} selectedTable={selectedTable} onSelectTable={setSelectedTable} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'llm' ? 'visible' : 'hidden'}>
+          {chunks && <LlmTab chunks={chunks} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'ask' ? 'visible' : 'hidden'}>
+          {graph && <AskPanel graph={graph} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'schema' ? 'visible' : 'hidden'}>
+          {graph && <SchemaTab graph={graph} files={files} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'insights' ? 'visible' : 'hidden'}>
+          {graph && <InsightsPanel files={files} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'graph-export' ? 'visible' : 'hidden'}>
+          {graph && <GraphExportPanel files={files} />}
+        </Activity>
       </div>
     </div>
   );

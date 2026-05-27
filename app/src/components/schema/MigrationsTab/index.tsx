@@ -83,7 +83,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
       </div>
 
       {files.map((file, i) => (
-        <div className="file-block" key={i}>
+        <div className="file-block" key={file.filename || `migration-${i}`}>
           <div className="file-hdr">
             <span className="file-v-badge">V</span>
             <input
