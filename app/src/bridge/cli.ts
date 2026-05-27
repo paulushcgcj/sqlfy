@@ -163,7 +163,7 @@ export async function parse(files: MigrationFile[]): Promise<ParseResult> {
 // GENERIC CLI COMMAND RUNNER
 // ─────────────────────────────────────────────
 
-export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export';
+export type CliSubcommand = 'dump' | 'insights' | 'graph' | 'export' | 'health';
 
 /**
  * Run an arbitrary CLI subcommand and return stdout as a string.
@@ -412,6 +412,62 @@ export function runGraphExport(files: MigrationFile[], options: GraphExportOptio
   if (options.noSplit) args.push('--no-split');
   if (options.atVersion !== undefined) args.push('--at', String(options.atVersion));
   return runCliCommand('graph', files, args);
+}
+
+// ── Health types ─────────────────────────────────────────────────────────────
+
+/** Health grade returned by `sqlfy health --format json`. */
+export type HealthGrade = 'excellent' | 'good' | 'warning' | 'critical';
+
+/** Per-migration safety classification. */
+export interface HealthMigrationStatus {
+  readonly filename: string;
+  readonly status: 'safe' | 'unsafe' | 'irreversible';
+  readonly errors: number;
+  readonly warnings: number;
+  readonly has_drop_table: boolean;
+  readonly has_drop_column: boolean;
+}
+
+/** Full result from `sqlfy health --format json`. */
+export interface HealthResult {
+  readonly folder: string;
+  readonly timestamp: string;
+  readonly summary: {
+    readonly total_migrations: number;
+    readonly safe_migrations: number;
+    readonly unsafe_migrations: number;
+    readonly irreversible_migrations: number;
+    readonly safe_percentage: number;
+  };
+  readonly findings: {
+    readonly errors: number;
+    readonly warnings: number;
+    readonly infos: number;
+    readonly by_code: Record<string, number>;
+  };
+  readonly migrations: HealthMigrationStatus[];
+  readonly health_score: {
+    readonly score: number;
+    readonly grade: HealthGrade;
+    readonly breakdown: {
+      readonly base: number;
+      readonly error_penalty: number;
+      readonly warning_penalty: number;
+      readonly irreversible_penalty: number;
+    };
+  };
+  readonly recommendation: string;
+}
+
+/**
+ * Run `sqlfy health --format json` and return a typed {@link HealthResult}.
+ *
+ * Requires CLI availability (`CLI_AVAILABLE`). Not available in pure-browser mode.
+ */
+export async function runHealth(files: MigrationFile[]): Promise<HealthResult> {
+  const raw = await runCliCommand('health', files, ['--format', 'json']);
+  return JSON.parse(raw) as HealthResult;
 }
 
 // ─────────────────────────────────────────────

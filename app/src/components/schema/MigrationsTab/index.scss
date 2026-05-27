@@ -43,3 +43,106 @@
 
 .add-btn, .migraton-btn        { padding: 6px 14px; background: none; border: 1px dashed var(--border); border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 12px; color: var(--accent); }
 .add-btn:hover, .migraton-btn:hover  { background: rgba(124,58,237,.05); }
+.health-btn { border-style: solid; }
+.health-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Health grade badge ───────────────────────────────────────────────────── */
+.health-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 4px; border: none;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s;
+}
+.health-badge:hover { opacity: .85; }
+.health-grade--excellent { background: rgba(16,185,129,.15); color: #10b981; }
+.health-grade--good      { background: rgba(59,130,246,.15); color: #3b82f6; }
+.health-grade--warning   { background: rgba(245,158,11,.15); color: #f59e0b; }
+.health-grade--critical  { background: rgba(239,68,68,.15);  color: #ef4444; }
+
+/* ── Validation banner ────────────────────────────────────────────────────── */
+.validation-banner {
+  border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;
+  font-size: 12px; line-height: 1.5;
+}
+.validation-banner--error   { background: rgba(239,68,68,.08);  border: 1px solid rgba(239,68,68,.3); }
+.validation-banner--warning { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.3); }
+
+.validation-banner__hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.validation-banner__title { font-weight: 600; color: var(--text); }
+.validation-banner__dismiss {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 16px; line-height: 1; padding: 0 2px;
+}
+.validation-banner__dismiss:hover { color: var(--text-2); }
+.validation-banner__list { margin: 0; padding-left: 16px; }
+
+.vissue { margin-bottom: 4px; }
+.vissue--error .vissue__msg   { color: #f87171; }
+.vissue--warning .vissue__msg { color: #fbbf24; }
+.vissue__hint { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+/* ── Health panel ─────────────────────────────────────────────────────────── */
+.health-panel {
+  border: 0.5px solid var(--border-sub); border-radius: 8px;
+  padding: 14px 16px; margin-bottom: 12px; background: var(--bg-card);
+  font-size: 12px;
+}
+.health-panel__hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.health-panel__title { font-weight: 600; color: var(--text); font-size: 13px; }
+.health-panel__rec   { color: var(--text-2); margin: 0 0 12px; }
+
+.health-panel__summary { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+
+.health-score-circle {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 60px; height: 60px; border-radius: 50%; border: 2px solid currentColor;
+  flex-shrink: 0;
+}
+.health-score-circle__num   { font-size: 18px; font-weight: 700; line-height: 1; }
+.health-score-circle__label { font-size: 10px; color: var(--text-3); }
+.health-score-circle.health-grade--excellent { color: #10b981; }
+.health-score-circle.health-grade--good      { color: #3b82f6; }
+.health-score-circle.health-grade--warning   { color: #f59e0b; }
+.health-score-circle.health-grade--critical  { color: #ef4444; }
+
+.health-panel__stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.hstat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hstat__val       { font-size: 18px; font-weight: 700; color: var(--text); }
+.hstat__val--ok   { color: #10b981; }
+.hstat__val--warn { color: #f59e0b; }
+.hstat__val--err  { color: #ef4444; }
+.hstat__lbl       { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Health migrations table ──────────────────────────────────────────────── */
+.health-migrations-table {
+  width: 100%; border-collapse: collapse; font-size: 11.5px;
+}
+.health-migrations-table th {
+  text-align: left; color: var(--text-3); font-weight: 500; font-size: 11px;
+  padding: 4px 8px; border-bottom: 0.5px solid var(--border-sub);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.health-migrations-table td { padding: 5px 8px; }
+.hrow { border-bottom: 0.5px solid var(--border-sub); }
+.hrow--irreversible { background: rgba(245,158,11,.04); }
+.hrow--unsafe       { background: rgba(239,68,68,.04); }
+.hrow__file { font-family: monospace; color: var(--text-2); }
+.hrow__status--safe         { color: #10b981; font-size: 11px; }
+.hrow__status--irreversible { color: #f59e0b; font-size: 11px; }
+.hrow__status--unsafe       { color: #ef4444; font-size: 11px; }
+.hrow__num--err  { color: #f87171; font-weight: 600; }
+.hrow__num--warn { color: #fbbf24; font-weight: 600; }
+
+/* ── Per-file health status dot ───────────────────────────────────────────── */
+.file-health-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.file-health-dot--safe         { background: #10b981; }
+.file-health-dot--irreversible { background: #f59e0b; }
+.file-health-dot--unsafe       { background: #ef4444; }
