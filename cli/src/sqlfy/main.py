@@ -12,14 +12,14 @@ from .commands import (
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
     cmd_impact,
     cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety,
-    cmd_provenance,
+    cmd_cost, cmd_provenance,
 )
 
 KNOWN_SUBCOMMANDS = {
     "dump", "manifest", "chunks", "diff", "graph", "graph-migrations", "build-graph",
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
-    "provenance",
+    "provenance", "cost",
     "domains", "stability", "validate", "deps", "lineage", "drift",
     "classify", "safety",
 }
@@ -141,6 +141,20 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-recursive", action="store_true", help="Do not recurse into subdirectories")
     p.add_argument("--include-untracked", action="store_true", help="Include untracked files when collecting provenance (default: only tracked files)")
     p.set_defaults(func=cmd_provenance)
+
+    # cost
+    p = sub.add_parser("cost", help="Estimate migration execution cost (heuristic)")
+    p.add_argument("migrations_dir", help="Path to migrations directory")
+    p.add_argument("--format", choices=["text", "json"], default="text")
+    p.add_argument("--dialect", default="oracle")
+    p.add_argument("--no-recursive", action="store_true", help="Do not recurse into subdirectories")
+    p.add_argument("--verbose", action="store_true", help="Show per-statement operation weights")
+    p.add_argument("--out", metavar="FILE", help="Write output to file (JSON when --format=json)")
+    p.add_argument("--table-stats", metavar="FILE", help="Path to JSON file with table stats (table -> {rows:int, avg_row_size:int})")
+    p.add_argument("--throughput", type=float, metavar="MBPS", help="Assumed IO throughput in MB/s (default: 100)")
+    p.add_argument("--weight-profile", choices=["default", "plsql", "data-migration"], default="default",
+                   help="Scoring profile: 'default' (conservative), 'plsql' (reduce PL/SQL noise), 'data-migration' (amplify bulk DML)")
+    p.set_defaults(func=cmd_cost)
 
     # cache
     p = sub.add_parser("cache", help="Manage file-based caching system")

@@ -357,6 +357,65 @@ def cmd_safety(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cost(args: argparse.Namespace) -> int:
+    """Estimate migration execution cost based on SQL operations."""
+    from ..analysis.cost_estimator import estimate_migrations, format_text, format_json
+
+    dialect = getattr(args, "dialect", "oracle")
+
+    # Respect --no-recursive: load top-level files only when requested
+    if getattr(args, "no_recursive", False):
+        from pathlib import Path
+
+        p = Path(args.migrations_dir)
+        if not p.is_dir():
+            print(f"Error: migrations directory not found: {p}", file=sys.stderr)
+            return 1
+        sql_files = sorted([f for f in p.glob("*.sql") if f.is_file()])
+        files = [{"filename": str(f.relative_to(p)), "sql": f.read_text(encoding="utf-8")} for f in sql_files]
+        print(f"Loaded {len(files)} migration file(s) from {p} (no-recursive)", file=sys.stderr)
+    else:
+        files = load_files(args.migrations_dir, getattr(args, "json_input", None))
+
+    # Load optional table stats JSON
+    table_stats = None
+    if getattr(args, "table_stats", None):
+        stats_path = Path(getattr(args, "table_stats"))
+        if not stats_path.exists():
+            print(f"Error: table stats file not found: {stats_path}", file=sys.stderr)
+            return 1
+        try:
+            raw = json.loads(stats_path.read_text(encoding="utf-8"))
+            # normalize keys to lower-case
+            table_stats = {str(k).lower(): v for k, v in raw.items()}
+        except Exception as e:
+            print(f"Error reading table stats: {e}", file=sys.stderr)
+            return 1
+
+    # Allow throughput override (MB/s) -> convert to bytes/sec
+    throughput = getattr(args, "throughput", None)
+    weight_profile = getattr(args, "weight_profile", "default")
+    if throughput is not None:
+        try:
+            throughput_bps = float(throughput) * 1024.0 * 1024.0
+        except Exception:
+            print(f"Error: invalid --throughput value: {throughput}", file=sys.stderr)
+            return 1
+        results = estimate_migrations(files, dialect=dialect, table_stats=table_stats, throughput_bytes_per_sec=throughput_bps, weight_profile=weight_profile)
+    else:
+        results = estimate_migrations(files, dialect=dialect, table_stats=table_stats, weight_profile=weight_profile)
+
+    fmt = getattr(args, "format", "text")
+    verbose = getattr(args, "verbose", False)
+    if fmt == "json":
+        output = format_json(results)
+    else:
+        output = format_text(results, verbose=verbose, weight_profile=weight_profile)
+
+    write_output(output, getattr(args, "out", None))
+    return 0
+
+
 def cmd_cache(args: argparse.Namespace) -> None:
     """Manage the file-based caching system (clear or show info)."""
     from ..cache import clear_cache, _CACHE_ROOT

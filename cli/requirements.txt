@@ -21,3 +21,5 @@ sqlfluff>=3.0.0  # SQL linter and style checker
 
 # Optional — for embedding-based retrieval (step 15)
 # voyageai  # only needed with --embed flag
+
+# (No DB drivers are required by the core CLI — keep the CLI DB-agnostic)

@@ -7,7 +7,7 @@ from .evolution import cmd_diff, cmd_rollback_analysis, cmd_simulate, cmd_integr
 from .analysis import cmd_insights, cmd_health, cmd_domains, cmd_stability
 from .ai import cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES
 from .impact import cmd_impact
-from .devtools import cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety
+from .devtools import cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety, cmd_cost
 from .provenance import cmd_provenance
 
 __all__ = [
@@ -18,5 +18,6 @@ __all__ = [
     "cmd_ask", "cmd_chat", "cmd_query", "_QUERY_TYPES",
     "cmd_impact",
     "cmd_lint", "cmd_validate", "cmd_deps", "cmd_lineage", "cmd_cache", "cmd_classify", "cmd_safety",
+    "cmd_cost",
     "cmd_provenance",
 ]
