@@ -42,6 +42,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Suppress sqlglot "unsupported syntax" warnings — handled via regex fallback
+logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
+
 
 # ─────────────────────────────────────────────
 # FEATURE DETECTION
@@ -68,8 +71,8 @@ def _detect_modify_support() -> bool:
         test_sql = "ALTER TABLE users MODIFY (email VARCHAR2(255) NOT NULL)"
         stmt = sqlglot.parse_one(test_sql, dialect="oracle")
 
-        # If sqlglot supports MODIFY, the statement should be AlterTable
-        if not isinstance(stmt, exp.AlterTable):
+        # If sqlglot supports MODIFY, the statement should be an Alter node
+        if not isinstance(stmt, exp.Alter):
             return False
 
         # Check if it has structured actions (not just raw Command)
@@ -112,7 +115,7 @@ def _detect_rename_column_support() -> bool:
         test_sql = "ALTER TABLE users RENAME COLUMN old_name TO new_name"
         stmt = sqlglot.parse_one(test_sql, dialect="oracle")
 
-        if not isinstance(stmt, exp.AlterTable):
+        if not isinstance(stmt, exp.Alter):
             return False
 
         if not hasattr(stmt, 'actions') or not stmt.actions:
@@ -182,8 +185,8 @@ def parse_modify_native(sql: str, dialect: str = "oracle") -> tuple[str, list[Mo
 
     stmt = sqlglot.parse_one(sql, dialect=dialect)
 
-    if not isinstance(stmt, exp.AlterTable):
-        raise ValueError(f"Expected AlterTable, got {type(stmt).__name__}")
+    if not isinstance(stmt, exp.Alter):
+        raise ValueError(f"Expected Alter, got {type(stmt).__name__}")
 
     # Extract table name
     table_name = stmt.this.name if hasattr(stmt.this, 'name') else str(stmt.this)

@@ -237,6 +237,50 @@ def cmd_lineage(args: argparse.Namespace) -> None:
         print(f"  {len(lineage)} column(s) analyzed", file=sys.stderr)
 
 
+def cmd_classify(args: argparse.Namespace) -> int:
+    """Classify migrations by semantic category (table_creation, data_migration, etc.)."""
+    from ..analysis.classifier import (
+        classify_migrations, format_text, format_json, MigrationCategory,
+    )
+
+    files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, "dialect", "oracle")
+
+    classifications = classify_migrations(files, dialect=dialect)
+
+    # Filter by primary category
+    category_filter = getattr(args, "category", None)
+    if category_filter:
+        try:
+            cat = MigrationCategory(category_filter)
+            classifications = [c for c in classifications if c.primary_category == cat]
+        except ValueError:
+            print(f"Error: unknown category '{category_filter}'", file=sys.stderr)
+            print(
+                "Valid categories: table_creation, column_addition, column_removal, "
+                "constraint_modification, index_management, data_migration, "
+                "cleanup, refactor, view_trigger_procedure, mixed",
+                file=sys.stderr,
+            )
+            return 1
+
+    # Filter by risk level
+    risk_filter = getattr(args, "risk", None)
+    if risk_filter:
+        classifications = [c for c in classifications if c.risk_level == risk_filter]
+
+    fmt = getattr(args, "format", "text")
+    group_by = getattr(args, "group_by", False)
+
+    if fmt == "json":
+        output = format_json(classifications)
+    else:
+        output = format_text(classifications, group_by=group_by)
+
+    write_output(output, getattr(args, "out", None))
+    return 0
+
+
 def cmd_cache(args: argparse.Namespace) -> None:
     """Manage the file-based caching system (clear or show info)."""
     from ..cache import clear_cache, _CACHE_ROOT

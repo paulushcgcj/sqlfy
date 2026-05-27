@@ -11,7 +11,7 @@ from .commands import (
     cmd_insights, cmd_health, cmd_domains, cmd_stability,
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
     cmd_impact,
-    cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache,
+    cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify,
 )
 
 KNOWN_SUBCOMMANDS = {
@@ -19,6 +19,7 @@ KNOWN_SUBCOMMANDS = {
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
     "domains", "stability", "validate", "deps", "lineage", "drift",
+    "classify",
 }
 
 
@@ -281,6 +282,37 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-depth", type=int, default=3, metavar="N")
     p.set_defaults(func=cmd_lineage)
 
+    # classify
+    p = sub.add_parser(
+        "classify",
+        help="Classify migrations by semantic category "
+             "(table_creation, data_migration, cleanup, …)",
+    )
+    shared(p)
+    p.add_argument("--format", choices=["text", "json"], default="text")
+    p.add_argument(
+        "--category",
+        metavar="CAT",
+        choices=[
+            "table_creation", "column_addition", "column_removal",
+            "constraint_modification", "index_management", "data_migration",
+            "cleanup", "refactor", "view_trigger_procedure", "mixed",
+        ],
+        help="Filter by primary category",
+    )
+    p.add_argument(
+        "--risk",
+        choices=["low", "medium", "high"],
+        help="Filter by risk level",
+    )
+    p.add_argument(
+        "--group-by-category",
+        dest="group_by",
+        action="store_true",
+        help="Group output by category instead of file order",
+    )
+    p.set_defaults(func=cmd_classify)
+
     return parser
 
 
@@ -301,7 +333,7 @@ def main() -> None:
     argv = sys.argv[1:]
     first_positional = next((a for a in argv if not a.startswith("-")), None)
 
-    if first_positional in KNOWN_SUBCOMMANDS:
+    if first_positional in KNOWN_SUBCOMMANDS or "--help" in argv or "-h" in argv:
         args = _subcommand_parser().parse_args(argv)
         result = args.func(args)
         if isinstance(result, int):
