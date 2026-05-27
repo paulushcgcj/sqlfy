@@ -1,0 +1,36 @@
+name: Documentation Task
+description: Submit requests for documentation updates or new entries.
+title: "[DOCS]: "
+labels: [documentation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Help us improve documentation by providing the following details.**
+
+  - type: input
+    id: doc_topic
+    attributes:
+      label: Documentation Topic
+      placeholder: What topic needs to be documented or updated?
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Provide details about the documentation task. Markdown formatting is supported.
+      placeholder: Include what should be covered, examples, or references.
+
+  - type: input
+    id: related_files
+    attributes:
+      label: Related Files or URLs
+      description: Provide links to related files, PRs, or issues. (Optional)
+      placeholder: e.g., https://github.com/repo/file.md
+
+  - type: textarea
+    id: additional_notes
+    attributes:
+      label: Additional Notes
+      description: Add any other information that might be helpful. Markdown formatting is supported.
+      placeholder: e.g., Special formatting or resources to reference.

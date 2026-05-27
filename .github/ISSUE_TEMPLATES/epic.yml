@@ -1,0 +1,70 @@
+name: Epic
+description: Define a large body of work that can be broken down into smaller tasks or features.
+title: "[EPIC]: "
+labels: [epic, enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please provide the following details for your Epic.**  
+        If you're new to writing acceptance criteria, learn more about [Gherkin syntax](https://cucumber.io/docs/gherkin/).
+
+  - type: input
+    id: epic_summary
+    attributes:
+      label: Epic Summary
+      description: Provide a high-level summary of the epic.
+      placeholder: Summarize the problem or goal this epic addresses.
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: Epic Goal or User Story
+      description: |
+        Use the format below:  
+        **As a** _(User Type/Persona)_  
+        **I want** _(High-level objective or goal)_  
+        **So That** _(Value or purpose of this epic)_
+      placeholder: As a [User Type], I want [Objective], so that [Purpose].
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other relevant information, links, or resources.
+      placeholder: e.g., related features, designs, or dependencies.
+      render: shell
+
+  - type: markdown
+    attributes:
+      value: "**Acceptance Criteria**"
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Define the high-level conditions of success using Gherkin syntax. Example:  
+        - [ ] **Given** [Context], **When** [Action], **Then** [Outcome]  
+      placeholder: |
+        - [ ] Given [Context], When [Action carried out], Then [Expected outcome]  
+        - [ ] Given [Context], When [Action carried out], Then [Expected outcome]
+      render: shell
+
+  - type: markdown
+    attributes:
+      value: "**Definition of Done**"
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done Checklist
+      description: Confirm all criteria below are met before considering the epic complete.
+      options:
+        - label: All associated features and tasks are complete
+        - label: Ready to Demo in Sprint Review
+        - label: Appropriate test coverage exists for all related features
+        - label: Documentation and/or scientific documentation exists and can be found
+        - label: Peer Reviewed by 2 people on the team
+        - label: Manual testing of all features/tasks in Dev and Prod
+        - label: All related PRs are merged

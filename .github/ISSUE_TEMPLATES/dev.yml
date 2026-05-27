@@ -1,0 +1,39 @@
+name: Developer Task
+description: Use this template to request a development task.
+title: "[DEV TASK]: "
+labels: [development, task]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please provide the following details for the development task.**
+
+  - type: input
+    id: task_summary
+    attributes:
+      label: Task Summary
+      placeholder: Provide a concise summary of the task.
+
+  - type: textarea
+    id: task_details
+    attributes:
+      label: Task Details
+      description: Describe the task requirements and technical details. Markdown formatting is supported.
+      placeholder: Include any specifications, dependencies, or constraints.
+
+  - type: checkboxes
+    id: environment
+    attributes:
+      label: Affected Environments
+      description: Select environments where this task applies.
+      options:
+        - label: Development
+        - label: Test
+        - label: Production
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other relevant information, such as links to relevant resources.
+      placeholder: e.g., Reference PRs, APIs, or tickets.

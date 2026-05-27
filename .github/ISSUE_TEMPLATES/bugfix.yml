@@ -1,0 +1,83 @@
+name: Bugfix Task
+description: Use this template to report and address bugs.
+title: "[BUGFIX]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please provide details about the bug to help us resolve it efficiently.**  
+        Fill out all required fields to ensure we have the necessary context.
+
+  - type: input
+    id: bug_summary
+    attributes:
+      label: Bug Summary
+      placeholder: Provide a concise summary of the bug.
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: e.g., The feature breaks when X happens.
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Outline the steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: e.g., The system should display a confirmation dialog.
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: A clear and concise description of what actually happened.
+      placeholder: e.g., The system crashes when the dialog is triggered.
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Attach screenshots to help explain the problem. (Optional)
+      placeholder: Paste image URLs or describe where to find visuals.
+      render: shell
+
+  - type: checkboxes
+    id: environment
+    attributes:
+      label: Affected Environments
+      description: Select the environments where this bug occurs.
+      options:
+        - label: Development
+        - label: Staging
+        - label: Production
+
+  - type: input
+    id: desktop_info
+    attributes:
+      label: Desktop Information
+      description: Provide details about the desktop environment where the bug was encountered.
+      placeholder: |
+        OS: [e.g., iOS, Windows]  
+        Browser: [e.g., Chrome, Safari]  
+        Version: [e.g., 22]  
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other relevant information or context.
+      placeholder: e.g., Related tickets, logs, or PRs.

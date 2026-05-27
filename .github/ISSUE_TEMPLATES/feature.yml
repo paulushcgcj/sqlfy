@@ -1,0 +1,62 @@
+name: Feature Request / User Story
+description: Suggest an idea or user story from the perspective of a user.
+title: "[FEATURE]: "
+labels: [enhancement, feature]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please provide the following details for your feature request or user story.**  
+        If you're new to writing acceptance criteria, learn more about [Gherkin syntax](https://cucumber.io/docs/gherkin/).
+
+  - type: input
+    id: user_story
+    attributes:
+      label: User Story
+      description: |
+        Use the format below:  
+        **As a** _(User Type/Persona)_  
+        **I want** _(Feature/Enhancement)_  
+        **So That** _(Value or purpose of this request)_
+      placeholder: As a [User Type], I want [Feature], so that [Purpose].
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other relevant information, links, or resources.
+      placeholder: e.g., links to designs, related tickets, or dependencies.
+      render: shell
+
+  - type: markdown
+    attributes:
+      value: "**Acceptance Criteria**"
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Define the conditions of success using Gherkin syntax. Example:  
+        - [ ] **Given** [Context], **When** [Action], **Then** [Outcome]  
+      placeholder: |
+        - [ ] Given [Context], When [Action carried out], Then [Expected outcome]  
+        - [ ] Given [Context], When [Action carried out], Then [Expected outcome]
+      render: shell
+
+  - type: markdown
+    attributes:
+      value: "**Definition of Done**"
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done Checklist
+      description: Confirm all criteria below are met before considering the feature complete.
+      options:
+        - label: Ready to Demo in Sprint Review
+        - label: Does what I have made have appropriate test coverage?
+        - label: Documentation and/or scientific documentation exists and can be found
+        - label: Peer Reviewed by 2 people on the team
+        - label: Manual testing of all PRs in Dev and Prod
+        - label: Merged

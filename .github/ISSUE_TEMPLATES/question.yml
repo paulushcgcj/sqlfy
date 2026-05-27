@@ -1,0 +1,44 @@
+name: Question
+description: Ask any technical or general question about the project.
+title: "[QUESTION]: "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Need help or clarification?**  
+        Use this template to ask technical, general, or project-related questions.
+
+  - type: input
+    id: question_summary
+    attributes:
+      label: Question Summary
+      description: Provide a concise summary of your question.
+      placeholder: e.g., How does the authentication flow work?
+
+  - type: textarea
+    id: question_details
+    attributes:
+      label: Details
+      description: Provide more details or context about your question.
+      placeholder: e.g., Include related context, code snippets, or links to documentation if applicable.
+      render: shell
+
+  - type: checkboxes
+    id: question_type
+    attributes:
+      label: Question Type
+      description: Select the category that best describes your question.
+      options:
+        - label: Technical
+        - label: General
+        - label: Process/Workflow
+        - label: Other
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context (Optional)
+      description: Add any additional notes or relevant information.
+      placeholder: e.g., links to related issues or features.
+      render: shell
