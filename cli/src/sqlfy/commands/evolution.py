@@ -41,6 +41,25 @@ def cmd_diff(args: argparse.Namespace) -> None:
     write_output(result.to_json() if fmt == "json" else result.to_text(), args.out)
 
 
+def cmd_diff_versions(args: argparse.Namespace) -> None:
+    """Compare two version snapshots from the same migration set via --json-input."""
+    files = load_files(args.migrations_dir, args.json_input)
+    dialect = getattr(args, "dialect", "oracle")
+    from_ver = getattr(args, "from_version", None)
+    to_ver = getattr(args, "to_version", None)
+
+    state_a = SchemaStateBuilder.from_graph(
+        reconstruct_at(files, from_ver, dialect=dialect) if from_ver else reconstruct(files, dialect=dialect)
+    )
+    state_b = SchemaStateBuilder.from_graph(
+        reconstruct_at(files, to_ver, dialect=dialect) if to_ver else reconstruct(files, dialect=dialect)
+    )
+
+    result = SchemaDiffer.diff(state_a, state_b)
+    fmt = (args.format or "json").lower()
+    write_output(result.to_json() if fmt == "json" else result.to_text(), args.out)
+
+
 def cmd_rollback_analysis(args: argparse.Namespace) -> None:
     """Analyze migration rollback feasibility."""
     files = load_files(args.migrations_dir, args.json_input, use_cache=False)

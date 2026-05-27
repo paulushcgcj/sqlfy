@@ -7,19 +7,20 @@ import argparse
 from .commands import (
     cmd_dump, cmd_manifest, cmd_chunks, cmd_export, legacy_main,
     cmd_graph, cmd_graph_migrations, cmd_build_graph,
-    cmd_diff, cmd_rollback_analysis, cmd_simulate, cmd_integrity, cmd_drift,
+    cmd_diff, cmd_diff_versions, cmd_rollback_analysis, cmd_simulate, cmd_integrity, cmd_drift,
     cmd_insights, cmd_health, cmd_domains, cmd_stability,
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
     cmd_impact,
     cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety,
-    cmd_cost, cmd_provenance,
+    cmd_cost, cmd_provenance, cmd_naming,
 )
 
 KNOWN_SUBCOMMANDS = {
-    "dump", "manifest", "chunks", "diff", "graph", "graph-migrations", "build-graph",
+    "dump", "manifest", "chunks", "diff", "diff-versions", "graph", "graph-migrations", "build-graph",
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
     "provenance", "cost",
+    "naming",
     "domains", "stability", "validate", "deps", "lineage", "drift",
     "classify", "safety",
 }
@@ -67,6 +68,14 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--format", choices=["json", "text"], default="text")
     p.add_argument("--out", metavar="FILE")
     p.set_defaults(func=cmd_diff)
+
+    # diff-versions
+    p = sub.add_parser("diff-versions", help="Compare two version snapshots from one migration set")
+    shared(p)
+    p.add_argument("--from", dest="from_version", metavar="VERSION", help="Base version (default: latest)")
+    p.add_argument("--to", dest="to_version", metavar="VERSION", help="Target version (default: latest)")
+    p.add_argument("--format", choices=["json", "text"], default="json")
+    p.set_defaults(func=cmd_diff_versions)
 
     # graph
     p = sub.add_parser("graph", help="Output schema graph (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report)")
@@ -285,6 +294,17 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--fix-numbering", action="store_true")
     p.add_argument("--out", metavar="FILE")
     p.set_defaults(func=cmd_validate)
+
+    # naming
+    p = sub.add_parser("naming", help="Enforce migration naming conventions")
+    p.add_argument("migrations_dir", help="Path to directory containing migration files")
+    p.add_argument("--format", choices=["text", "json"], default="text")
+    p.add_argument("--pattern", metavar="REGEX", default=r"^[a-z0-9_]+$",
+                   help="Regex for description (default: lower-case, digits, underscores)")
+    p.add_argument("--max-len", type=int, default=120, help="Maximum allowed filename length")
+    p.add_argument("--strict", action="store_true", help="Exit 1 if any warnings are found")
+    p.add_argument("--out", metavar="FILE")
+    p.set_defaults(func=cmd_naming)
 
     # deps
     p = sub.add_parser("deps", help="Analyze migration dependencies and detect issues")

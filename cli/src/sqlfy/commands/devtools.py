@@ -127,6 +127,36 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_naming(args: argparse.Namespace) -> int:
+    """Enforce migration naming conventions and report violations."""
+    from ..analysis import naming
+
+    migrations_dir = Path(args.migrations_dir)
+    if not migrations_dir.is_dir():
+        print(f"Error: migrations directory not found: {migrations_dir}", file=sys.stderr)
+        return 1
+
+    pattern = getattr(args, "pattern", r"^[a-z0-9_]+$")
+    max_len = getattr(args, "max_len", 120)
+
+    # Use the on-disk validator
+    report = naming.validate_naming(migrations_dir, pattern=pattern, max_length=max_len)
+
+    fmt = getattr(args, "format", "text")
+    if fmt == "json":
+        output = naming.format_json(report)
+    else:
+        output = naming.format_text(report)
+
+    write_output(output, getattr(args, "out", None))
+
+    if report.has_errors:
+        return 1
+    if getattr(args, "strict", False) and report.has_warnings:
+        return 1
+    return 0
+
+
 def cmd_deps(args: argparse.Namespace) -> int:
     """Analyze migration dependencies — detect circular deps and critical path."""
     from ..analysis.deps import analyze_dependencies, format_text, format_json, format_dot, validate_dependencies

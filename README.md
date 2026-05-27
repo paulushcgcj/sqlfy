@@ -143,6 +143,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `manifest` | Output graph manifest/metadata with high-level summary |
 | `chunks` | Output LLM vector chunks |
 | `diff` | Compare two Schema State Dictionaries or migration directories |
+| `diff-versions` | Compare two version snapshots from the same migration set |
 | `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report) |
 | `graph-migrations` | Visualize migration timeline and dependency graph |
 | `rollback-analysis` | Analyze migration rollback feasibility and generate rollback scripts |
@@ -164,6 +165,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 | `deps` | Analyze migration dependencies and detect circular dependencies |
 | `drift` | Detect schema drift between migration folders and generate repair SQL |
 | `classify` | Classify migrations by semantic category (table creation, data migration, cleanup, etc.) |
+| `naming` | Enforce migration filename naming conventions (Flyway pattern, description format) |
 | `cost` | Estimate migration execution cost (score, category, estimated_seconds) |
 | `safety` | Score migrations by safety level (SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS) |
 
@@ -239,6 +241,27 @@ Both arguments accept either a `.json` state file (from `sqlfy dump`) or a migra
 sqlfy diff state_v2.json state_v5.json              # Diff two state files
 sqlfy diff state_v2.json state_v5.json --format json
 sqlfy diff ./migrations-v1 ./migrations-v2          # Diff two directories
+```
+
+#### `sqlfy diff-versions`
+
+```bash
+sqlfy diff-versions <migrations-dir> [--from VERSION] [--to VERSION] [--format json|text] [--out FILE]
+```
+
+Compare two version snapshots from **the same** migration set. Unlike `sqlfy diff` (which takes two directories), this command applies a single folder up to two different versions and diffs the resulting states — ideal for seeing what changed between releases.
+
+| Flag | Description |
+|---|---|
+| `--from VERSION` | Base version snapshot (default: latest) |
+| `--to VERSION` | Target version snapshot (default: latest) |
+| `--format json\|text` | Output format (default: `json`) |
+
+**Examples:**
+```bash
+sqlfy diff-versions ./migrations --from 5 --to 10        # What changed V5→V10?
+sqlfy diff-versions ./migrations --from 1 --to latest --format text
+sqlfy diff-versions ./migrations --from 3               # V3 state vs current
 ```
 
 #### `sqlfy graph`
@@ -1260,13 +1283,36 @@ Total migrations: 20
   run: sqlfy validate ./migrations --strict
 ```
 
-**Pre-commit Hook Example:**
+#### `sqlfy naming`
+
 ```bash
-#!/bin/bash
-sqlfy validate ./migrations --strict || {
-  echo "Migration validation failed. Run 'sqlfy validate ./migrations --fix-numbering' for suggestions."
-  exit 1
-}
+sqlfy naming <migrations-dir> [--pattern REGEX] [--max-len N] [--format text|json] [--strict] [--out FILE]
+```
+
+Enforce migration filename naming conventions. Validates that descriptions match a pattern (default: lower-case letters, digits, underscores), filenames are not too long, and descriptions have no accidental leading/trailing underscores.
+
+| Flag | Description |
+|---|---|
+| `--pattern REGEX` | Regex applied to the description portion (default: `^[a-z0-9_]+$`) |
+| `--max-len N` | Maximum filename length in characters (default: `120`) |
+| `--format text\|json` | Output format (default: `text`) |
+| `--strict` | Exit 1 if any warnings are found |
+
+**Detection codes:**
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `INVALID_FILENAME` | warning | File does not match any Flyway format |
+| `DESC_FORMAT` | warning | Description does not match `--pattern` |
+| `LONG_FILENAME` | warning | Filename exceeds `--max-len` characters |
+| `DESC_UNDERSCORE` | warning | Description has a leading or trailing `_` |
+
+**Examples:**
+```bash
+sqlfy naming ./migrations                              # Default rules
+sqlfy naming ./migrations --strict                     # Exit 1 on any warning
+sqlfy naming ./migrations --pattern "^[a-z0-9_-]+$"   # Allow hyphens too
+sqlfy naming ./migrations --max-len 80 --format json   # Stricter length, JSON
 ```
 
 #### `sqlfy deps`
