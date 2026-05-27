@@ -70,6 +70,13 @@ def _git_branches_containing(commit: Optional[str], repo_root: Path) -> List[str
     return []
 
 
+def _is_tracked(path: Path, repo_root: Path) -> bool:
+    """Return True if the file is tracked by git in repo_root."""
+    rel = str(path.resolve().relative_to(repo_root.resolve()))
+    res = _run_git(["ls-files", "--error-unmatch", "--", rel], cwd=repo_root.resolve())
+    return res.returncode == 0
+
+
 def _detect_pr_from_message(message: Optional[str]) -> Optional[str]:
     if not message:
         return None
@@ -88,23 +95,41 @@ def _detect_pr_from_message(message: Optional[str]) -> Optional[str]:
     return None
 
 
-def collect_provenance(migrations_dir: str, recursive: bool = True) -> Dict[str, Any]:
+def collect_provenance(migrations_dir: str, recursive: bool = True, include_untracked: bool = False) -> Dict[str, Any]:
     pdir = Path(migrations_dir).resolve()
     if not pdir.exists():
         raise ValueError(f"Path does not exist: {migrations_dir}")
 
     repo_root = find_repo_root(pdir)
-    if not repo_root:
-        raise ValueError(f"Not a git repository (no git rev-parse) for: {migrations_dir}")
+    if not repo_root and not include_untracked:
+        raise ValueError(f"Not a git repository (no git rev-parse) for: {migrations_dir}. Use include_untracked=True to collect without git.")
 
     sql_files = sorted(pdir.rglob("*.sql")) if recursive else sorted(pdir.glob("*.sql"))
     files: List[Dict[str, Any]] = []
 
     for f in sql_files:
-        info = _git_last_commit_info(f, repo_root)
-        commit = info.get("commit")
-        branches = _git_branches_containing(commit, repo_root)
-        pr = _detect_pr_from_message(info.get("message"))
+        # If we have a repo root, optionally filter untracked files when include_untracked=False
+        if repo_root and not include_untracked:
+            try:
+                tracked = _is_tracked(f, repo_root)
+            except Exception:
+                tracked = False
+            if not tracked:
+                # skip untracked files when user did not request them
+                continue
+
+        if repo_root:
+            info = _git_last_commit_info(f, repo_root)
+            commit = info.get("commit")
+            branches = _git_branches_containing(commit, repo_root)
+            pr = _detect_pr_from_message(info.get("message"))
+        else:
+            # non-git repository; include file with empty provenance
+            info = {"commit": None, "author_name": None, "author_email": None, "date": None, "message": None}
+            commit = None
+            branches = []
+            pr = None
+
         files.append({
             "path": str(f.relative_to(pdir)),
             "commit": commit,
@@ -118,7 +143,7 @@ def collect_provenance(migrations_dir: str, recursive: bool = True) -> Dict[str,
 
     return {
         "migrations_dir": str(pdir.resolve()),
-        "repo_root": str(repo_root.resolve()),
+        "repo_root": str(repo_root.resolve()) if repo_root else None,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "files": files,
     }
@@ -129,12 +154,12 @@ def write_manifest(manifest: Dict[str, Any], out_path: str) -> None:
     p.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def verify_manifest(manifest_path: str, migrations_dir: str) -> Dict[str, Any]:
+def verify_manifest(manifest_path: str, migrations_dir: str, recursive: bool = True, include_untracked: bool = False) -> Dict[str, Any]:
     p = Path(manifest_path)
     if not p.exists():
         raise ValueError(f"Manifest not found: {manifest_path}")
     manifest = json.loads(p.read_text(encoding="utf-8"))
-    current = collect_provenance(migrations_dir)
+    current = collect_provenance(migrations_dir, recursive=recursive, include_untracked=include_untracked)
 
     # Build lookup by path
     old_by_path = {f["path"]: f for f in manifest.get("files", [])}

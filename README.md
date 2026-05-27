@@ -360,11 +360,15 @@ Collect git provenance metadata for migration files. Records per-file commit has
 | `--out FILE` | Write output to file instead of stdout |
 | `--verify MANIFEST` | Compare current provenance to an existing manifest JSON file |
 
+| `--no-recursive` | Do not recurse into subdirectories when collecting provenance |
+| `--include-untracked` | Include untracked files (files not committed to git) when collecting provenance |
+
 **Examples:**
 ```bash
 sqlfy provenance ./samples --format json --out sqlfy-out/provenance-samples.json
 sqlfy provenance ./nr-forest-client --record --out nr-forest-client/provenance.json
 sqlfy provenance ./nr-waste-plus --verify nr-waste-plus/provenance.json
+sqlfy provenance ./migrations --include-untracked --no-recursive --out ./provenance.json
 ```
 
 #### `sqlfy lint`

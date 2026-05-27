@@ -138,6 +138,8 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--record", action="store_true", help="Write provenance manifest to disk (defaults to <migrations_dir>/provenance.json)")
     p.add_argument("--out", metavar="FILE", help="Write output to file (JSON when --format=json)")
     p.add_argument("--verify", metavar="MANIFEST", help="Verify current provenance against existing manifest JSON file")
+    p.add_argument("--no-recursive", action="store_true", help="Do not recurse into subdirectories")
+    p.add_argument("--include-untracked", action="store_true", help="Include untracked files when collecting provenance (default: only tracked files)")
     p.set_defaults(func=cmd_provenance)
 
     # cache
