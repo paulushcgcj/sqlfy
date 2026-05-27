@@ -344,6 +344,29 @@ sqlfy rollback-analysis ./migrations --format json    # JSON output
 sqlfy rollback-analysis ./migrations --out report.txt
 ```
 
+#### `sqlfy provenance`
+
+```
+sqlfy provenance <migrations-dir> [--format text|json] [--record] [--out FILE] [--verify MANIFEST]
+```
+
+Collect git provenance metadata for migration files. Records per-file commit hash, author, commit date, branches containing the commit, and attempts to detect PR numbers from commit messages.
+
+| Flag | Description |
+|---|---|
+| `migrations-dir` | Directory containing Flyway `V*__*.sql` files |
+| `--format` | `text` (default) or `json` |
+| `--record` | Write provenance manifest to disk (defaults to `<migrations-dir>/provenance.json`) |
+| `--out FILE` | Write output to file instead of stdout |
+| `--verify MANIFEST` | Compare current provenance to an existing manifest JSON file |
+
+**Examples:**
+```bash
+sqlfy provenance ./samples --format json --out sqlfy-out/provenance-samples.json
+sqlfy provenance ./nr-forest-client --record --out nr-forest-client/provenance.json
+sqlfy provenance ./nr-waste-plus --verify nr-waste-plus/provenance.json
+```
+
 #### `sqlfy lint`
 
 ```bash

@@ -12,12 +12,14 @@ from .commands import (
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
     cmd_impact,
     cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety,
+    cmd_provenance,
 )
 
 KNOWN_SUBCOMMANDS = {
     "dump", "manifest", "chunks", "diff", "graph", "graph-migrations", "build-graph",
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
+    "provenance",
     "domains", "stability", "validate", "deps", "lineage", "drift",
     "classify", "safety",
 }
@@ -128,6 +130,15 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--update-manifest", action="store_true",
                    help="Accept modifications and update manifest")
     p.set_defaults(func=cmd_integrity)
+
+    # provenance
+    p = sub.add_parser("provenance", help="Collect git provenance for migrations (author, commit, branches, PR)")
+    p.add_argument("migrations_dir", help="Path to migrations directory")
+    p.add_argument("--format", choices=["text", "json"], default="text")
+    p.add_argument("--record", action="store_true", help="Write provenance manifest to disk (defaults to <migrations_dir>/provenance.json)")
+    p.add_argument("--out", metavar="FILE", help="Write output to file (JSON when --format=json)")
+    p.add_argument("--verify", metavar="MANIFEST", help="Verify current provenance against existing manifest JSON file")
+    p.set_defaults(func=cmd_provenance)
 
     # cache
     p = sub.add_parser("cache", help="Manage file-based caching system")
