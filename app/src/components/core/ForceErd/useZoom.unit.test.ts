@@ -4,7 +4,7 @@ import { setupZoom } from './useZoom';
 
 describe('useZoom:setupZoom', () => {
   it('returns a cleanup function and tolerates null inputs', () => {
-    const cleanup = setupZoom(null as any, null as any, { current: null } as any);
+    const cleanup = setupZoom(null, null, { current: null });
     expect(typeof cleanup).toBe('function');
     expect(() => cleanup()).not.toThrow();
   });

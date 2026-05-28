@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { MigrationFile } from '@/core/types';
 import type { FC } from 'react';
@@ -55,18 +55,14 @@ const GRADE_CLASS: Record<HealthGrade, string> = {
  * @returns An editable list of SQL migration file blocks.
  */
 const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, onLoadFolder }) => {
-  // ── Validation (pure TS, runs on every files change) ─────────────────────
-  const [validation, setValidation] = useState<ValidationResult | null>(null);
-  const [validationDismissed, setValidationDismissed] = useState(false);
-
-  useEffect(() => {
-    if (files.length === 0) {
-      setValidation(null);
-      return;
-    }
-    setValidationDismissed(false);
-    setValidation(validateMigrations(files));
-  }, [files]);
+  // ── Validation (pure TS, derived from files — no effect needed) ─────────
+  const validation = useMemo<ValidationResult | null>(
+    () => (files.length === 0 ? null : validateMigrations(files)),
+    [files],
+  );
+  // Track which files instance the user dismissed — auto-resets when files change.
+  const [dismissedFor, setDismissedFor] = useState<MigrationFile[] | null>(null);
+  const validationDismissed = dismissedFor === files;
 
   // ── Health (CLI, runs on demand or on folder load) ────────────────────────
   const [health, setHealth] = useState<HealthResult | null>(null);
@@ -176,7 +172,7 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
             </span>
             <button
               className="validation-banner__dismiss"
-              onClick={() => setValidationDismissed(true)}
+              onClick={() => setDismissedFor(files)}
               aria-label="Dismiss validation issues"
             >
               ×

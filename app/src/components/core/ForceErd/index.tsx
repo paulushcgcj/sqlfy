@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { type FC } from 'react';
 
 import { getComponents } from './detectIslands';
@@ -19,9 +19,6 @@ import './index.scss';
 const NODE_W = 140;
 const NODE_H = 52;
 const R = 8; // border-radius
-const CHARGE = -600; // repulsion strength
-const LINK_D = 220; // target edge length
-const ALPHA = 0.3; // simulation re-heat on drag
 
 // ─── Colour helpers ────────────────────────────────────────────────────────
 
@@ -173,7 +170,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     // ── Zoom & pan ────────────────────────────────────────────────────
     // Extracted to helper to keep D3 behaviour testable and concise.
     // setupZoom returns a cleanup function which we call on effect teardown.
-    const cleanupZoom = setupZoom(svgRef.current!, root, zoomRef as any);
+    const cleanupZoom = setupZoom(svgRef.current!, root, zoomRef);
 
     // ── Island background blobs (convex hull per component) ───────────
     const components = getComponents(nodeData, edges);
@@ -352,7 +349,7 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
     svg.on('click', () => highlightNeighbours(null));
 
     // ── Drag: extracted to helper for testability and reuse
-    const cleanupDrag = setupDrag(nodeSel, simRef as any);
+    const cleanupDrag = setupDrag(nodeSel, simRef);
 
     // ── Force simulation ──────────────────────────────────────────────
     const { sim, stop } = createForceSimulation({
@@ -364,7 +361,6 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       nodeById,
       width,
       height,
-      pal,
     });
 
     simRef.current = sim;
@@ -376,6 +372,9 @@ const ForceErd: FC<ForceErdProps> = ({ graph, selectedTable, onSelectTable, heig
       cleanupZoom?.();
     };
     // Rebuild when the graph or theme (dark mode) changes so colours/tooltip update.
+    // All other deps (nodeData, linkData, etc.) are derived from graph and would cause
+    // unnecessary rebuilds if included.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph, isDark]);
 
   // ── Sync selected node highlight ─────────────────────────────────────

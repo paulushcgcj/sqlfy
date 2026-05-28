@@ -48,7 +48,7 @@ const DumpPanel: FC<DumpPanelProps> = ({ files, graph }) => {
     } finally {
       setDumpLoading(false);
     }
-  }, [files, graph, dumpFormat, dumpAtVersion]);
+  }, [files, graph, dumpFormat, dumpAtVersion, isCliLocal]);
 
   async function copyText(text: string, setCopied: (v: boolean) => void) {
     const ok = await copyToClipboard(text);

@@ -4,15 +4,12 @@ import type { GraphExportOptions, GraphFormat } from '@/bridge/cli';
 import type { MigrationFile } from '@/core/types';
 import type { FC } from 'react';
 
-import { IS_TAURI, CLI_AVAILABLE, CLI_MODE_LABEL, runGraphExport } from '@/bridge/cli';
+import { CLI_AVAILABLE, CLI_MODE_LABEL, runGraphExport } from '@/bridge/cli';
 import { downloadBlob, copyToClipboard } from '@/utils/io';
 
 import './index.scss';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const CLI_MODE_LABEL = IS_TAURI ? '⚡ Tauri CLI' : import.meta.env.DEV ? '⚡ Dev CLI' : null;
-const CLI_AVAILABLE = IS_TAURI || import.meta.env.DEV;
 
 interface FormatMeta {
   label: string;
@@ -124,8 +121,8 @@ const GraphExportPanel: FC<GraphExportPanelProps> = ({ files }) => {
       const opts: GraphExportOptions = { format, resolution };
       if (title.trim()) opts.title = title.trim();
       if (noSplit) opts.noSplit = true;
-      const ver = parseInt(atVersion, 10);
-      if (!isNaN(ver) && ver > 0) opts.atVersion = ver;
+      const ver = Number.parseInt(atVersion, 10);
+      if (!Number.isNaN(ver) && ver > 0) opts.atVersion = ver;
       const result = await runGraphExport(files, opts);
       setContent(result);
     } catch (err) {

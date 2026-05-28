@@ -6,7 +6,7 @@ import { createForceSimulation } from './useForceSimulation';
 describe('useForceSimulation:createForceSimulation', () => {
   it('returns sim and stop without throwing', () => {
     const nodeData = [{ id: 'A', x: 0, y: 0 }];
-    const linkData: any[] = [];
+    const linkData: d3.SimulationLinkDatum<d3.SimulationNodeDatum & { id: string }>[] = [];
     const nodeSel = d3.create('g').selectAll('g');
     const linkSel = d3.create('g').selectAll('path');
     const islandPaths = d3.create('g').selectAll('path');

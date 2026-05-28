@@ -3,10 +3,13 @@ import { useCallback } from 'react';
 
 import type { RefObject } from 'react';
 
+type ZoomRef = { current: d3.ZoomBehavior<SVGSVGElement, unknown> | null };
+type SimRef = { current: { alpha(n: number): { restart(): unknown } } | null };
+
 export function useSimulationControls(params: {
   svgRef: RefObject<SVGSVGElement | null>;
-  zoomRef: { current: any };
-  simRef: { current: any };
+  zoomRef: ZoomRef;
+  simRef: SimRef;
   height: number;
 }) {
   const { svgRef, zoomRef, simRef, height } = params;
@@ -32,7 +35,10 @@ export function useSimulationControls(params: {
     } catch {
       // In test environments the transition may not exist — fallback to no-transition
       try {
-        zoomRef.current?.transform?.(d3.zoomIdentity.translate(tx, ty).scale(scale));
+        zoomRef.current?.transform(
+          d3.select(svgNode),
+          d3.zoomIdentity.translate(tx, ty).scale(scale),
+        );
       } catch {
         // swallow
       }

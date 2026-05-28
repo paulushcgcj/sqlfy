@@ -10,7 +10,7 @@ describe('detectIslands:getComponents', () => {
       { fromTable: 'B', toTable: 'C' },
     ];
 
-    const comps = getComponents(nodes as any, edges as any);
+    const comps = getComponents(nodes, edges);
     // All nodes should be in one component
     expect(comps.length).toBe(1);
     expect(comps[0].sort()).toEqual(['A', 'B', 'C']);
@@ -20,7 +20,7 @@ describe('detectIslands:getComponents', () => {
     const nodes = [{ id: 'A' }, { id: 'B' }, { id: 'C' }];
     const edges = [{ fromTable: 'A', toTable: 'B' }];
 
-    const comps = getComponents(nodes as any, edges as any);
+    const comps = getComponents(nodes, edges);
     // One component should include A and B, one component should be C alone
     expect(comps.length).toBe(2);
     expect(comps.some((c) => c.includes('C'))).toBe(true);

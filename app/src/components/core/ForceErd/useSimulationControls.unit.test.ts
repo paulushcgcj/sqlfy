@@ -24,9 +24,11 @@ describe('useSimulationControls', () => {
   });
 
   it('calls simRef.alpha and restart on reheat', () => {
-    const alpha = vi.fn().mockReturnThis();
     const restart = vi.fn();
-    const simRef = { current: { alpha, restart } as any };
+    const alpha = vi.fn().mockReturnValue({ restart });
+    const simRef: { current: { alpha(n: number): { restart(): unknown } } | null } = {
+      current: { alpha },
+    };
 
     const { result } = renderHook(() =>
       useSimulationControls({

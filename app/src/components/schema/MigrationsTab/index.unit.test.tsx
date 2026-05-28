@@ -144,9 +144,7 @@ describe('MigrationsTab', () => {
 
     it('expands health panel after health check', async () => {
       mockRunHealth.mockResolvedValue(mockHealthResult);
-      const { getByText, getByRole } = render(
-        <MigrationsTab files={orderedFiles} onChange={() => {}} />,
-      );
+      const { getByText } = render(<MigrationsTab files={orderedFiles} onChange={() => {}} />);
       await act(async () => {
         fireEvent.click(getByText('🩺 Health Check'));
       });

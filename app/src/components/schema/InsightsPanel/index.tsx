@@ -18,7 +18,7 @@ import type { InsightFinding, InsightsResult, InsightsOptions } from '@/bridge/c
 import type { MigrationFile } from '@/core/types';
 import type { FC } from 'react';
 
-import { IS_TAURI, CLI_AVAILABLE, CLI_MODE_LABEL, runInsights } from '@/bridge/cli';
+import { CLI_AVAILABLE, CLI_MODE_LABEL, runInsights } from '@/bridge/cli';
 import './index.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

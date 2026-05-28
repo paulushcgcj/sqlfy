@@ -18,7 +18,6 @@ import './index.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SubTab = 'dump';
 /** Props for the {@link SchemaTab} component. */
 export interface SchemaTabProps {
   /** Parsed schema graph (used for client-side fallbacks). */
