@@ -9,15 +9,7 @@ Converts SchemaGraph into semantic chunks for RAG/embedding-based retrieval.
 from __future__ import annotations
 
 from ..domain.models import SchemaGraph, VectorChunk, Column, Table, Edge
-
-
-def _type_str(col: Column) -> str:
-    """Render column data type back to a display string."""
-    if col.precision is not None and col.scale is not None:
-        return f'{col.type}({col.precision},{col.scale})'
-    if col.precision is not None:
-        return f'{col.type}({col.precision})'
-    return col.type
+from ..domain.utils import type_str as _type_str
 
 
 def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:

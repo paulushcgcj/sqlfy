@@ -42,7 +42,7 @@ from ..analysis.insights import InsightsEngine
 from ..analysis.health import HealthAnalyzer
 from ..output.graph_export import export_graph_json, export_graph_html, export_graph_report
 from ..output.grapher import Grapher
-from .io import load_files
+from ._utils import load_files
 
 
 @dataclass

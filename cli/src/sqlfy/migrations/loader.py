@@ -1,9 +1,16 @@
-"""Shared I/O helpers for CLI commands."""
+"""
+sqlfy.migrations.loader
+=======================
+Migration file discovery and loading.
+
+Loads Flyway-style SQL migration files from a directory or a pre-parsed
+JSON input file. Integrates with the file cache for fast repeated runs.
+"""
 
 from __future__ import annotations
 
-import json
 import sys
+import json
 from pathlib import Path
 
 
@@ -12,6 +19,19 @@ def load_files(
     json_input: str | None,
     use_cache: bool = True,
 ) -> list[dict]:
+    """Load migration files from a directory or a JSON input file.
+
+    Args:
+        migrations_dir: Path to a directory containing .sql migration files.
+        json_input: Path to a JSON file containing pre-loaded migration records.
+        use_cache: Whether to use the on-disk file cache for repeated loads.
+
+    Returns:
+        List of dicts with 'filename' and 'sql' keys.
+
+    Raises:
+        SystemExit: On missing path or no SQL files found.
+    """
     if json_input:
         p = Path(json_input)
         if not p.is_file():
@@ -36,7 +56,6 @@ def load_files(
 
         if use_cache:
             from ..cache import load_cached, save_cached
-
             files = []
             cache_hits = 0
             for f in sql_files:
@@ -62,11 +81,3 @@ def load_files(
 
     print("Error: provide either migrations_dir or --json-input FILE", file=sys.stderr)
     sys.exit(1)
-
-
-def write_output(content: str, out: str | None) -> None:
-    if out:
-        Path(out).write_text(content, encoding="utf-8")
-        print(f"Output written to {out}", file=sys.stderr)
-    else:
-        print(content)
