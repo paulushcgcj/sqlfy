@@ -45,7 +45,27 @@ def cmd_manifest(args: argparse.Namespace) -> None:
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph)
-    write_output(state.to_manifest(), args.out)
+    fmt = (getattr(args, "format", "json") or "json").lower()
+    if fmt == "text":
+        import json as _json
+        data = _json.loads(state.to_manifest())
+        lines = [
+            f"Schema Version  : {data.get('schemaVersion', '-')}",
+            f"Dialect         : {data.get('dialect', '-')}",
+            f"Generated At    : {data.get('generatedAt', '-')}",
+            f"Fingerprint     : {data.get('fingerprint', '-')}",
+            f"Tables          : {data.get('tableCount', 0)}",
+            f"Columns         : {data.get('columnCount', 0)}",
+            f"Sequences       : {data.get('sequenceCount', 0)}",
+            f"Relationships   : {data.get('relationshipCount', 0)}",
+            f"Indexes         : {data.get('indexCount', 0)}",
+            f"Migrations      : {data.get('migrationCount', 0)}",
+            f"Tables w/o PK   : {data.get('tablesWithoutPk', 0)}",
+        ]
+        output = "\n".join(lines)
+    else:
+        output = state.to_manifest()
+    write_output(output, args.out)
 
 
 def cmd_chunks(args: argparse.Namespace) -> None:

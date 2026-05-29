@@ -140,7 +140,8 @@ class Asker:
         use_cache:      bool = True,
         files:          Optional[list[dict]] = None,
     ) -> None:
-        self._api_key  = api_key or os.environ.get('ANTHROPIC_API_KEY', '')
+        from ..config import settings as _settings
+        self._api_key  = api_key or _settings.api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         self._k        = k
         self._model    = model or self._MODEL
         

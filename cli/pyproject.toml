@@ -23,6 +23,7 @@ dev = ["pytest>=8", "datamodel-code-generator>=0.25"]
 
 [project.scripts]
 sqlfy = "sqlfy.main:main"
+sqlfy-ng = "sqlfy.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]

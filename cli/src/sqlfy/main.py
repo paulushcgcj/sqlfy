@@ -53,6 +53,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     # manifest
     p = sub.add_parser("manifest", help="Output graph manifest/metadata summary")
     shared(p)
+    p.add_argument("--format", choices=["json", "text"], default="json")
     p.set_defaults(func=cmd_manifest)
 
     # chunks
@@ -138,6 +139,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help="Exit with error if modified migrations detected")
     p.add_argument("--update-manifest", action="store_true",
                    help="Accept modifications and update manifest")
+    p.add_argument("--format", choices=["text", "json"], default="text")
     p.set_defaults(func=cmd_integrity)
 
     # provenance

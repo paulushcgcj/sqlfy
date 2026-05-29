@@ -1,6 +1,7 @@
 """Schema evolution commands: diff, rollback-analysis, simulate, drift, integrity."""
 
 import sys
+import json
 import argparse
 from pathlib import Path
 
@@ -108,34 +109,50 @@ def cmd_integrity(args: argparse.Namespace) -> None:
     from ..analysis.integrity import check_integrity, update_manifest
 
     migrations_dir = Path(args.migrations_dir)
+    fmt = (getattr(args, "format", "text") or "text").lower()
 
     if getattr(args, "update_manifest", False):
         update_manifest(migrations_dir)
-        print("✓ Manifest updated")
+        if fmt == "json":
+            write_output(json.dumps({"updated": True}, indent=2), getattr(args, "out", None))
+        else:
+            print("✓ Manifest updated")
         return
 
     report = check_integrity(migrations_dir)
 
-    if report.status == "clean":
-        print(f"✓ All {report.total_migrations} migrations verified")
+    if fmt == "json":
+        output = json.dumps({
+            "status": report.status,
+            "totalMigrations": report.total_migrations,
+            "modified": report.modified,
+            "missing": report.missing,
+            "new": report.new,
+        }, indent=2, ensure_ascii=False)
+        write_output(output, getattr(args, "out", None))
+        if getattr(args, "strict", False) and report.modified:
+            sys.exit(1)
         return
 
-    if report.modified:
-        print("\n⚠ Modified migrations:")
-        for m in report.modified:
-            print(f"  {m['filename']} (V{m['version']})")
-            print(f"    Old: {m['old_hash'][:12]}...")
-            print(f"    New: {m['new_hash'][:12]}...")
+    if report.status == "clean":
+        print(f"✓ All {report.total_migrations} migrations verified")
+    else:
+        if report.modified:
+            print("\n⚠ Modified migrations:")
+            for m in report.modified:
+                print(f"  {m['filename']} (V{m['version']})")
+                print(f"    Old: {m['old_hash'][:12]}...")
+                print(f"    New: {m['new_hash'][:12]}...")
 
-    if report.missing:
-        print("\n⚠ Missing migrations:")
-        for m in report.missing:
-            print(f"  {m['filename']} (V{m['version']})")
+        if report.missing:
+            print("\n⚠ Missing migrations:")
+            for m in report.missing:
+                print(f"  {m['filename']} (V{m['version']})")
 
-    if report.new:
-        print(f"\n✓ New migrations ({len(report.new)}):")
-        for m in report.new:
-            print(f"  {m['filename']} (V{m['version']})")
+        if report.new:
+            print(f"\n✓ New migrations ({len(report.new)}):")
+            for m in report.new:
+                print(f"  {m['filename']} (V{m['version']})")
 
     if getattr(args, "strict", False) and report.modified:
         print("\nError: Modified migrations detected (--strict mode)")

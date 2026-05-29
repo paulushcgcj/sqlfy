@@ -197,7 +197,8 @@ class EmbeddingRetriever:
     def __init__(self, chunks: list[VectorChunk], api_key: Optional[str] = None, 
                  cached_embeddings: Optional[any] = None) -> None:
         self._chunks = chunks
-        self._key    = api_key or os.environ.get('ANTHROPIC_API_KEY', '')
+        from ...config import settings as _settings
+        self._key    = api_key or _settings.api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         if not self._key:
             raise ValueError(
                 'ANTHROPIC_API_KEY not set. '

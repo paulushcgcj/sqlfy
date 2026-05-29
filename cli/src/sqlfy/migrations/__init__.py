@@ -11,8 +11,12 @@ Packages:
 
 from .parser import parse_flyway_ver
 from .loader import load_files
+from .cache import load_cached, save_cached, clear_cache
 
 __all__ = [
     "parse_flyway_ver",
     "load_files",
+    "load_cached",
+    "save_cached",
+    "clear_cache",
 ]

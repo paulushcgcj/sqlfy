@@ -28,23 +28,25 @@ from typing import Optional
 import sqlglot
 import sqlglot.expressions as exp
 
-from .core import (
-    # Data types
+from .domain.models import (
     Column, Constraint, Index, Table, Sequence,
     Edge, MigrationHistory, MigrationAction, SchemaGraph, VectorChunk,
-    # AST helpers
-    _table_full, _table_schema_name, _col_datatype,
-    _on_delete_from_options, _parse_column_def, _parse_table_constraint,
-    type_str,
-    # Flyway version parser
-    parse_flyway_ver,
 )
+from .domain.utils import type_str
+from .parsing.ast_helpers import (
+    _table_full, _table_schema_name, _col_datatype, _on_delete_from_options,
+)
+from .parsing.column_parser import _parse_column_def
+from .parsing.constraint_parser import _parse_table_constraint
+from .migrations.parser import parse_flyway_ver
 from .domain.sqlglot_compat import (
     SQLGLOT_HAS_MODIFY,
     SQLGLOT_HAS_RENAME_COLUMN,
     parse_modify_native,
     log_sqlglot_capabilities,
 )
+from .parsing.extractors import get_extractor
+from .semantic.operations import AnyOperation, OperationProvenance
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ class Reconstructor:
         self.mig_hist: list[MigrationHistory] = []
         self.actions:  list[MigrationAction]  = []
         self._applied: set[str] = set()   # versions already applied
+        self.semantic_ops: list[AnyOperation] = []  # semantic operations (Phase 9)
         
         # Log sqlglot capabilities on first instantiation
         if not hasattr(Reconstructor, '_logged_capabilities'):
@@ -165,6 +168,7 @@ class Reconstructor:
         self.seqs.clear()
         self.mig_hist.clear()
         self.actions.clear()
+        self.semantic_ops.clear()
         self._applied.clear()
 
     # ── Statement dispatcher ────────────────────────────────────────────────
@@ -172,6 +176,19 @@ class Reconstructor:
     def _dispatch(self, stmt: exp.Expression, version: str) -> list[MigrationAction]:
         """Route a parsed statement to the appropriate handler."""
         acts: list[MigrationAction] = []
+
+        # ── Semantic operation extraction (additive, non-breaking) ──────────
+        extractor = get_extractor(stmt)
+        if extractor:
+            prov = OperationProvenance.of(
+                source_file=version, version=version, statement_index=0,
+                raw_sql=stmt.sql(dialect=self.dialect),
+            )
+            try:
+                self.semantic_ops.extend(extractor.extract(stmt, prov))
+            except Exception as _exc:
+                log.debug("Extractor failed for %s: %s", type(stmt).__name__, _exc)
+        # ────────────────────────────────────────────────────────────────────
 
         if isinstance(stmt, exp.Create):
             kind = stmt.args.get('kind', '')
