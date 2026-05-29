@@ -12,9 +12,9 @@ import type {
   Sequence,
   Edge,
   SchemaGraph,
-  VectorChunk,
   LayoutPoint,
-} from './types';
+} from '@/core/local-types';
+import type { VectorChunk } from './types';
 
 // ─────────────────────────────────────────────
 // SQL TOKENISER UTILITIES

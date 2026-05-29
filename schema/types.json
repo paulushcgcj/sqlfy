@@ -1,0 +1,512 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sqlfy.app/schema/types.json",
+  "title": "SQLfy CLI Response Types",
+  "description": "JSON shapes produced by the SQLfy CLI as command output. Every property name is the camelCase alias that Pydantic emits via model_dump_json(by_alias=True).",
+  "$defs": {
+    "MigrationHistory": {
+      "description": "One entry in a migration history list.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "description"],
+      "properties": {
+        "version":     { "description": "Migration version string.", "type": "string", "readOnly": true },
+        "description": { "description": "Human-readable description.", "type": "string", "readOnly": true }
+      }
+    },
+    "VectorChunk": {
+      "description": "One chunk from sqlfy chunks --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title", "content", "metadata", "hint"],
+      "properties": {
+        "id":       { "description": "Unique chunk ID.",               "type": "string", "readOnly": true },
+        "type":     { "description": "Chunk type (table, etc.).",      "type": "string", "readOnly": true },
+        "title":    { "description": "Short title.",                   "type": "string", "readOnly": true },
+        "content":  { "description": "Full text for embedding.",       "type": "string", "readOnly": true },
+        "metadata": { "description": "Arbitrary metadata.",            "type": "object", "additionalProperties": true, "readOnly": true },
+        "hint":     { "description": "RAG retrieval hint.",            "type": "string", "readOnly": true }
+      }
+    },
+    "InsightSeverity": {
+      "description": "Severity of a schema insight finding.",
+      "type": "string",
+      "enum": ["error", "warning", "info"]
+    },
+    "InsightFinding": {
+      "description": "One finding from sqlfy insights --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "category", "message"],
+      "properties": {
+        "code":     { "description": "Rule code (e.g. ORPHAN_TABLE).", "type": "string", "readOnly": true },
+        "severity": { "description": "Severity level.",  "$ref": "#/$defs/InsightSeverity", "readOnly": true },
+        "category": { "description": "Category grouping.", "type": "string", "readOnly": true },
+        "message":  { "description": "Human-readable description.", "type": "string", "readOnly": true },
+        "detail":   { "description": "Extended explanation.", "type": "string" },
+        "fix":      { "description": "Suggested SQL/action.", "type": "string" },
+        "table":    { "description": "Affected table name.", "type": "string" },
+        "column":   { "description": "Affected column name.", "type": "string" }
+      }
+    },
+    "InsightsSummary": {
+      "description": "Aggregated finding counts inside InsightsResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errors", "warnings", "infos", "total", "healthy"],
+      "properties": {
+        "errors":   { "description": "Error count.",   "type": "integer", "readOnly": true },
+        "warnings": { "description": "Warning count.", "type": "integer", "readOnly": true },
+        "infos":    { "description": "Info count.",    "type": "integer", "readOnly": true },
+        "total":    { "description": "Total count.",   "type": "integer", "readOnly": true },
+        "healthy":  { "description": "True when no errors/warnings.", "type": "boolean", "readOnly": true }
+      }
+    },
+    "InsightsResult": {
+      "description": "Full response from sqlfy insights --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "fingerprint", "summary", "findings"],
+      "properties": {
+        "version":     { "description": "Schema version.", "type": "string", "readOnly": true },
+        "fingerprint": { "description": "State fingerprint.", "type": "string", "readOnly": true },
+        "summary":     { "description": "Aggregated counts.", "$ref": "#/$defs/InsightsSummary", "readOnly": true },
+        "findings": {
+          "description": "Findings grouped by severity.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["error", "warning", "info"],
+          "properties": {
+            "error":   { "description": "Error findings.",   "type": "array", "items": { "$ref": "#/$defs/InsightFinding" }, "readOnly": true },
+            "warning": { "description": "Warning findings.", "type": "array", "items": { "$ref": "#/$defs/InsightFinding" }, "readOnly": true },
+            "info":    { "description": "Info findings.",    "type": "array", "items": { "$ref": "#/$defs/InsightFinding" }, "readOnly": true }
+          },
+          "readOnly": true
+        }
+      }
+    },
+    "HealthGrade": {
+      "description": "Qualitative health grade.",
+      "type": "string",
+      "enum": ["excellent", "good", "warning", "critical"]
+    },
+    "HealthMigrationStatus": {
+      "description": "Per-migration safety row inside HealthResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "status", "errors", "warnings", "hasDropTable", "hasDropColumn"],
+      "properties": {
+        "filename":      { "description": "Migration filename.",               "type": "string",  "readOnly": true },
+        "status":        { "description": "safe | unsafe | irreversible.",     "type": "string",  "enum": ["safe","unsafe","irreversible"], "readOnly": true },
+        "errors":        { "description": "Error count.",                      "type": "integer", "readOnly": true },
+        "warnings":      { "description": "Warning count.",                   "type": "integer", "readOnly": true },
+        "hasDropTable":  { "description": "Contains DROP TABLE.",              "type": "boolean", "readOnly": true },
+        "hasDropColumn": { "description": "Contains DROP COLUMN.",             "type": "boolean", "readOnly": true }
+      }
+    },
+    "HealthScoreBreakdown": {
+      "description": "Score component breakdown inside HealthScore.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "errorPenalty", "warningPenalty", "irreversiblePenalty"],
+      "properties": {
+        "base":                { "description": "Base score.",                   "type": "integer", "readOnly": true },
+        "errorPenalty":        { "description": "Error deduction.",              "type": "integer", "readOnly": true },
+        "warningPenalty":      { "description": "Warning deduction.",            "type": "integer", "readOnly": true },
+        "irreversiblePenalty": { "description": "Irreversible deduction.",       "type": "integer", "readOnly": true }
+      }
+    },
+    "HealthScore": {
+      "description": "Health score inside HealthResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "grade", "breakdown"],
+      "properties": {
+        "score":     { "description": "Score 0-100.",          "type": "integer", "readOnly": true },
+        "grade":     { "description": "Qualitative grade.",    "$ref": "#/$defs/HealthGrade", "readOnly": true },
+        "breakdown": { "description": "Per-factor breakdown.", "$ref": "#/$defs/HealthScoreBreakdown", "readOnly": true }
+      }
+    },
+    "HealthSummary": {
+      "description": "Migration folder stats inside HealthResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalMigrations","safeMigrations","unsafeMigrations","irreversibleMigrations","safePercentage"],
+      "properties": {
+        "totalMigrations":        { "description": "Total count.",          "type": "integer", "readOnly": true },
+        "safeMigrations":         { "description": "Safe count.",           "type": "integer", "readOnly": true },
+        "unsafeMigrations":       { "description": "Unsafe count.",        "type": "integer", "readOnly": true },
+        "irreversibleMigrations": { "description": "Irreversible count.",   "type": "integer", "readOnly": true },
+        "safePercentage":         { "description": "Percent safe 0-100.",   "type": "integer", "readOnly": true }
+      }
+    },
+    "HealthFindings": {
+      "description": "Aggregated finding counts inside HealthResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errors", "warnings", "infos", "byCode"],
+      "properties": {
+        "errors":   { "description": "Total error count.",   "type": "integer", "readOnly": true },
+        "warnings": { "description": "Total warning count.", "type": "integer", "readOnly": true },
+        "infos":    { "description": "Total info count.",    "type": "integer", "readOnly": true },
+        "byCode":   { "description": "Counts by rule code.", "type": "object", "additionalProperties": { "type": "integer" }, "readOnly": true }
+      }
+    },
+    "HealthResult": {
+      "description": "Full response from sqlfy health --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["folder","timestamp","summary","findings","migrations","healthScore","recommendation"],
+      "properties": {
+        "folder":         { "description": "Migrations folder path.",     "type": "string", "readOnly": true },
+        "timestamp":      { "description": "ISO-8601 report timestamp.",  "type": "string", "readOnly": true },
+        "summary":        { "$ref": "#/$defs/HealthSummary",  "description": "Migration stats.", "readOnly": true },
+        "findings":       { "$ref": "#/$defs/HealthFindings", "description": "Finding counts.", "readOnly": true },
+        "migrations":     { "description": "Per-migration rows.", "type": "array", "items": { "$ref": "#/$defs/HealthMigrationStatus" }, "readOnly": true },
+        "healthScore":    { "$ref": "#/$defs/HealthScore", "description": "Health score.", "readOnly": true },
+        "recommendation": { "description": "Human-readable recommendation.", "type": "string", "readOnly": true }
+      }
+    },
+    "DiffStats": {
+      "description": "Change count summary inside DiffResult and SimulateResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tablesAdded","tablesRemoved","tablesModified","columnsAdded","columnsRemoved","columnsModified","sequencesAdded","sequencesRemoved","relationshipsAdded","relationshipsRemoved","isBreaking"],
+      "properties": {
+        "tablesAdded":          { "description": "Tables added.",            "type": "integer", "readOnly": true },
+        "tablesRemoved":        { "description": "Tables removed.",          "type": "integer", "readOnly": true },
+        "tablesModified":       { "description": "Tables modified.",         "type": "integer", "readOnly": true },
+        "columnsAdded":         { "description": "Columns added.",           "type": "integer", "readOnly": true },
+        "columnsRemoved":       { "description": "Columns removed.",         "type": "integer", "readOnly": true },
+        "columnsModified":      { "description": "Columns modified.",        "type": "integer", "readOnly": true },
+        "sequencesAdded":       { "description": "Sequences added.",         "type": "integer", "readOnly": true },
+        "sequencesRemoved":     { "description": "Sequences removed.",       "type": "integer", "readOnly": true },
+        "relationshipsAdded":   { "description": "FK relationships added.",  "type": "integer", "readOnly": true },
+        "relationshipsRemoved": { "description": "FK relationships removed.","type": "integer", "readOnly": true },
+        "isBreaking":           { "description": "Any breaking change.",     "type": "boolean", "readOnly": true }
+      }
+    },
+    "DiffColumnChange": {
+      "description": "Column-level change inside DiffTableChange.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "change", "breaking"],
+      "properties": {
+        "name":    { "description": "Column name.",                        "type": "string", "readOnly": true },
+        "change":  { "description": "added | removed | modified.",         "type": "string", "enum": ["added","removed","modified"], "readOnly": true },
+        "before":  { "description": "Column state before (absent for added).", "type": "object", "additionalProperties": true },
+        "after":   { "description": "Column state after (absent for removed).", "type": "object", "additionalProperties": true },
+        "diffs":   { "description": "Field change descriptions.", "type": "array", "items": { "type": "string" } },
+        "breaking":{ "description": "Could break existing code.", "type": "boolean", "readOnly": true }
+      }
+    },
+    "DiffConstraintChange": {
+      "description": "Constraint-level change inside DiffTableChange.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "change", "type", "columns"],
+      "properties": {
+        "name":    { "description": "Constraint name. Null if unnamed.", "type": ["string","null"], "readOnly": true },
+        "change":  { "description": "added | removed.",                 "type": "string", "enum": ["added","removed"], "readOnly": true },
+        "type":    { "description": "Constraint kind.",                 "type": "string", "readOnly": true },
+        "columns": { "description": "Columns in the constraint.",       "type": "array", "items": { "type": "string" }, "readOnly": true }
+      }
+    },
+    "DiffIndexChange": {
+      "description": "Index-level change inside DiffTableChange.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "change", "columns", "unique"],
+      "properties": {
+        "name":    { "description": "Index name.",              "type": "string",  "readOnly": true },
+        "change":  { "description": "added | removed.",        "type": "string",  "enum": ["added","removed"], "readOnly": true },
+        "columns": { "description": "Columns in the index.",   "type": "array",   "items": { "type": "string" }, "readOnly": true },
+        "unique":  { "description": "Whether unique.",         "type": "boolean", "readOnly": true }
+      }
+    },
+    "DiffTableChange": {
+      "description": "Table-level change inside DiffResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fullName", "change", "breaking"],
+      "properties": {
+        "fullName":          { "description": "Fully-qualified table name.",    "type": "string", "readOnly": true },
+        "change":            { "description": "added | removed | modified.",    "type": "string", "enum": ["added","removed","modified"], "readOnly": true },
+        "breaking":          { "description": "Is this change breaking.",       "type": "boolean", "readOnly": true },
+        "columnChanges":     { "description": "Column changes.", "type": "array", "items": { "$ref": "#/$defs/DiffColumnChange" } },
+        "constraintChanges": { "description": "Constraint changes.", "type": "array", "items": { "$ref": "#/$defs/DiffConstraintChange" } },
+        "indexChanges":      { "description": "Index changes.", "type": "array", "items": { "$ref": "#/$defs/DiffIndexChange" } }
+      }
+    },
+    "DiffSequenceChange": {
+      "description": "Sequence-level change inside DiffResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fullName", "change"],
+      "properties": {
+        "fullName": { "description": "Fully-qualified sequence name.",   "type": "string", "readOnly": true },
+        "change":   { "description": "added | removed | modified.",     "type": "string", "enum": ["added","removed","modified"], "readOnly": true },
+        "diffs":    { "description": "Field change descriptions.", "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "DiffRelationshipChange": {
+      "description": "FK relationship change inside DiffResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["change", "from", "fromCols", "to", "toCols", "onDelete"],
+      "properties": {
+        "change":   { "description": "added | removed.",              "type": "string", "enum": ["added","removed"], "readOnly": true },
+        "from":     { "description": "Source table name.",            "type": "string", "readOnly": true },
+        "fromCols": { "description": "Source column names.",          "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "to":       { "description": "Target table name.",            "type": "string", "readOnly": true },
+        "toCols":   { "description": "Target column names.",          "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "onDelete": { "description": "ON DELETE action. Null if none.", "type": ["string","null"], "readOnly": true }
+      }
+    },
+    "DiffResult": {
+      "description": "Full response from sqlfy diff-versions --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["versionA","versionB","fingerprintA","fingerprintB","stats","tableChanges","sequenceChanges","relationshipChanges"],
+      "properties": {
+        "versionA":            { "description": "Source version.",                  "type": "string", "readOnly": true },
+        "versionB":            { "description": "Target version.",                  "type": "string", "readOnly": true },
+        "fingerprintA":        { "description": "Source SHA-256 fingerprint.",      "type": "string", "readOnly": true },
+        "fingerprintB":        { "description": "Target SHA-256 fingerprint.",      "type": "string", "readOnly": true },
+        "stats":               { "$ref": "#/$defs/DiffStats", "description": "Change counts.", "readOnly": true },
+        "tableChanges":        { "description": "Table changes.", "type": "array", "items": { "$ref": "#/$defs/DiffTableChange" }, "readOnly": true },
+        "sequenceChanges":     { "description": "Sequence changes.", "type": "array", "items": { "$ref": "#/$defs/DiffSequenceChange" }, "readOnly": true },
+        "relationshipChanges": { "description": "FK changes.", "type": "array", "items": { "$ref": "#/$defs/DiffRelationshipChange" }, "readOnly": true }
+      }
+    },
+    "SimulateHealth": {
+      "description": "Health snapshot nested inside SimulateResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "grade", "errors", "warnings"],
+      "properties": {
+        "score":    { "description": "Score 0-100.",       "type": "integer",             "readOnly": true },
+        "grade":    { "description": "Qualitative grade.", "$ref": "#/$defs/HealthGrade", "readOnly": true },
+        "errors":   { "description": "Error insight count.", "type": "integer",           "readOnly": true },
+        "warnings": { "description": "Warning insight count.", "type": "integer",         "readOnly": true }
+      }
+    },
+    "SimulateDiff": {
+      "description": "Diff section nested inside SimulateResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stats", "isBreaking"],
+      "properties": {
+        "stats":      { "$ref": "#/$defs/DiffStats", "description": "Change counts.", "readOnly": true },
+        "isBreaking": { "description": "Any breaking change.", "type": "boolean",    "readOnly": true }
+      }
+    },
+    "SimulateResult": {
+      "description": "Full response from sqlfy simulate --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp","baseVersion","sql","success","isSafe","isBreaking","errors","warnings","diff","health"],
+      "properties": {
+        "timestamp":   { "description": "ISO-8601 simulation timestamp.",             "type": "string",  "readOnly": true },
+        "baseVersion": { "description": "Base migration version.",                    "type": "string",  "readOnly": true },
+        "sql":         { "description": "The simulated DDL.",                         "type": "string",  "readOnly": true },
+        "success":     { "description": "Applied without parse errors.",              "type": "boolean", "readOnly": true },
+        "isSafe":      { "description": "No destructive operations.",                 "type": "boolean", "readOnly": true },
+        "isBreaking":  { "description": "At least one breaking change detected.",     "type": "boolean", "readOnly": true },
+        "errors":      { "description": "Parse/validation errors.",  "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "warnings":    { "description": "Advisory warnings.",        "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "diff":        { "$ref": "#/$defs/SimulateDiff",    "description": "Structural diff.",   "readOnly": true },
+        "health":      { "$ref": "#/$defs/SimulateHealth",  "description": "Health snapshot.",   "readOnly": true }
+      }
+    },
+    "ImpactResult": {
+      "description": "Full response from sqlfy impact --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objectId","direct","transitive","depthMap","byType","criticalPaths","maxDepth","totalCount"],
+      "properties": {
+        "objectId":      { "description": "Analyzed schema object.",                     "type": "string", "readOnly": true },
+        "direct":        { "description": "Directly affected objects (depth 1).",        "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "transitive":    { "description": "Transitively affected objects (depth > 1).",  "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "depthMap":      { "description": "Object ID to traversal depth.",               "type": "object", "additionalProperties": { "type": "integer" }, "readOnly": true },
+        "byType":        { "description": "Affected objects grouped by type.",           "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } }, "readOnly": true },
+        "criticalPaths": { "description": "Critical paths from source to leaves.",       "type": "array", "items": { "type": "array", "items": { "type": "string" } }, "readOnly": true },
+        "maxDepth":      { "description": "Maximum traversal depth reached.",            "type": "integer", "readOnly": true },
+        "totalCount":    { "description": "Total affected count excluding source.",      "type": "integer", "readOnly": true }
+      }
+    },
+    "RollbackAnalysis": {
+      "description": "Rollback feasibility for one migration inside RollbackResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migration","feasibility","score","rollbackScript","warnings","recommendations","operations"],
+      "properties": {
+        "migration":       { "description": "Migration filename.",                         "type": "string", "readOnly": true },
+        "feasibility":     { "description": "reversible | partial | irreversible.",        "type": "string", "enum": ["reversible","partial","irreversible"], "readOnly": true },
+        "score":           { "description": "Rollback difficulty score 0-100.",            "type": "integer", "readOnly": true },
+        "rollbackScript":  { "description": "Suggested rollback SQL. Null if irreversible.", "type": ["string","null"], "readOnly": true },
+        "warnings":        { "description": "Risk warnings.",                              "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "recommendations": { "description": "Actionable recommendations.",                "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "operations":      { "description": "Detected SQL operations.",                    "type": "array", "items": { "type": "string" }, "readOnly": true }
+      }
+    },
+    "RollbackResult": {
+      "description": "Full response from sqlfy rollback-analysis --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "migrations"],
+      "properties": {
+        "summary": {
+          "description": "Counts by feasibility.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total","reversible","partial","irreversible"],
+          "properties": {
+            "total":        { "description": "Total migrations.", "type": "integer", "readOnly": true },
+            "reversible":   { "description": "Reversible count.", "type": "integer", "readOnly": true },
+            "partial":      { "description": "Partial count.",    "type": "integer", "readOnly": true },
+            "irreversible": { "description": "Irreversible count.", "type": "integer", "readOnly": true }
+          },
+          "readOnly": true
+        },
+        "migrations": { "description": "Per-migration analyses.", "type": "array", "items": { "$ref": "#/$defs/RollbackAnalysis" }, "readOnly": true }
+      }
+    },
+    "SchemaManifest": {
+      "description": "High-level metadata from sqlfy manifest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion","fingerprint","dialect","generatedAt","sqlfyVersion","nodeCount","edgeCount","tableCount","columnCount","sequenceCount","relationshipCount","indexCount","tablesWithoutPk","migrationCount","migrationHistory"],
+      "properties": {
+        "schemaVersion":     { "description": "Latest migration version.",         "type": "string",  "readOnly": true },
+        "fingerprint":       { "description": "SHA-256 fingerprint.",              "type": "string",  "readOnly": true },
+        "dialect":           { "description": "SQL dialect.",                      "type": "string",  "readOnly": true },
+        "generatedAt":       { "description": "ISO-8601 timestamp.",               "type": "string",  "readOnly": true },
+        "sqlfyVersion":      { "description": "sqlfy tool version.",               "type": "string",  "readOnly": true },
+        "nodeCount":         { "description": "Graph node count.",                 "type": "integer", "readOnly": true },
+        "edgeCount":         { "description": "Graph edge count.",                 "type": "integer", "readOnly": true },
+        "tableCount":        { "description": "Table count.",                      "type": "integer", "readOnly": true },
+        "columnCount":       { "description": "Column count.",                     "type": "integer", "readOnly": true },
+        "sequenceCount":     { "description": "Sequence count.",                   "type": "integer", "readOnly": true },
+        "relationshipCount": { "description": "FK relationship count.",            "type": "integer", "readOnly": true },
+        "indexCount":        { "description": "Index count.",                      "type": "integer", "readOnly": true },
+        "tablesWithoutPk":   { "description": "Tables without primary key.",       "type": "integer", "readOnly": true },
+        "migrationCount":    { "description": "Migration file count.",             "type": "integer", "readOnly": true },
+        "migrationHistory":  { "description": "Ordered migration list.", "type": "array", "items": { "$ref": "#/$defs/MigrationHistory" }, "readOnly": true }
+      }
+    },
+    "ColumnState": {
+      "description": "Column inside TableState (from sqlfy dump).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name","dataType","rawType","precision","scale","nullable","default","isPk","isFk","isUnique","comment"],
+      "properties": {
+        "name":     { "description": "Column name.",                        "type": "string",           "readOnly": true },
+        "dataType": { "description": "Rendered type e.g. NUMBER(10,2).",    "type": "string",           "readOnly": true },
+        "rawType":  { "description": "Base type name e.g. NUMBER.",         "type": "string",           "readOnly": true },
+        "precision":{ "description": "Numeric precision. Null if N/A.",     "type": ["integer","null"], "readOnly": true },
+        "scale":    { "description": "Numeric scale. Null if N/A.",         "type": ["integer","null"], "readOnly": true },
+        "nullable": { "description": "Accepts NULL.",                       "type": "boolean",          "readOnly": true },
+        "default":  { "description": "Default expression. Null if none.",   "type": ["string","null"],  "readOnly": true },
+        "isPk":     { "description": "Part of primary key.",                "type": "boolean",          "readOnly": true },
+        "isFk":     { "description": "Part of foreign key.",                "type": "boolean",          "readOnly": true },
+        "isUnique": { "description": "Has unique constraint.",              "type": "boolean",          "readOnly": true },
+        "comment":  { "description": "Column comment. Null if none.",       "type": ["string","null"],  "readOnly": true }
+      }
+    },
+    "ConstraintState": {
+      "description": "Constraint inside TableState (from sqlfy dump).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name","type","columns"],
+      "properties": {
+        "name":       { "description": "Name. Null if unnamed.",            "type": ["string","null"], "readOnly": true },
+        "type":       { "description": "primary_key|unique|foreign_key|check.", "type": "string",     "readOnly": true },
+        "columns":    { "description": "Column names.",                    "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "refTable":   { "description": "Referenced table (FK only).",      "type": ["string","null"] },
+        "refColumns": { "description": "Referenced columns (FK only).",    "type": ["array","null"], "items": { "type": "string" } },
+        "onDelete":   { "description": "ON DELETE action (FK only).",      "type": ["string","null"] },
+        "checkExpr":  { "description": "CHECK expression (CHECK only).",   "type": ["string","null"] }
+      }
+    },
+    "IndexState": {
+      "description": "Index inside TableState (from sqlfy dump).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name","columns","unique","createdIn"],
+      "properties": {
+        "name":      { "description": "Index name.",               "type": "string",  "readOnly": true },
+        "columns":   { "description": "Columns in the index.",     "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "unique":    { "description": "Whether unique.",           "type": "boolean", "readOnly": true },
+        "createdIn": { "description": "Created in migration ver.", "type": "string",  "readOnly": true }
+      }
+    },
+    "TableState": {
+      "description": "Table inside SchemaState (from sqlfy dump).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema","name","fullName","columns","constraints","indexes","comment","createdIn","modifiedIn","columnCount","hasPk","pkColumns"],
+      "properties": {
+        "schema":      { "description": "Schema/owner. Null for default.",      "type": ["string","null"], "readOnly": true },
+        "name":        { "description": "Table name (uppercased).",             "type": "string",          "readOnly": true },
+        "fullName":    { "description": "Fully-qualified name.",                "type": "string",          "readOnly": true },
+        "columns":     { "description": "Ordered columns.",   "type": "array", "items": { "$ref": "#/$defs/ColumnState" }, "readOnly": true },
+        "constraints": { "description": "Constraints.",       "type": "array", "items": { "$ref": "#/$defs/ConstraintState" }, "readOnly": true },
+        "indexes":     { "description": "Indexes.",            "type": "array", "items": { "$ref": "#/$defs/IndexState" }, "readOnly": true },
+        "comment":     { "description": "Table comment.",                       "type": ["string","null"], "readOnly": true },
+        "createdIn":   { "description": "Created in migration ver.",            "type": "string",          "readOnly": true },
+        "modifiedIn":  { "description": "Modified in migration versions.",      "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "columnCount": { "description": "Number of columns.",                   "type": "integer",         "readOnly": true },
+        "hasPk":       { "description": "Has a primary key.",                   "type": "boolean",         "readOnly": true },
+        "pkColumns":   { "description": "PK column names.",  "type": "array", "items": { "type": "string" }, "readOnly": true }
+      }
+    },
+    "SequenceState": {
+      "description": "Sequence inside SchemaState (from sqlfy dump).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema","name","fullName","startWith","incrementBy","createdIn"],
+      "properties": {
+        "schema":      { "description": "Schema/owner. Null for default.", "type": ["string","null"], "readOnly": true },
+        "name":        { "description": "Sequence name.",                  "type": "string",          "readOnly": true },
+        "fullName":    { "description": "Fully-qualified name.",           "type": "string",          "readOnly": true },
+        "startWith":   { "description": "START WITH value.",              "type": "integer",         "readOnly": true },
+        "incrementBy": { "description": "INCREMENT BY value.",            "type": "integer",         "readOnly": true },
+        "createdIn":   { "description": "Created in migration ver.",      "type": "string",          "readOnly": true }
+      }
+    },
+    "RelationshipState": {
+      "description": "FK relationship inside SchemaState (from sqlfy dump).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id","fromTable","fromColumns","toTable","toColumns","constraintName","onDelete","cardinality"],
+      "properties": {
+        "id":             { "description": "Unique relationship ID.",            "type": "string",           "readOnly": true },
+        "fromTable":      { "description": "Source table.",                      "type": "string",           "readOnly": true },
+        "fromColumns":    { "description": "Source columns.",  "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "toTable":        { "description": "Target table.",                      "type": "string",           "readOnly": true },
+        "toColumns":      { "description": "Target columns.", "type": "array", "items": { "type": "string" }, "readOnly": true },
+        "constraintName": { "description": "FK name. Null if unnamed.",          "type": ["string","null"],  "readOnly": true },
+        "onDelete":       { "description": "ON DELETE action. Null if none.",    "type": ["string","null"],  "readOnly": true },
+        "cardinality":    { "description": "many_to_one | one_to_one | unknown.", "type": "string",          "readOnly": true }
+      }
+    },
+    "SchemaState": {
+      "description": "Full response from sqlfy dump --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version","generatedAt","fingerprint","dialect","tables","sequences","relationships","migrationHistory","stats"],
+      "properties": {
+        "version":          { "description": "Latest migration version.",            "type": "string", "readOnly": true },
+        "generatedAt":      { "description": "ISO-8601 generation timestamp.",       "type": "string", "readOnly": true },
+        "fingerprint":      { "description": "SHA-256 fingerprint.",                 "type": "string", "readOnly": true },
+        "dialect":          { "description": "SQL dialect.",                         "type": "string", "readOnly": true },
+        "tables":           { "description": "Tables keyed by full name.", "type": "object", "additionalProperties": { "$ref": "#/$defs/TableState" }, "readOnly": true },
+        "sequences":        { "description": "Sequences keyed by full name.", "type": "object", "additionalProperties": { "$ref": "#/$defs/SequenceState" }, "readOnly": true },
+        "relationships":    { "description": "All FK relationships.", "type": "array", "items": { "$ref": "#/$defs/RelationshipState" }, "readOnly": true },
+        "migrationHistory": { "description": "Ordered migration list.", "type": "array", "items": { "$ref": "#/$defs/MigrationHistory" }, "readOnly": true },
+        "stats":            { "description": "Summary counts.", "type": "object", "additionalProperties": { "type": "integer" }, "readOnly": true }
+      }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
 import type { DiffVersionsResult } from '@/bridge/cli';
-import type { MigrationFile, SchemaGraph } from '@/core/types';
+import type { MigrationFile } from '@/core/local-types';
+import type { SchemaGraph } from '@/core/types';
 
 import { runDiff, CLI_AVAILABLE } from '@/bridge/cli';
 
@@ -104,32 +105,32 @@ export default function DiffPanel({ files, graph }: DiffPanelProps) {
       {result && (
         <div className="diff-results">
           <h4>
-            V{result.version_a} → V{result.version_b}
+            V{result.versionA} → V{result.versionB}
           </h4>
           <div className="diff-stats-grid">
             <div>Tables added</div>
-            <div>{result.stats.tables_added}</div>
+            <div>{result.stats.tablesAdded}</div>
             <div>Tables removed</div>
-            <div>{result.stats.tables_removed}</div>
+            <div>{result.stats.tablesRemoved}</div>
             <div>Tables modified</div>
-            <div>{result.stats.tables_modified}</div>
+            <div>{result.stats.tablesModified}</div>
             <div>Columns added</div>
-            <div>{result.stats.columns_added}</div>
+            <div>{result.stats.columnsAdded}</div>
             <div>Columns removed</div>
-            <div>{result.stats.columns_removed}</div>
+            <div>{result.stats.columnsRemoved}</div>
             <div>Columns modified</div>
-            <div>{result.stats.columns_modified}</div>
+            <div>{result.stats.columnsModified}</div>
             <div>Sequences added</div>
-            <div>{result.stats.sequences_added}</div>
+            <div>{result.stats.sequencesAdded}</div>
             <div>Sequences removed</div>
-            <div>{result.stats.sequences_removed}</div>
+            <div>{result.stats.sequencesRemoved}</div>
             <div>Relationships added</div>
-            <div>{result.stats.relationships_added}</div>
+            <div>{result.stats.relationshipsAdded}</div>
             <div>Relationships removed</div>
-            <div>{result.stats.relationships_removed}</div>
+            <div>{result.stats.relationshipsRemoved}</div>
           </div>
 
-          {result.stats.is_breaking ? (
+          {result.stats.isBreaking ? (
             <div className="diff-results__breaking">⚠ Breaking changes detected</div>
           ) : (
             <div className="diff-results__safe">✓ No breaking removals detected</div>

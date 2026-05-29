@@ -54,7 +54,7 @@ def test_diff_versions_v1_to_v2_adds_table(tmp_path, capsys):
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
-    assert data.get("stats", {}).get("tables_added", 0) > 0 or len(data.get("table_changes", [])) > 0
+    assert data.get("stats", {}).get("tablesAdded", 0) > 0 or len(data.get("tableChanges", [])) > 0
 
 
 def test_diff_versions_text_output(tmp_path, capsys):
@@ -68,7 +68,7 @@ def test_diff_versions_text_output(tmp_path, capsys):
     cmd_diff_versions(args)
 
     captured = capsys.readouterr()
-    assert "SCHEMA STATE DIFF" in captured.out or "tables_added" in captured.out.lower() or "ORDERS" in captured.out
+    assert "SCHEMA STATE DIFF" in captured.out or "tablesAdded" in captured.out.lower() or "ORDERS" in captured.out
 
 
 def test_diff_versions_same_version_produces_no_changes(tmp_path, capsys):
@@ -83,8 +83,8 @@ def test_diff_versions_same_version_produces_no_changes(tmp_path, capsys):
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
-    assert data.get("stats", {}).get("tables_added", 0) == 0
-    assert data.get("stats", {}).get("tables_removed", 0) == 0
+    assert data.get("stats", {}).get("tablesAdded", 0) == 0
+    assert data.get("stats", {}).get("tablesRemoved", 0) == 0
 
 
 def test_diff_versions_no_versions_uses_latest(tmp_path, capsys):
@@ -116,7 +116,7 @@ def test_diff_versions_from_only_compares_partial_to_full(tmp_path, capsys):
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
-    assert data.get("stats", {}).get("tables_added", 0) >= 1
+    assert data.get("stats", {}).get("tablesAdded", 0) >= 1
 
 
 def test_diff_versions_to_only_compares_full_to_partial(tmp_path, capsys):
@@ -133,4 +133,4 @@ def test_diff_versions_to_only_compares_full_to_partial(tmp_path, capsys):
     captured = capsys.readouterr()
     data = json.loads(captured.out)
     # Going from full (orders exist) to V1 (no orders) should show tables removed
-    assert data.get("stats", {}).get("tables_removed", 0) >= 1
+    assert data.get("stats", {}).get("tablesRemoved", 0) >= 1

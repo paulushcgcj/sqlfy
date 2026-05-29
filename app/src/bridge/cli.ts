@@ -16,7 +16,8 @@
  *   cargo add tauri-plugin-shell tauri-plugin-fs
  */
 
-import type { MigrationFile, SchemaGraph, VectorChunk } from '@/core/types';
+import type { MigrationFile, SchemaGraph } from '@/core/local-types';
+import type { VectorChunk, InsightFinding, InsightsResult, HealthGrade, HealthMigrationStatus, HealthResult, SimulateResult, DiffResult } from '@/core/types';
 
 import { applyMigrations, buildChunks } from '@/core/core';
 
@@ -284,48 +285,8 @@ export function dumpSummary(files: MigrationFile[]): Promise<string> {
 }
 
 // ── Insights types ──────────────────────────────────────────────────────────
-
-/** A single finding emitted by the CLI `insights` command. */
-export interface InsightFinding {
-  /** Finding rule code (e.g. `"ORPHAN_TABLE"`, `"NO_PK"`). */
-  code: string;
-  /** Severity level. */
-  severity: 'error' | 'warning' | 'info';
-  /** Category grouping (e.g. `"structural"`, `"referential"`, `"migrations"`). */
-  category: string;
-  /** Human-readable description of the finding. */
-  message: string;
-  /** Extended explanation (optional). */
-  detail?: string;
-  /** Suggested SQL or action to resolve the finding (optional). */
-  fix?: string;
-  /** Qualified table name affected by this finding (optional). */
-  table?: string;
-  /** Column name affected by this finding (optional). */
-  column?: string;
-}
-
-/** Typed result from the CLI `insights` command. */
-export interface InsightsResult {
-  /** Schema version at analysis time. */
-  version: string;
-  /** Short fingerprint of the schema state. */
-  fingerprint: string;
-  /** Aggregated counts. */
-  summary: {
-    errors: number;
-    warnings: number;
-    infos: number;
-    total: number;
-    healthy: boolean;
-  };
-  /** Findings grouped by severity. */
-  findings: {
-    error: InsightFinding[];
-    warning: InsightFinding[];
-    info: InsightFinding[];
-  };
-}
+// InsightFinding and InsightsResult are re-exported from @/core/types (generated).
+export type { InsightFinding, InsightsResult } from '@/core/types';
 
 export interface InsightsOptions {
   /** Filter results to a minimum severity level. */
@@ -427,50 +388,8 @@ export function runGraphExport(
 }
 
 // ── Health types ─────────────────────────────────────────────────────────────
-
-/** Health grade returned by `sqlfy health --format json`. */
-export type HealthGrade = 'excellent' | 'good' | 'warning' | 'critical';
-
-/** Per-migration safety classification. */
-export interface HealthMigrationStatus {
-  readonly filename: string;
-  readonly status: 'safe' | 'unsafe' | 'irreversible';
-  readonly errors: number;
-  readonly warnings: number;
-  readonly has_drop_table: boolean;
-  readonly has_drop_column: boolean;
-}
-
-/** Full result from `sqlfy health --format json`. */
-export interface HealthResult {
-  readonly folder: string;
-  readonly timestamp: string;
-  readonly summary: {
-    readonly total_migrations: number;
-    readonly safe_migrations: number;
-    readonly unsafe_migrations: number;
-    readonly irreversible_migrations: number;
-    readonly safe_percentage: number;
-  };
-  readonly findings: {
-    readonly errors: number;
-    readonly warnings: number;
-    readonly infos: number;
-    readonly by_code: Record<string, number>;
-  };
-  readonly migrations: HealthMigrationStatus[];
-  readonly health_score: {
-    readonly score: number;
-    readonly grade: HealthGrade;
-    readonly breakdown: {
-      readonly base: number;
-      readonly error_penalty: number;
-      readonly warning_penalty: number;
-      readonly irreversible_penalty: number;
-    };
-  };
-  readonly recommendation: string;
-}
+// HealthGrade, HealthMigrationStatus, HealthResult are re-exported from @/core/types (generated).
+export type { HealthGrade, HealthMigrationStatus, HealthResult } from '@/core/types';
 
 /**
  * Run `sqlfy health --format json` and return a typed {@link HealthResult}.
@@ -483,50 +402,8 @@ export async function runHealth(files: MigrationFile[]): Promise<HealthResult> {
 }
 
 // ── Simulate types ────────────────────────────────────────────────────────────
-
-/** Diff statistics between the base schema version and the simulated state. */
-export interface SimulateDiffStats {
-  readonly tables_added: number;
-  readonly tables_removed: number;
-  readonly tables_modified: number;
-  readonly columns_added: number;
-  readonly columns_removed: number;
-  readonly columns_modified: number;
-  readonly sequences_added: number;
-  readonly sequences_removed: number;
-  readonly relationships_added: number;
-  readonly relationships_removed: number;
-  readonly is_breaking: boolean;
-}
-
-/** Full result from `sqlfy simulate --format json`. */
-export interface SimulateResult {
-  readonly timestamp: string;
-  /** Migration version used as the simulation base (e.g. `"8"`). */
-  readonly base_version: string;
-  /** The DDL that was simulated. */
-  readonly sql: string;
-  /** Whether the CLI was able to apply the DDL without parse/apply errors. */
-  readonly success: boolean;
-  /** `false` when the change contains destructive or unsafe operations. */
-  readonly is_safe: boolean;
-  /** `true` when at least one breaking change was detected. */
-  readonly is_breaking: boolean;
-  /** Parse or validation errors from the CLI. */
-  readonly errors: string[];
-  /** Non-fatal advisory warnings. */
-  readonly warnings: string[];
-  readonly diff: {
-    readonly stats: SimulateDiffStats;
-    readonly is_breaking: boolean;
-  };
-  readonly health: {
-    readonly score: number;
-    readonly grade: HealthGrade;
-    readonly errors: number;
-    readonly warnings: number;
-  };
-}
+// SimulateResult is re-exported from @/core/types (generated).
+export type { SimulateResult } from '@/core/types';
 
 /** Options for {@link runSimulate}. */
 export interface SimulateOptions {
@@ -554,6 +431,10 @@ export async function runSimulate(
 }
 
 // ── Diff-versions types ───────────────────────────────────────────────────────
+// DiffResult (was DiffVersionsResult) is re-exported from @/core/types (generated).
+export type { DiffResult } from '@/core/types';
+// Keep DiffVersionsResult as an alias for backward compat with existing component imports.
+export type { DiffResult as DiffVersionsResult } from '@/core/types';
 
 /** Options for {@link runDiff}. */
 export interface DiffVersionsOptions {
@@ -561,55 +442,6 @@ export interface DiffVersionsOptions {
   fromVersion?: number | string;
   /** Target (to) migration version. Omit to use the latest state. */
   toVersion?: number | string;
-}
-
-/** A single column-level change entry in a diff result. */
-export interface DiffColumnChange {
-  readonly name: string;
-  readonly change: 'added' | 'removed' | 'modified';
-  readonly before?: Record<string, unknown>;
-  readonly after?: Record<string, unknown>;
-  readonly diffs?: string[];
-  readonly breaking: boolean;
-}
-
-/** A single table-level change entry in a diff result. */
-export interface DiffTableChange {
-  readonly full_name: string;
-  readonly change: 'added' | 'removed' | 'modified';
-  readonly breaking: boolean;
-  readonly column_changes?: DiffColumnChange[];
-  readonly constraint_changes?: Array<{
-    name: string | null;
-    change: string;
-    type: string;
-    columns: string[];
-  }>;
-  readonly index_changes?: Array<{
-    name: string;
-    change: string;
-    columns: string[];
-    unique: boolean;
-  }>;
-}
-
-/** Full result from `sqlfy diff-versions --format json`. */
-export interface DiffVersionsResult {
-  readonly version_a: string;
-  readonly version_b: string;
-  readonly fingerprint_a: string;
-  readonly fingerprint_b: string;
-  readonly stats: SimulateDiffStats;
-  readonly table_changes: DiffTableChange[];
-  readonly sequence_changes: Array<{ full_name: string; change: string; diffs?: string[] }>;
-  readonly relationship_changes: Array<{
-    change: string;
-    from: string;
-    from_cols: string[];
-    to: string;
-    to_cols: string[];
-    on_delete: string | null;
-  }>;
 }
 
 /**
@@ -621,12 +453,12 @@ export interface DiffVersionsResult {
 export async function runDiff(
   files: MigrationFile[],
   options?: DiffVersionsOptions,
-): Promise<DiffVersionsResult> {
+): Promise<DiffResult> {
   const args: string[] = ['--format', 'json'];
   if (options?.fromVersion !== undefined) args.push('--from', String(options.fromVersion));
   if (options?.toVersion !== undefined) args.push('--to', String(options.toVersion));
   const raw = await runCliCommand('diff-versions', files, args);
-  return JSON.parse(raw) as DiffVersionsResult;
+  return JSON.parse(raw) as DiffResult;
 }
 
 // ─────────────────────────────────────────────
@@ -635,8 +467,8 @@ export async function runDiff(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserialiseGraph(raw: any): SchemaGraph {
-  const tables = new Map<string, import('../core/types').Table>();
-  const seqs = new Map<string, import('../core/types').Sequence>();
+  const tables = new Map<string, import('@/core/local-types').Table>();
+  const seqs = new Map<string, import('@/core/local-types').Sequence>();
 
   for (const [key, t] of Object.entries(raw.tables ?? {})) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -678,7 +510,7 @@ function deserialiseGraph(raw: any): SchemaGraph {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseColumn(c: any): import('../core/types').Column {
+function deserialiseColumn(c: any): import('@/core/local-types').Column {
   return {
     name: c.name,
     type: c.type,
@@ -693,7 +525,7 @@ function deserialiseColumn(c: any): import('../core/types').Column {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseConstraint(c: any): import('../core/types').Constraint {
+function deserialiseConstraint(c: any): import('@/core/local-types').Constraint {
   return {
     name: c.name,
     type: c.type,
@@ -710,12 +542,12 @@ function deserialiseConstraint(c: any): import('../core/types').Constraint {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseIndex(i: any): import('../core/types').Index {
+function deserialiseIndex(i: any): import('@/core/local-types').Index {
   return { name: i.name, columns: i.columns, unique: i.unique, createdIn: i.created_in };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseEdge(e: any): import('../core/types').Edge {
+function deserialiseEdge(e: any): import('@/core/local-types').Edge {
   return {
     id: e.id,
     fromTable: e.from_table,

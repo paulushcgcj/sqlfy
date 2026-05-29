@@ -230,7 +230,93 @@ class DiffResult:
         }
 
     def to_json(self, indent: int = 2) -> str:
-        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+        from ..models import (
+            DiffResult as _DiffResult,
+            DiffStats as _DiffStats,
+            DiffTableChange as _DiffTableChange,
+            DiffColumnChange as _DiffColumnChange,
+            DiffConstraintChange as _DiffConstraintChange,
+            DiffIndexChange as _DiffIndexChange,
+            DiffSequenceChange as _DiffSequenceChange,
+            DiffRelationshipChange as _DiffRelationshipChange,
+        )
+        stats = self.stats()
+        model = _DiffResult(
+            version_a=self.version_a,
+            version_b=self.version_b,
+            fingerprint_a=self.fingerprint_a,
+            fingerprint_b=self.fingerprint_b,
+            stats=_DiffStats(
+                tables_added=stats['tables_added'],
+                tables_removed=stats['tables_removed'],
+                tables_modified=stats['tables_modified'],
+                columns_added=stats['columns_added'],
+                columns_removed=stats['columns_removed'],
+                columns_modified=stats['columns_modified'],
+                sequences_added=stats['sequences_added'],
+                sequences_removed=stats['sequences_removed'],
+                relationships_added=stats['relationships_added'],
+                relationships_removed=stats['relationships_removed'],
+                is_breaking=stats['is_breaking'],
+            ),
+            table_changes=[
+                _DiffTableChange(
+                    full_name=t.full_name,
+                    change=t.change,
+                    breaking=t.is_breaking(),
+                    column_changes=[
+                        _DiffColumnChange(
+                            name=c.name,
+                            change=c.change,
+                            before=c.before,
+                            after=c.after,
+                            diffs=c.field_diffs if c.field_diffs else None,
+                            breaking=c.is_breaking(),
+                        )
+                        for c in t.column_changes
+                    ] if t.column_changes else None,
+                    constraint_changes=[
+                        _DiffConstraintChange(
+                            name=c.name,
+                            change=c.change,
+                            type=c.type,
+                            columns=c.columns,
+                        )
+                        for c in t.constraint_changes
+                    ] if t.constraint_changes else None,
+                    index_changes=[
+                        _DiffIndexChange(
+                            name=i.name,
+                            change=i.change,
+                            columns=i.columns,
+                            unique=i.unique,
+                        )
+                        for i in t.index_changes
+                    ] if t.index_changes else None,
+                )
+                for t in self.table_changes
+            ],
+            sequence_changes=[
+                _DiffSequenceChange(
+                    full_name=s.full_name,
+                    change=s.change,
+                    diffs=s.field_diffs if s.field_diffs else None,
+                )
+                for s in self.sequence_changes
+            ],
+            relationship_changes=[
+                _DiffRelationshipChange(
+                    change=r.change,
+                    from_=r.from_table,
+                    from_cols=r.from_columns,
+                    to=r.to_table,
+                    to_cols=r.to_columns,
+                    on_delete=r.on_delete,
+                )
+                for r in self.relationship_changes
+            ],
+        )
+        return model.model_dump_json(by_alias=True, indent=indent)
 
     def to_text(self) -> str:
         lines: list[str] = []

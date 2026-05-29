@@ -192,8 +192,12 @@ def graph_to_dict(graph: SchemaGraph) -> dict:
 
 
 def chunks_to_list(chunks: list[VectorChunk]) -> list[dict]:
+    from ..models import VectorChunk as _VectorChunk
     return [
-        {"id": c.id, "type": c.type, "title": c.title, "content": c.content, "metadata": c.meta, "hint": c.hint}
+        json.loads(_VectorChunk(
+            id=c.id, type=c.type, title=c.title,
+            content=c.content, metadata=c.meta, hint=c.hint,
+        ).model_dump_json(by_alias=True))
         for c in chunks
     ]
 

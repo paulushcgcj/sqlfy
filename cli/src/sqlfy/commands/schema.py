@@ -45,7 +45,7 @@ def cmd_manifest(args: argparse.Namespace) -> None:
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph)
-    write_output(json.dumps(state.to_manifest(), indent=2, ensure_ascii=False), args.out)
+    write_output(state.to_manifest(), args.out)
 
 
 def cmd_chunks(args: argparse.Namespace) -> None:

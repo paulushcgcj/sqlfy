@@ -12,7 +12,7 @@
 
 import { IS_TAURI } from './cli';
 
-import type { MigrationFile } from '@/core/types';
+import type { MigrationFile } from '@/core/local-types';
 
 // ── Type declarations for File System Access API ────────────────────────────
 

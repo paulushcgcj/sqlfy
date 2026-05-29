@@ -130,8 +130,8 @@ def test_health_report_json_format():
     
     data = json.loads(json_str)
     
-    assert data['summary']['total_migrations'] == health_report.total_migrations
-    assert data['health_score']['score'] == health_report.health_score.score
+    assert data['summary']['totalMigrations'] == health_report.total_migrations
+    assert data['healthScore']['score'] == health_report.health_score.score
     assert 'migrations' in data
     assert len(data['migrations']) == health_report.total_migrations
     assert data['migrations'][0]['filename'] == 'V1__create_users.sql'

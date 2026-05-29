@@ -141,7 +141,40 @@ class InsightsReport:
         }
 
     def to_json(self, indent: int = 2) -> str:
-        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+        from ..models import (
+            InsightsResult as _InsightsResult,
+            InsightsSummary as _InsightsSummary,
+            InsightFinding as _InsightFinding,
+            Findings as _Findings,
+        )
+        def _finding(f: Finding) -> _InsightFinding:
+            return _InsightFinding(
+                code=f.code,
+                severity=f.severity,
+                category=f.category,
+                message=f.message,
+                detail=f.detail,
+                fix=f.fix,
+                table=f.table,
+                column=f.column,
+            )
+        model = _InsightsResult(
+            version=self.version,
+            fingerprint=self.fingerprint,
+            summary=_InsightsSummary(
+                errors=len(self.errors()),
+                warnings=len(self.warnings()),
+                infos=len(self.infos()),
+                total=len(self.findings),
+                healthy=self.is_healthy(),
+            ),
+            findings=_Findings(
+                error=[_finding(f) for f in self.errors()],
+                warning=[_finding(f) for f in self.warnings()],
+                info=[_finding(f) for f in self.infos()],
+            ),
+        )
+        return model.model_dump_json(by_alias=True, indent=indent)
 
     def to_text(self) -> str:
         lines: list[str] = []

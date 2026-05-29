@@ -123,9 +123,9 @@ def test_simulation_result_json_format():
     data = json.loads(result.to_json())
     
     assert 'success' in data
-    assert 'is_safe' in data
+    assert 'isSafe' in data
     assert 'health' in data
-    assert data['base_version'] == '1'
+    assert data['baseVersion'] == '1'
 
 
 def test_diff_stats():

@@ -185,41 +185,137 @@ class SchemaState:
         """Convert to a plain dict (JSON-safe)."""
         return _deep_asdict(self)
     
-    def to_manifest(self) -> dict:
-        """Generate manifest/metadata dictionary with high-level summary.
+    def to_manifest(self) -> str:
+        """Generate manifest/metadata JSON with high-level summary.
         
-        Returns graph metadata including:
-        - Schema version and fingerprint
-        - Node/edge counts
-        - Dialect
-        - Migration count
-        - Generation timestamp
-        - SQLFY version
+        Returns camelCase JSON string using the SchemaManifest Pydantic model.
         """
-        return {
-            "schema_version": self.version,
-            "fingerprint": self.fingerprint,
-            "dialect": self.dialect,
-            "generated_at": self.generated_at,
-            "sqlfy_version": "0.3.0",  # TODO: get from package metadata
-            "node_count": self.stats.get("table_count", 0) + self.stats.get("sequence_count", 0),
-            "edge_count": self.stats.get("relationship_count", 0),
-            "table_count": self.stats.get("table_count", 0),
-            "column_count": self.stats.get("column_count", 0),
-            "sequence_count": self.stats.get("sequence_count", 0),
-            "relationship_count": self.stats.get("relationship_count", 0),
-            "index_count": self.stats.get("index_count", 0),
-            "tables_without_pk": self.stats.get("tables_without_pk", 0),
-            "migration_count": self.stats.get("migration_count", 0),
-            "migration_history": [
-                {"version": m.version, "description": m.description}
+        from ..models import (
+            SchemaManifest as _SchemaManifest,
+            MigrationHistory as _MigrationHistory,
+        )
+        model = _SchemaManifest(
+            schema_version=self.version,
+            fingerprint=self.fingerprint,
+            dialect=self.dialect,
+            generated_at=self.generated_at,
+            sqlfy_version="0.3.0",  # TODO: get from package metadata
+            node_count=self.stats.get("table_count", 0) + self.stats.get("sequence_count", 0),
+            edge_count=self.stats.get("relationship_count", 0),
+            table_count=self.stats.get("table_count", 0),
+            column_count=self.stats.get("column_count", 0),
+            sequence_count=self.stats.get("sequence_count", 0),
+            relationship_count=self.stats.get("relationship_count", 0),
+            index_count=self.stats.get("index_count", 0),
+            tables_without_pk=self.stats.get("tables_without_pk", 0),
+            migration_count=self.stats.get("migration_count", 0),
+            migration_history=[
+                _MigrationHistory(version=m.version, description=m.description)
                 for m in self.migration_history
             ],
-        }
+        )
+        return model.model_dump_json(by_alias=True, indent=2)
 
     def to_json(self, indent: int = 2) -> str:
-        """Serialise to JSON string."""
-        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False, default=str)
+        """Serialise to camelCase JSON string using Pydantic SchemaState model."""
+        from ..models import (
+            SchemaState as _SchemaState,
+            TableState as _TableState,
+            ColumnState as _ColumnState,
+            ConstraintState as _ConstraintState,
+            IndexState as _IndexState,
+            SequenceState as _SequenceState,
+            RelationshipState as _RelationshipState,
+            MigrationHistory as _MigrationHistory,
+        )
+
+        def _col(c: ColumnState) -> _ColumnState:
+            return _ColumnState(
+                name=c.name,
+                data_type=c.data_type,
+                raw_type=c.raw_type,
+                precision=c.precision,
+                scale=c.scale,
+                nullable=c.nullable,
+                default=c.default,
+                is_pk=c.is_pk,
+                is_fk=c.is_fk,
+                is_unique=c.is_unique,
+                comment=c.comment,
+            )
+
+        def _con(c: ConstraintState) -> _ConstraintState:
+            return _ConstraintState(
+                name=c.name,
+                type=c.type,
+                columns=c.columns,
+                ref_table=c.ref_table,
+                ref_columns=c.ref_columns,
+                on_delete=c.on_delete,
+                check_expr=c.check_expr,
+            )
+
+        def _idx(i: IndexState) -> _IndexState:
+            return _IndexState(
+                name=i.name,
+                columns=i.columns,
+                unique=i.unique,
+                created_in=i.created_in,
+            )
+
+        def _tbl(t: TableState) -> _TableState:
+            return _TableState(
+                **{'schema': t.schema},
+                name=t.name,
+                full_name=t.full_name,
+                columns=[_col(c) for c in t.columns],
+                constraints=[_con(c) for c in t.constraints],
+                indexes=[_idx(i) for i in t.indexes],
+                comment=t.comment,
+                created_in=t.created_in,
+                modified_in=t.modified_in,
+                column_count=t.column_count,
+                has_pk=t.has_pk,
+                pk_columns=t.pk_columns,
+            )
+
+        def _seq(s: SequenceState) -> _SequenceState:
+            return _SequenceState(
+                **{'schema': s.schema},
+                name=s.name,
+                full_name=s.full_name,
+                start_with=s.start_with,
+                increment_by=s.increment_by,
+                created_in=s.created_in,
+            )
+
+        def _rel(r: RelationshipState) -> _RelationshipState:
+            return _RelationshipState(
+                id=r.id,
+                from_table=r.from_table,
+                from_columns=r.from_columns,
+                to_table=r.to_table,
+                to_columns=r.to_columns,
+                constraint_name=r.constraint_name,
+                on_delete=r.on_delete,
+                cardinality=r.cardinality,
+            )
+
+        model = _SchemaState(
+            version=self.version,
+            generated_at=self.generated_at,
+            fingerprint=self.fingerprint,
+            dialect=self.dialect,
+            tables={k: _tbl(t) for k, t in self.tables.items()},
+            sequences={k: _seq(s) for k, s in self.sequences.items()},
+            relationships=[_rel(r) for r in self.relationships],
+            migration_history=[
+                _MigrationHistory(version=m.version, description=m.description)
+                for m in self.migration_history
+            ],
+            stats=self.stats,
+        )
+        return model.model_dump_json(by_alias=True, indent=indent)
 
     def to_yaml(self) -> str:
         """

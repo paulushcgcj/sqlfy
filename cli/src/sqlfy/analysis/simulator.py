@@ -154,27 +154,46 @@ class SimulationResult:
     
     def to_json(self) -> str:
         """Generate JSON report."""
-        data = {
-            "timestamp": self.timestamp,
-            "base_version": self.base_version,
-            "sql": self.sql,
-            "success": self.success,
-            "is_safe": self.is_safe(),
-            "is_breaking": self.is_breaking(),
-            "errors": self.errors,
-            "warnings": self.warnings,
-            "diff": {
-                "stats": self.diff.stats(),
-                "is_breaking": self.diff.is_breaking(),
-            },
-            "health": {
-                "score": self.health_score,
-                "grade": self.health_grade,
-                "errors": len(self.insights.errors()),
-                "warnings": len(self.insights.warnings()),
-            },
-        }
-        return json.dumps(data, indent=2)
+        from ..models import (
+            SimulateResult as _SimulateResult,
+            SimulateDiff as _SimulateDiff,
+            SimulateHealth as _SimulateHealth,
+            DiffStats as _DiffStats,
+        )
+        diff_stats = self.diff.stats()
+        model = _SimulateResult(
+            timestamp=self.timestamp,
+            base_version=self.base_version,
+            sql=self.sql,
+            success=self.success,
+            is_safe=self.is_safe(),
+            is_breaking=self.is_breaking(),
+            errors=self.errors,
+            warnings=self.warnings,
+            diff=_SimulateDiff(
+                stats=_DiffStats(
+                    tables_added=diff_stats['tables_added'],
+                    tables_removed=diff_stats['tables_removed'],
+                    tables_modified=diff_stats['tables_modified'],
+                    columns_added=diff_stats['columns_added'],
+                    columns_removed=diff_stats['columns_removed'],
+                    columns_modified=diff_stats['columns_modified'],
+                    sequences_added=diff_stats['sequences_added'],
+                    sequences_removed=diff_stats['sequences_removed'],
+                    relationships_added=diff_stats['relationships_added'],
+                    relationships_removed=diff_stats['relationships_removed'],
+                    is_breaking=diff_stats['is_breaking'],
+                ),
+                is_breaking=self.diff.is_breaking(),
+            ),
+            health=_SimulateHealth(
+                score=self.health_score,
+                grade=self.health_grade,
+                errors=len(self.insights.errors()),
+                warnings=len(self.insights.warnings()),
+            ),
+        )
+        return model.model_dump_json(by_alias=True, indent=2)
 
 
 class SchemaSimulator:

@@ -149,41 +149,54 @@ class FolderHealthReport:
     
     def to_json(self) -> str:
         """Generate JSON report."""
-        data = {
-            "folder": self.folder,
-            "timestamp": self.timestamp,
-            "summary": {
-                "total_migrations": self.total_migrations,
-                "safe_migrations": self.safe_migrations,
-                "unsafe_migrations": self.unsafe_migrations,
-                "irreversible_migrations": self.irreversible_migrations,
-                "safe_percentage": self.safe_percentage,
-            },
-            "findings": {
-                "errors": self.errors,
-                "warnings": self.warnings,
-                "infos": self.infos,
-                "by_code": self.findings_by_code,
-            },
-            "migrations": [
-                {
-                    "filename": m.filename,
-                    "status": m.status,
-                    "errors": m.errors,
-                    "warnings": m.warnings,
-                    "has_drop_table": m.has_drop_table,
-                    "has_drop_column": m.has_drop_column,
-                }
+        from ..models import (
+            HealthResult as _HealthResult,
+            HealthSummary as _HealthSummary,
+            HealthFindings as _HealthFindings,
+            HealthMigrationStatus as _HealthMigrationStatus,
+            HealthScore as _HealthScore,
+            HealthScoreBreakdown as _HealthScoreBreakdown,
+        )
+        model = _HealthResult(
+            folder=self.folder,
+            timestamp=self.timestamp,
+            summary=_HealthSummary(
+                total_migrations=self.total_migrations,
+                safe_migrations=self.safe_migrations,
+                unsafe_migrations=self.unsafe_migrations,
+                irreversible_migrations=self.irreversible_migrations,
+                safe_percentage=self.safe_percentage,
+            ),
+            findings=_HealthFindings(
+                errors=self.errors,
+                warnings=self.warnings,
+                infos=self.infos,
+                by_code=self.findings_by_code,
+            ),
+            migrations=[
+                _HealthMigrationStatus(
+                    filename=m.filename,
+                    status=m.status,
+                    errors=m.errors,
+                    warnings=m.warnings,
+                    has_drop_table=m.has_drop_table,
+                    has_drop_column=m.has_drop_column,
+                )
                 for m in self.migration_statuses
             ],
-            "health_score": {
-                "score": self.health_score.score,
-                "grade": self.health_score.grade,
-                "breakdown": self.health_score.breakdown,
-            },
-            "recommendation": self.health_score.recommendation,
-        }
-        return json.dumps(data, indent=2)
+            health_score=_HealthScore(
+                score=self.health_score.score,
+                grade=self.health_score.grade,
+                breakdown=_HealthScoreBreakdown(
+                    base=self.health_score.breakdown.get('base', 100),
+                    error_penalty=self.health_score.breakdown.get('error_penalty', 0),
+                    warning_penalty=self.health_score.breakdown.get('warning_penalty', 0),
+                    irreversible_penalty=self.health_score.breakdown.get('irreversible_penalty', 0),
+                ),
+            ),
+            recommendation=self.health_score.recommendation,
+        )
+        return model.model_dump_json(by_alias=True, indent=2)
 
 
 class HealthAnalyzer:

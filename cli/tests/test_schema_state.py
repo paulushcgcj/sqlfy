@@ -303,4 +303,4 @@ class TestSchemaStateSerialization:
         j = state.to_json()
         d = json.loads(j)
         assert d['tables']['APP.USERS']['name'] == 'USERS'
-        assert isinstance(d['tables']['APP.USERS']['column_count'], int)
+        assert isinstance(d['tables']['APP.USERS']['columnCount'], int)

@@ -136,12 +136,12 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
         {/* Health score badge */}
         {health && !healthLoading && (
           <button
-            className={`health-badge ${GRADE_CLASS[health.health_score.grade]}`}
+            className={`health-badge ${GRADE_CLASS[health.healthScore.grade]}`}
             onClick={() => setHealthExpanded((v) => !v)}
             title="Click to toggle health breakdown"
             aria-expanded={healthExpanded}
           >
-            {GRADE_LABEL[health.health_score.grade]} — {health.health_score.score}/100
+            {GRADE_LABEL[health.healthScore.grade]} — {health.healthScore.score}/100
           </button>
         )}
 
@@ -211,24 +211,24 @@ const MigrationsTab: FC<MigrationsTabProps> = ({ files, onChange, folderHandle, 
           </div>
 
           <div className="health-panel__summary">
-            <div className={`health-score-circle ${GRADE_CLASS[health.health_score.grade]}`}>
-              <span className="health-score-circle__num">{health.health_score.score}</span>
+            <div className={`health-score-circle ${GRADE_CLASS[health.healthScore.grade]}`}>
+              <span className="health-score-circle__num">{health.healthScore.score}</span>
               <span className="health-score-circle__label">/100</span>
             </div>
             <div className="health-panel__stats">
               <div className="hstat">
-                <span className="hstat__val hstat__val--ok">{health.summary.safe_migrations}</span>
+                <span className="hstat__val hstat__val--ok">{health.summary.safeMigrations}</span>
                 <span className="hstat__lbl">Safe</span>
               </div>
               <div className="hstat">
                 <span className="hstat__val hstat__val--warn">
-                  {health.summary.unsafe_migrations}
+                  {health.summary.unsafeMigrations}
                 </span>
                 <span className="hstat__lbl">Unsafe</span>
               </div>
               <div className="hstat">
                 <span className="hstat__val hstat__val--err">
-                  {health.summary.irreversible_migrations}
+                  {health.summary.irreversibleMigrations}
                 </span>
                 <span className="hstat__lbl">Irreversible</span>
               </div>

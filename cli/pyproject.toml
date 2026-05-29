@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 yaml = ["pyyaml"]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "datamodel-code-generator>=0.25"]
 # embeddings = ["voyageai"]   # only needed with --embed flag
 
 [project.scripts]

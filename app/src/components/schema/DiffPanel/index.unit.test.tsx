@@ -28,34 +28,34 @@ const mockFiles: MigrationFile[] = [
 ];
 
 const mockDiffResult: DiffVersionsResult = {
-  version_a: '1',
-  version_b: '2',
-  fingerprint_a: 'abc',
-  fingerprint_b: 'def',
+  versionA: '1',
+  versionB: '2',
+  fingerprintA: 'abc',
+  fingerprintB: 'def',
   stats: {
-    tables_added: 1,
-    tables_removed: 0,
-    tables_modified: 1,
-    columns_added: 2,
-    columns_removed: 0,
-    columns_modified: 0,
-    sequences_added: 0,
-    sequences_removed: 0,
-    relationships_added: 0,
-    relationships_removed: 0,
-    is_breaking: false,
+    tablesAdded: 1,
+    tablesRemoved: 0,
+    tablesModified: 1,
+    columnsAdded: 2,
+    columnsRemoved: 0,
+    columnsModified: 0,
+    sequencesAdded: 0,
+    sequencesRemoved: 0,
+    relationshipsAdded: 0,
+    relationshipsRemoved: 0,
+    isBreaking: false,
   },
-  table_changes: [
-    { full_name: 'APP.NEW_TABLE', change: 'added', breaking: false },
+  tableChanges: [
+    { fullName: 'APP.NEW_TABLE', change: 'added', breaking: false },
     {
-      full_name: 'APP.USERS',
+      fullName: 'APP.USERS',
       change: 'modified',
       breaking: false,
-      column_changes: [{ name: 'EMAIL', change: 'added', breaking: false }],
+      columnChanges: [{ name: 'EMAIL', change: 'added', breaking: false }],
     },
   ],
-  sequence_changes: [],
-  relationship_changes: [],
+  sequenceChanges: [],
+  relationshipChanges: [],
 };
 
 describe('DiffPanel', () => {

@@ -261,9 +261,9 @@ def test_format_impact_json():
     
     json_str = format_impact_json(result)
     
-    assert '"object_id": "A"' in json_str
+    assert '"objectId": "A"' in json_str
     assert '"direct": [\n    "B"\n  ]' in json_str or '"direct":["B"]' in json_str
-    assert '"total_count": 2' in json_str
+    assert '"totalCount": 2' in json_str
 
 
 def test_analyze_impact_complex_graph():

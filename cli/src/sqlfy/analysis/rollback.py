@@ -498,21 +498,32 @@ def format_rollback_text(results: list[RollbackAnalysis]) -> str:
 
 def format_rollback_json(results: list[RollbackAnalysis]) -> str:
     """Format rollback analysis as JSON."""
-    import json
-    
-    # Summary statistics
+    from ..models import (
+        RollbackResult as _RollbackResult,
+        RollbackAnalysis as _RollbackAnalysis,
+        Summary as _Summary,
+    )
     reversible = sum(1 for r in results if r.feasibility == 'reversible')
     partial = sum(1 for r in results if r.feasibility == 'partial')
     irreversible = sum(1 for r in results if r.feasibility == 'irreversible')
-    
-    data = {
-        'summary': {
-            'total': len(results),
-            'reversible': reversible,
-            'partial': partial,
-            'irreversible': irreversible,
-        },
-        'migrations': [r.to_dict() for r in results]
-    }
-    
-    return json.dumps(data, indent=2)
+    model = _RollbackResult(
+        summary=_Summary(
+            total=len(results),
+            reversible=reversible,
+            partial=partial,
+            irreversible=irreversible,
+        ),
+        migrations=[
+            _RollbackAnalysis(
+                migration=r.migration,
+                feasibility=r.feasibility,
+                score=r.score,
+                rollback_script=r.rollback_script,
+                warnings=r.warnings,
+                recommendations=r.recommendations,
+                operations=r.operations,
+            )
+            for r in results
+        ],
+    )
+    return model.model_dump_json(by_alias=True, indent=2)

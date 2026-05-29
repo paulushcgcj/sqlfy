@@ -10,15 +10,15 @@ import './index.scss';
 // ── Stat rows shown in the diff summary ────────────────────────────────────
 interface DiffRow {
   label: string;
-  addedKey: keyof import('@/bridge/cli').SimulateDiffStats;
-  removedKey: keyof import('@/bridge/cli').SimulateDiffStats;
+  addedKey: keyof import('@/core/types').DiffStats;
+  removedKey: keyof import('@/core/types').DiffStats;
 }
 
 const DIFF_ROWS: DiffRow[] = [
-  { label: 'Tables', addedKey: 'tables_added', removedKey: 'tables_removed' },
-  { label: 'Columns', addedKey: 'columns_added', removedKey: 'columns_removed' },
-  { label: 'Sequences', addedKey: 'sequences_added', removedKey: 'sequences_removed' },
-  { label: 'Relationships', addedKey: 'relationships_added', removedKey: 'relationships_removed' },
+  { label: 'Tables', addedKey: 'tablesAdded', removedKey: 'tablesRemoved' },
+  { label: 'Columns', addedKey: 'columnsAdded', removedKey: 'columnsRemoved' },
+  { label: 'Sequences', addedKey: 'sequencesAdded', removedKey: 'sequencesRemoved' },
+  { label: 'Relationships', addedKey: 'relationshipsAdded', removedKey: 'relationshipsRemoved' },
 ];
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -129,26 +129,26 @@ export default function SimulatePanel({ files }: SimulatePanelProps) {
 // ── Results sub-component ───────────────────────────────────────────────────
 
 function SimulateResults({ result }: { result: SimulateResult }) {
-  const { is_safe, is_breaking, health, errors, warnings, diff, base_version } = result;
+  const { isSafe, isBreaking, health, errors, warnings, diff, baseVersion } = result;
 
   const hasDiffChanges = diff
     ? DIFF_ROWS.some((r) => diff.stats[r.addedKey] > 0 || diff.stats[r.removedKey] > 0)
     : false;
 
   const modified =
-    diff?.stats.tables_modified || diff?.stats.columns_modified
-      ? diff.stats.tables_modified + diff.stats.columns_modified
+    diff?.stats.tablesModified || diff?.stats.columnsModified
+      ? diff.stats.tablesModified + diff.stats.columnsModified
       : 0;
 
   return (
     <div className="sim-results">
       {/* Status badges */}
       <div className="sim-results__badges">
-        <span className={`sim-badge sim-badge--${is_safe ? 'safe' : 'unsafe'}`}>
-          {is_safe ? '✓ Safe' : '✕ Unsafe'}
+        <span className={`sim-badge sim-badge--${isSafe ? 'safe' : 'unsafe'}`}>
+          {isSafe ? '✓ Safe' : '✕ Unsafe'}
         </span>
 
-        {is_breaking && <span className="sim-badge sim-badge--breaking">⚠ Breaking Changes</span>}
+        {isBreaking && <span className="sim-badge sim-badge--breaking">⚠ Breaking Changes</span>}
 
         <span className={`sim-badge sim-badge--health-${health.grade}`}>
           Health {health.score}/100 · {health.grade}
@@ -156,7 +156,7 @@ function SimulateResults({ result }: { result: SimulateResult }) {
       </div>
 
       <p className="sim-results__meta">
-        Simulated at base version <strong>V{base_version}</strong>
+        Simulated at base version <strong>V{baseVersion}</strong>
       </p>
 
       {/* Errors */}
@@ -213,7 +213,7 @@ function SimulateResults({ result }: { result: SimulateResult }) {
         </div>
       )}
 
-      {!hasDiffChanges && !is_breaking && (
+      {!hasDiffChanges && !isBreaking && (
         <p className="sim-results__no-changes">No structural changes detected.</p>
       )}
 

@@ -303,5 +303,15 @@ def format_impact_json(result: ImpactResult) -> str:
     Returns:
         JSON string
     """
-    import json
-    return json.dumps(result.to_dict(), indent=2, ensure_ascii=False)
+    from ..models import ImpactResult as _ImpactResult
+    model = _ImpactResult(
+        object_id=result.object_id,
+        direct=result.direct,
+        transitive=result.transitive,
+        depth_map=result.depth_map,
+        by_type=result.by_type,
+        critical_paths=result.critical_paths,
+        max_depth=result.max_depth,
+        total_count=result.total_count,
+    )
+    return model.model_dump_json(by_alias=True, indent=2)
