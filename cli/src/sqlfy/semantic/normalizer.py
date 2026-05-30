@@ -148,7 +148,7 @@ class Normalizer:
                 c = _parse_table_constraint(item)
                 if c:
                     constraints.append(_to_constraint_def(c))
-        return CreateTableOperation(provenance=prov, table=table_name, schema=schema,
+        return CreateTableOperation(provenance=prov, table=table_name, schema_=schema,
                                      columns=columns, constraints=constraints)
 
     def _create_index(self, stmt: exp.Create, prov: OperationProvenance) -> CreateIndexOperation:
@@ -170,7 +170,7 @@ class Normalizer:
         this = stmt.this
         seq_name = _table_full(this) if hasattr(this, "name") else str(this)
         schema, _ = _table_schema_name(this) if hasattr(this, "args") else (None, seq_name)
-        return CreateSequenceOperation(provenance=prov, sequence=seq_name, schema=schema)
+        return CreateSequenceOperation(provenance=prov, sequence=seq_name, schema_=schema)
 
     # ── DROP ────────────────────────────────────────────────
 

@@ -265,7 +265,7 @@ class SchemaState:
 
         def _tbl(t: TableState) -> _TableState:
             return _TableState(
-                **{'schema': t.schema},
+                schema_=t.schema,
                 name=t.name,
                 full_name=t.full_name,
                 columns=[_col(c) for c in t.columns],
@@ -281,7 +281,7 @@ class SchemaState:
 
         def _seq(s: SequenceState) -> _SequenceState:
             return _SequenceState(
-                **{'schema': s.schema},
+                schema_=s.schema,
                 name=s.name,
                 full_name=s.full_name,
                 start_with=s.start_with,

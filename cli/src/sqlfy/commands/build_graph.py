@@ -120,19 +120,18 @@ def cmd_build_graph(
     """
     start_time = time.time()
 
-    output_dir_path = Path(output_dir or 'graphify-out')
+    out_dir: Path = Path(out_dir or 'graphify-out')
     files = load_files(migrations_dir, json_input)
     version = at
     enable_splitting = not no_split
     skip_queries = no_queries
     skip_viz = no_viz
-    output_dir = output_dir_path
     
     # Create output directories
-    output_dir.mkdir(parents=True, exist_ok=True)
-    queries_dir = output_dir / 'queries'
-    insights_dir = output_dir / 'insights'
-    viz_dir = output_dir / 'viz'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    queries_dir = out_dir / 'queries'
+    insights_dir = out_dir / 'insights'
+    viz_dir = out_dir / 'viz'
     queries_dir.mkdir(exist_ok=True)
     insights_dir.mkdir(exist_ok=True)
     if not skip_viz:
@@ -143,7 +142,7 @@ def cmd_build_graph(
     print("╚══════════════════════════════════════════════════════════╝", file=sys.stderr)
     print(file=sys.stderr)
     print(f"📂 Building graph from: {migrations_dir}", file=sys.stderr)
-    print(f"📍 Output directory: {output_dir}", file=sys.stderr)
+    print(f"📍 Output directory: {out_dir}", file=sys.stderr)
     print(file=sys.stderr)
     
     # ─────────────────────────────────────────────────────────────
@@ -190,7 +189,7 @@ def cmd_build_graph(
         'algorithm': comm_result.algorithm,
         'resolution': resolution
     }
-    with open(output_dir / 'communities.json', 'w', encoding='utf-8') as f:
+    with open(out_dir / 'communities.json', 'w', encoding='utf-8') as f:
         json.dump(communities_data, f, indent=2)
     print(file=sys.stderr)
     
@@ -207,7 +206,7 @@ def cmd_build_graph(
     god_node_count = len(god_nodes)
     print(f"   ✓ Computing god nodes (top {god_node_count} by degree centrality)", file=sys.stderr)
     
-    with open(output_dir / 'god-nodes.json', 'w', encoding='utf-8') as f:
+    with open(out_dir / 'god-nodes.json', 'w', encoding='utf-8') as f:
         json.dump({'god_nodes': god_nodes, 'count': god_node_count, 'min_refs': min_refs}, f, indent=2)
     
     # Insights
@@ -246,7 +245,7 @@ def cmd_build_graph(
             'count': len(god_cols),
             'min_refs': min_refs
         }
-        with open(output_dir / 'god-columns.json', 'w', encoding='utf-8') as f:
+        with open(out_dir / 'god-columns.json', 'w', encoding='utf-8') as f:
             json.dump(god_cols_data, f, indent=2)
         print("   ✓ Analyzing column lineage", file=sys.stderr)
     except ImportError:
@@ -306,12 +305,12 @@ def cmd_build_graph(
     print("🎨 Phase 5: Visualizations", file=sys.stderr)
     
     # NetworkX JSON + HTML + Report (always generated)
-    export_graph_json(nx_graph, output_path=output_dir / 'graph.json', 
+    export_graph_json(nx_graph, output_path=out_dir / 'graph.json', 
                       resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
     print("   ✓ Generating graph.json (NetworkX format)", file=sys.stderr)
     viz_count += 1
     
-    export_graph_html(nx_graph, output_path=output_dir / 'graph.html',
+    export_graph_html(nx_graph, output_path=out_dir / 'graph.html',
                       resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
     print("   ✓ Generating graph.html (interactive vis.js)", file=sys.stderr)
     viz_count += 1
@@ -364,13 +363,13 @@ def cmd_build_graph(
     print("📝 Phase 6: Report Generation", file=sys.stderr)
     
     # Comprehensive GRAPH_REPORT.md
-    export_graph_report(nx_graph, output_path=output_dir / 'GRAPH_REPORT.md',
+    export_graph_report(nx_graph, output_path=out_dir / 'GRAPH_REPORT.md',
                         resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
     print("   ✓ Writing GRAPH_REPORT.md (comprehensive analysis)", file=sys.stderr)
     
     # Manifest metadata
     manifest = state.to_manifest()
-    with open(output_dir / 'manifest.json', 'w', encoding='utf-8') as f:
+    with open(out_dir / 'manifest.json', 'w', encoding='utf-8') as f:
         json.dump(manifest, f, indent=2)
     print("   ✓ Writing manifest.json (metadata)", file=sys.stderr)
     
@@ -385,17 +384,17 @@ def cmd_build_graph(
     print("✅ GRAPH BUILD COMPLETE", file=sys.stderr)
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", file=sys.stderr)
     print(file=sys.stderr)
-    print(f"📦 Output: {output_dir}/", file=sys.stderr)
+    print(f"📦 Output: {out_dir}/", file=sys.stderr)
     print(f"   • graph.json ({node_count} nodes, {edge_count} edges)", file=sys.stderr)
     print(f"   • graph.html (interactive)", file=sys.stderr)
-    print(f"   • GRAPH_REPORT.md ({(output_dir / 'GRAPH_REPORT.md').stat().st_size:,} bytes)", file=sys.stderr)
+    print(f"   • GRAPH_REPORT.md ({(out_dir / 'GRAPH_REPORT.md').stat().st_size:,} bytes)", file=sys.stderr)
     print(f"   • {community_count} community files", file=sys.stderr)
     print(f"   • {query_count} pre-computed queries", file=sys.stderr)
     print(f"   • {viz_count} visualization formats", file=sys.stderr)
     print(file=sys.stderr)
     print("🔗 Next steps:", file=sys.stderr)
-    print(f"   • Open {output_dir / 'graph.html'} in browser for interactive exploration", file=sys.stderr)
-    print(f"   • Read {output_dir / 'GRAPH_REPORT.md'} for detailed analysis", file=sys.stderr)
+    print(f"   • Open {out_dir / 'graph.html'} in browser for interactive exploration", file=sys.stderr)
+    print(f"   • Read {out_dir / 'GRAPH_REPORT.md'} for detailed analysis", file=sys.stderr)
     print(f"   • Use queries/ for quick insights", file=sys.stderr)
     print(f"   • Import graph.json for programmatic analysis", file=sys.stderr)
     print(file=sys.stderr)
@@ -403,11 +402,11 @@ def cmd_build_graph(
     
     # Build result
     result = GraphBuildResult(
-        output_dir=output_dir,
-        graph_path=output_dir / 'graph.json',
-        html_path=output_dir / 'graph.html',
-        report_path=output_dir / 'GRAPH_REPORT.md',
-        manifest_path=output_dir / 'manifest.json',
+        out_dir=out_dir,
+        graph_path=out_dir / 'graph.json',
+        html_path=out_dir / 'graph.html',
+        report_path=out_dir / 'GRAPH_REPORT.md',
+        manifest_path=out_dir / 'manifest.json',
         node_count=node_count,
         edge_count=edge_count,
         community_count=community_count,
@@ -420,5 +419,5 @@ def cmd_build_graph(
     )
     
     # Write build result
-    with open(output_dir / 'build-result.json', 'w', encoding='utf-8') as f:
+    with open(out_dir / 'build-result.json', 'w', encoding='utf-8') as f:
         f.write(result.to_json())

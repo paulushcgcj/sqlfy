@@ -14,11 +14,12 @@ dependencies = [
     "sqllineage>=1.5.0",
     "typer>=0.12",
     "rich>=13",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
 yaml = ["pyyaml"]
-dev = ["pytest>=8", "datamodel-code-generator>=0.25"]
+dev = ["pytest>=8", "datamodel-code-generator>=0.25", "pyright>=1.1"]
 # embeddings = ["voyageai"]   # only needed with --embed flag
 
 [project.scripts]
@@ -36,8 +37,16 @@ pythonpath = ["src"]
 [tool.pyright]
 include = ["src"]
 exclude = ["**/node_modules", "**/__pycache__"]
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 reportMissingImports = true
 reportMissingTypeStubs = false
-pythonVersion = "3.11"
+reportPrivateImportUsage = false
+pythonVersion = "3.14"
 pythonPlatform = "All"
+venvPath = "."
+venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.409",
+]

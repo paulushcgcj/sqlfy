@@ -161,10 +161,10 @@ class HealthMigrationStatus(BaseModel):
     errors: int = Field(..., description='Error count.')
     warnings: int = Field(..., description='Warning count.')
     has_drop_table: bool = Field(
-        ..., alias='hasDropTable', description='Contains DROP TABLE.'
+        ..., serialization_alias='hasDropTable', description='Contains DROP TABLE.'
     )
     has_drop_column: bool = Field(
-        ..., alias='hasDropColumn', description='Contains DROP COLUMN.'
+        ..., serialization_alias='hasDropColumn', description='Contains DROP COLUMN.'
     )
 
 
@@ -179,13 +179,13 @@ class HealthScoreBreakdown(BaseModel):
     )
     base: int = Field(..., description='Base score.')
     error_penalty: int = Field(
-        ..., alias='errorPenalty', description='Error deduction.'
+        ..., serialization_alias='errorPenalty', description='Error deduction.'
     )
     warning_penalty: int = Field(
-        ..., alias='warningPenalty', description='Warning deduction.'
+        ..., serialization_alias='warningPenalty', description='Warning deduction.'
     )
     irreversible_penalty: int = Field(
-        ..., alias='irreversiblePenalty', description='Irreversible deduction.'
+        ..., serialization_alias='irreversiblePenalty', description='Irreversible deduction.'
     )
 
 
@@ -213,17 +213,17 @@ class HealthSummary(BaseModel):
         populate_by_name=True,
     )
     total_migrations: int = Field(
-        ..., alias='totalMigrations', description='Total count.'
+        ..., serialization_alias='totalMigrations', description='Total count.'
     )
-    safe_migrations: int = Field(..., alias='safeMigrations', description='Safe count.')
+    safe_migrations: int = Field(..., serialization_alias='safeMigrations', description='Safe count.')
     unsafe_migrations: int = Field(
-        ..., alias='unsafeMigrations', description='Unsafe count.'
+        ..., serialization_alias='unsafeMigrations', description='Unsafe count.'
     )
     irreversible_migrations: int = Field(
-        ..., alias='irreversibleMigrations', description='Irreversible count.'
+        ..., serialization_alias='irreversibleMigrations', description='Irreversible count.'
     )
     safe_percentage: int = Field(
-        ..., alias='safePercentage', description='Percent safe 0-100.'
+        ..., serialization_alias='safePercentage', description='Percent safe 0-100.'
     )
 
 
@@ -240,7 +240,7 @@ class HealthFindings(BaseModel):
     warnings: int = Field(..., description='Total warning count.')
     infos: int = Field(..., description='Total info count.')
     by_code: dict[str, int] = Field(
-        ..., alias='byCode', description='Counts by rule code.'
+        ..., serialization_alias='byCode', description='Counts by rule code.'
     )
 
 
@@ -261,7 +261,7 @@ class HealthResult(BaseModel):
         ..., description='Per-migration rows.'
     )
     health_score: HealthScore = Field(
-        ..., alias='healthScore', description='Health score.'
+        ..., serialization_alias='healthScore', description='Health score.'
     )
     recommendation: str = Field(..., description='Human-readable recommendation.')
 
@@ -275,34 +275,34 @@ class DiffStats(BaseModel):
         extra='forbid',
         populate_by_name=True,
     )
-    tables_added: int = Field(..., alias='tablesAdded', description='Tables added.')
+    tables_added: int = Field(..., serialization_alias='tablesAdded', description='Tables added.')
     tables_removed: int = Field(
-        ..., alias='tablesRemoved', description='Tables removed.'
+        ..., serialization_alias='tablesRemoved', description='Tables removed.'
     )
     tables_modified: int = Field(
-        ..., alias='tablesModified', description='Tables modified.'
+        ..., serialization_alias='tablesModified', description='Tables modified.'
     )
-    columns_added: int = Field(..., alias='columnsAdded', description='Columns added.')
+    columns_added: int = Field(..., serialization_alias='columnsAdded', description='Columns added.')
     columns_removed: int = Field(
-        ..., alias='columnsRemoved', description='Columns removed.'
+        ..., serialization_alias='columnsRemoved', description='Columns removed.'
     )
     columns_modified: int = Field(
-        ..., alias='columnsModified', description='Columns modified.'
+        ..., serialization_alias='columnsModified', description='Columns modified.'
     )
     sequences_added: int = Field(
-        ..., alias='sequencesAdded', description='Sequences added.'
+        ..., serialization_alias='sequencesAdded', description='Sequences added.'
     )
     sequences_removed: int = Field(
-        ..., alias='sequencesRemoved', description='Sequences removed.'
+        ..., serialization_alias='sequencesRemoved', description='Sequences removed.'
     )
     relationships_added: int = Field(
-        ..., alias='relationshipsAdded', description='FK relationships added.'
+        ..., serialization_alias='relationshipsAdded', description='FK relationships added.'
     )
     relationships_removed: int = Field(
-        ..., alias='relationshipsRemoved', description='FK relationships removed.'
+        ..., serialization_alias='relationshipsRemoved', description='FK relationships removed.'
     )
     is_breaking: bool = Field(
-        ..., alias='isBreaking', description='Any breaking change.'
+        ..., serialization_alias='isBreaking', description='Any breaking change.'
     )
 
 
@@ -386,18 +386,18 @@ class DiffTableChange(BaseModel):
         populate_by_name=True,
     )
     full_name: str = Field(
-        ..., alias='fullName', description='Fully-qualified table name.'
+        ..., serialization_alias='fullName', description='Fully-qualified table name.'
     )
     change: Change = Field(..., description='added | removed | modified.')
     breaking: bool = Field(..., description='Is this change breaking.')
     column_changes: list[DiffColumnChange] | None = Field(
-        None, alias='columnChanges', description='Column changes.'
+        None, serialization_alias='columnChanges', description='Column changes.'
     )
     constraint_changes: list[DiffConstraintChange] | None = Field(
-        None, alias='constraintChanges', description='Constraint changes.'
+        None, serialization_alias='constraintChanges', description='Constraint changes.'
     )
     index_changes: list[DiffIndexChange] | None = Field(
-        None, alias='indexChanges', description='Index changes.'
+        None, serialization_alias='indexChanges', description='Index changes.'
     )
 
 
@@ -411,7 +411,7 @@ class DiffSequenceChange(BaseModel):
         populate_by_name=True,
     )
     full_name: str = Field(
-        ..., alias='fullName', description='Fully-qualified sequence name.'
+        ..., serialization_alias='fullName', description='Fully-qualified sequence name.'
     )
     change: Change = Field(..., description='added | removed | modified.')
     diffs: list[str] | None = Field(None, description='Field change descriptions.')
@@ -427,14 +427,14 @@ class DiffRelationshipChange(BaseModel):
         populate_by_name=True,
     )
     change: Change1 = Field(..., description='added | removed.')
-    from_: str = Field(..., alias='from', description='Source table name.')
+    from_: str = Field(..., serialization_alias='from', description='Source table name.')
     from_cols: list[str] = Field(
-        ..., alias='fromCols', description='Source column names.'
+        ..., serialization_alias='fromCols', description='Source column names.'
     )
     to: str = Field(..., description='Target table name.')
-    to_cols: list[str] = Field(..., alias='toCols', description='Target column names.')
+    to_cols: list[str] = Field(..., serialization_alias='toCols', description='Target column names.')
     on_delete: str | None = Field(
-        ..., alias='onDelete', description='ON DELETE action. Null if none.'
+        ..., serialization_alias='onDelete', description='ON DELETE action. Null if none.'
     )
 
 
@@ -447,23 +447,23 @@ class DiffResult(BaseModel):
         extra='forbid',
         populate_by_name=True,
     )
-    version_a: str = Field(..., alias='versionA', description='Source version.')
-    version_b: str = Field(..., alias='versionB', description='Target version.')
+    version_a: str = Field(..., serialization_alias='versionA', description='Source version.')
+    version_b: str = Field(..., serialization_alias='versionB', description='Target version.')
     fingerprint_a: str = Field(
-        ..., alias='fingerprintA', description='Source SHA-256 fingerprint.'
+        ..., serialization_alias='fingerprintA', description='Source SHA-256 fingerprint.'
     )
     fingerprint_b: str = Field(
-        ..., alias='fingerprintB', description='Target SHA-256 fingerprint.'
+        ..., serialization_alias='fingerprintB', description='Target SHA-256 fingerprint.'
     )
     stats: DiffStats = Field(..., description='Change counts.')
     table_changes: list[DiffTableChange] = Field(
-        ..., alias='tableChanges', description='Table changes.'
+        ..., serialization_alias='tableChanges', description='Table changes.'
     )
     sequence_changes: list[DiffSequenceChange] = Field(
-        ..., alias='sequenceChanges', description='Sequence changes.'
+        ..., serialization_alias='sequenceChanges', description='Sequence changes.'
     )
     relationship_changes: list[DiffRelationshipChange] = Field(
-        ..., alias='relationshipChanges', description='FK changes.'
+        ..., serialization_alias='relationshipChanges', description='FK changes.'
     )
 
 
@@ -493,7 +493,7 @@ class SimulateDiff(BaseModel):
     )
     stats: DiffStats = Field(..., description='Change counts.')
     is_breaking: bool = Field(
-        ..., alias='isBreaking', description='Any breaking change.'
+        ..., serialization_alias='isBreaking', description='Any breaking change.'
     )
 
 
@@ -508,13 +508,13 @@ class SimulateResult(BaseModel):
     )
     timestamp: str = Field(..., description='ISO-8601 simulation timestamp.')
     base_version: str = Field(
-        ..., alias='baseVersion', description='Base migration version.'
+        ..., serialization_alias='baseVersion', description='Base migration version.'
     )
     sql: str = Field(..., description='The simulated DDL.')
     success: bool = Field(..., description='Applied without parse errors.')
-    is_safe: bool = Field(..., alias='isSafe', description='No destructive operations.')
+    is_safe: bool = Field(..., serialization_alias='isSafe', description='No destructive operations.')
     is_breaking: bool = Field(
-        ..., alias='isBreaking', description='At least one breaking change detected.'
+        ..., serialization_alias='isBreaking', description='At least one breaking change detected.'
     )
     errors: list[str] = Field(..., description='Parse/validation errors.')
     warnings: list[str] = Field(..., description='Advisory warnings.')
@@ -531,25 +531,25 @@ class ImpactResult(BaseModel):
         extra='forbid',
         populate_by_name=True,
     )
-    object_id: str = Field(..., alias='objectId', description='Analyzed schema object.')
+    object_id: str = Field(..., serialization_alias='objectId', description='Analyzed schema object.')
     direct: list[str] = Field(..., description='Directly affected objects (depth 1).')
     transitive: list[str] = Field(
         ..., description='Transitively affected objects (depth > 1).'
     )
     depth_map: dict[str, int] = Field(
-        ..., alias='depthMap', description='Object ID to traversal depth.'
+        ..., serialization_alias='depthMap', description='Object ID to traversal depth.'
     )
     by_type: dict[str, list[str]] = Field(
-        ..., alias='byType', description='Affected objects grouped by type.'
+        ..., serialization_alias='byType', description='Affected objects grouped by type.'
     )
     critical_paths: list[list[str]] = Field(
-        ..., alias='criticalPaths', description='Critical paths from source to leaves.'
+        ..., serialization_alias='criticalPaths', description='Critical paths from source to leaves.'
     )
     max_depth: int = Field(
-        ..., alias='maxDepth', description='Maximum traversal depth reached.'
+        ..., serialization_alias='maxDepth', description='Maximum traversal depth reached.'
     )
     total_count: int = Field(
-        ..., alias='totalCount', description='Total affected count excluding source.'
+        ..., serialization_alias='totalCount', description='Total affected count excluding source.'
     )
 
 
@@ -579,7 +579,7 @@ class RollbackAnalysis(BaseModel):
     score: int = Field(..., description='Rollback difficulty score 0-100.')
     rollback_script: str | None = Field(
         ...,
-        alias='rollbackScript',
+        serialization_alias='rollbackScript',
         description='Suggested rollback SQL. Null if irreversible.',
     )
     warnings: list[str] = Field(..., description='Risk warnings.')
@@ -627,35 +627,35 @@ class SchemaManifest(BaseModel):
         populate_by_name=True,
     )
     schema_version: str = Field(
-        ..., alias='schemaVersion', description='Latest migration version.'
+        ..., serialization_alias='schemaVersion', description='Latest migration version.'
     )
     fingerprint: str = Field(..., description='SHA-256 fingerprint.')
     dialect: str = Field(..., description='SQL dialect.')
     generated_at: str = Field(
-        ..., alias='generatedAt', description='ISO-8601 timestamp.'
+        ..., serialization_alias='generatedAt', description='ISO-8601 timestamp.'
     )
     sqlfy_version: str = Field(
-        ..., alias='sqlfyVersion', description='sqlfy tool version.'
+        ..., serialization_alias='sqlfyVersion', description='sqlfy tool version.'
     )
-    node_count: int = Field(..., alias='nodeCount', description='Graph node count.')
-    edge_count: int = Field(..., alias='edgeCount', description='Graph edge count.')
-    table_count: int = Field(..., alias='tableCount', description='Table count.')
-    column_count: int = Field(..., alias='columnCount', description='Column count.')
+    node_count: int = Field(..., serialization_alias='nodeCount', description='Graph node count.')
+    edge_count: int = Field(..., serialization_alias='edgeCount', description='Graph edge count.')
+    table_count: int = Field(..., serialization_alias='tableCount', description='Table count.')
+    column_count: int = Field(..., serialization_alias='columnCount', description='Column count.')
     sequence_count: int = Field(
-        ..., alias='sequenceCount', description='Sequence count.'
+        ..., serialization_alias='sequenceCount', description='Sequence count.'
     )
     relationship_count: int = Field(
-        ..., alias='relationshipCount', description='FK relationship count.'
+        ..., serialization_alias='relationshipCount', description='FK relationship count.'
     )
-    index_count: int = Field(..., alias='indexCount', description='Index count.')
+    index_count: int = Field(..., serialization_alias='indexCount', description='Index count.')
     tables_without_pk: int = Field(
-        ..., alias='tablesWithoutPk', description='Tables without primary key.'
+        ..., serialization_alias='tablesWithoutPk', description='Tables without primary key.'
     )
     migration_count: int = Field(
-        ..., alias='migrationCount', description='Migration file count.'
+        ..., serialization_alias='migrationCount', description='Migration file count.'
     )
     migration_history: list[MigrationHistory] = Field(
-        ..., alias='migrationHistory', description='Ordered migration list.'
+        ..., serialization_alias='migrationHistory', description='Ordered migration list.'
     )
 
 
@@ -670,18 +670,18 @@ class ColumnState(BaseModel):
     )
     name: str = Field(..., description='Column name.')
     data_type: str = Field(
-        ..., alias='dataType', description='Rendered type e.g. NUMBER(10,2).'
+        ..., serialization_alias='dataType', description='Rendered type e.g. NUMBER(10,2).'
     )
     raw_type: str = Field(
-        ..., alias='rawType', description='Base type name e.g. NUMBER.'
+        ..., serialization_alias='rawType', description='Base type name e.g. NUMBER.'
     )
     precision: int | None = Field(..., description='Numeric precision. Null if N/A.')
     scale: int | None = Field(..., description='Numeric scale. Null if N/A.')
     nullable: bool = Field(..., description='Accepts NULL.')
     default: str | None = Field(..., description='Default expression. Null if none.')
-    is_pk: bool = Field(..., alias='isPk', description='Part of primary key.')
-    is_fk: bool = Field(..., alias='isFk', description='Part of foreign key.')
-    is_unique: bool = Field(..., alias='isUnique', description='Has unique constraint.')
+    is_pk: bool = Field(..., serialization_alias='isPk', description='Part of primary key.')
+    is_fk: bool = Field(..., serialization_alias='isFk', description='Part of foreign key.')
+    is_unique: bool = Field(..., serialization_alias='isUnique', description='Has unique constraint.')
     comment: str | None = Field(..., description='Column comment. Null if none.')
 
 
@@ -698,16 +698,16 @@ class ConstraintState(BaseModel):
     type: str = Field(..., description='primary_key|unique|foreign_key|check.')
     columns: list[str] = Field(..., description='Column names.')
     ref_table: str | None = Field(
-        None, alias='refTable', description='Referenced table (FK only).'
+        None, serialization_alias='refTable', description='Referenced table (FK only).'
     )
     ref_columns: list[str] | None = Field(
-        None, alias='refColumns', description='Referenced columns (FK only).'
+        None, serialization_alias='refColumns', description='Referenced columns (FK only).'
     )
     on_delete: str | None = Field(
-        None, alias='onDelete', description='ON DELETE action (FK only).'
+        None, serialization_alias='onDelete', description='ON DELETE action (FK only).'
     )
     check_expr: str | None = Field(
-        None, alias='checkExpr', description='CHECK expression (CHECK only).'
+        None, serialization_alias='checkExpr', description='CHECK expression (CHECK only).'
     )
 
 
@@ -724,7 +724,7 @@ class IndexState(BaseModel):
     columns: list[str] = Field(..., description='Columns in the index.')
     unique: bool = Field(..., description='Whether unique.')
     created_in: str = Field(
-        ..., alias='createdIn', description='Created in migration ver.'
+        ..., serialization_alias='createdIn', description='Created in migration ver.'
     )
 
 
@@ -738,26 +738,26 @@ class TableState(BaseModel):
         populate_by_name=True,
     )
     schema_: str | None = Field(
-        ..., alias='schema', description='Schema/owner. Null for default.'
+        ..., serialization_alias='schema', description='Schema/owner. Null for default.'
     )
     name: str = Field(..., description='Table name (uppercased).')
-    full_name: str = Field(..., alias='fullName', description='Fully-qualified name.')
+    full_name: str = Field(..., serialization_alias='fullName', description='Fully-qualified name.')
     columns: list[ColumnState] = Field(..., description='Ordered columns.')
     constraints: list[ConstraintState] = Field(..., description='Constraints.')
     indexes: list[IndexState] = Field(..., description='Indexes.')
     comment: str | None = Field(..., description='Table comment.')
     created_in: str = Field(
-        ..., alias='createdIn', description='Created in migration ver.'
+        ..., serialization_alias='createdIn', description='Created in migration ver.'
     )
     modified_in: list[str] = Field(
-        ..., alias='modifiedIn', description='Modified in migration versions.'
+        ..., serialization_alias='modifiedIn', description='Modified in migration versions.'
     )
     column_count: int = Field(
-        ..., alias='columnCount', description='Number of columns.'
+        ..., serialization_alias='columnCount', description='Number of columns.'
     )
-    has_pk: bool = Field(..., alias='hasPk', description='Has a primary key.')
+    has_pk: bool = Field(..., serialization_alias='hasPk', description='Has a primary key.')
     pk_columns: list[str] = Field(
-        ..., alias='pkColumns', description='PK column names.'
+        ..., serialization_alias='pkColumns', description='PK column names.'
     )
 
 
@@ -771,16 +771,16 @@ class SequenceState(BaseModel):
         populate_by_name=True,
     )
     schema_: str | None = Field(
-        ..., alias='schema', description='Schema/owner. Null for default.'
+        ..., serialization_alias='schema', description='Schema/owner. Null for default.'
     )
     name: str = Field(..., description='Sequence name.')
-    full_name: str = Field(..., alias='fullName', description='Fully-qualified name.')
-    start_with: int = Field(..., alias='startWith', description='START WITH value.')
+    full_name: str = Field(..., serialization_alias='fullName', description='Fully-qualified name.')
+    start_with: int = Field(..., serialization_alias='startWith', description='START WITH value.')
     increment_by: int = Field(
-        ..., alias='incrementBy', description='INCREMENT BY value.'
+        ..., serialization_alias='incrementBy', description='INCREMENT BY value.'
     )
     created_in: str = Field(
-        ..., alias='createdIn', description='Created in migration ver.'
+        ..., serialization_alias='createdIn', description='Created in migration ver.'
     )
 
 
@@ -794,17 +794,17 @@ class RelationshipState(BaseModel):
         populate_by_name=True,
     )
     id: str = Field(..., description='Unique relationship ID.')
-    from_table: str = Field(..., alias='fromTable', description='Source table.')
+    from_table: str = Field(..., serialization_alias='fromTable', description='Source table.')
     from_columns: list[str] = Field(
-        ..., alias='fromColumns', description='Source columns.'
+        ..., serialization_alias='fromColumns', description='Source columns.'
     )
-    to_table: str = Field(..., alias='toTable', description='Target table.')
-    to_columns: list[str] = Field(..., alias='toColumns', description='Target columns.')
+    to_table: str = Field(..., serialization_alias='toTable', description='Target table.')
+    to_columns: list[str] = Field(..., serialization_alias='toColumns', description='Target columns.')
     constraint_name: str | None = Field(
-        ..., alias='constraintName', description='FK name. Null if unnamed.'
+        ..., serialization_alias='constraintName', description='FK name. Null if unnamed.'
     )
     on_delete: str | None = Field(
-        ..., alias='onDelete', description='ON DELETE action. Null if none.'
+        ..., serialization_alias='onDelete', description='ON DELETE action. Null if none.'
     )
     cardinality: str = Field(..., description='many_to_one | one_to_one | unknown.')
 
@@ -820,7 +820,7 @@ class SchemaState(BaseModel):
     )
     version: str = Field(..., description='Latest migration version.')
     generated_at: str = Field(
-        ..., alias='generatedAt', description='ISO-8601 generation timestamp.'
+        ..., serialization_alias='generatedAt', description='ISO-8601 generation timestamp.'
     )
     fingerprint: str = Field(..., description='SHA-256 fingerprint.')
     dialect: str = Field(..., description='SQL dialect.')
@@ -832,6 +832,6 @@ class SchemaState(BaseModel):
         ..., description='All FK relationships.'
     )
     migration_history: list[MigrationHistory] = Field(
-        ..., alias='migrationHistory', description='Ordered migration list.'
+        ..., serialization_alias='migrationHistory', description='Ordered migration list.'
     )
     stats: dict[str, int] = Field(..., description='Summary counts.')

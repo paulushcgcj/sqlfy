@@ -51,6 +51,6 @@ class CreateTableExtractor(BaseExtractor):
                         on_delete=getattr(c, "on_delete", None),
                     ))
         return [CreateTableOperation(
-            provenance=provenance, table=table_name, schema=schema,
+            provenance=provenance, table=table_name, schema_=schema,
             columns=columns, constraints=constraints,
         )]

@@ -28,11 +28,11 @@ class OperationProvenance(BaseModel):
 
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
-    source_file: str = Field(..., alias="sourceFile", description="Relative migration filename.")
+    source_file: str = Field(..., serialization_alias="sourceFile", description="Relative migration filename.")
     version: str = Field(..., description="Flyway version string.")
-    statement_index: int = Field(..., alias="statementIndex", description="0-based index within the file.")
-    content_hash: str = Field(..., alias="contentHash", description="SHA-256 of the statement text.")
-    raw_sql: str | None = Field(None, alias="rawSql", description="Original SQL fragment.")
+    statement_index: int = Field(..., serialization_alias="statementIndex", description="0-based index within the file.")
+    content_hash: str = Field(..., serialization_alias="contentHash", description="SHA-256 of the statement text.")
+    raw_sql: str | None = Field(None, serialization_alias="rawSql", description="Original SQL fragment.")
 
     @classmethod
     def of(cls, source_file: str, version: str, statement_index: int, raw_sql: str | None) -> "OperationProvenance":
@@ -59,7 +59,7 @@ class ColumnDefinition(BaseModel):
     type: str = Field(..., description="Rendered data type e.g. VARCHAR2(100).")
     nullable: bool = Field(True, description="Accepts NULL.")
     default: str | None = Field(None, description="DEFAULT expression.")
-    primary_key: bool = Field(False, alias="primaryKey", description="Declared inline as PRIMARY KEY.")
+    primary_key: bool = Field(False, serialization_alias="primaryKey", description="Declared inline as PRIMARY KEY.")
     unique: bool = Field(False, description="Declared inline as UNIQUE.")
     references: str | None = Field(None, description="Inline REFERENCES target.")
 
@@ -72,10 +72,10 @@ class ConstraintDefinition(BaseModel):
     name: str | None = Field(None, description="Constraint name (null if anonymous).")
     type: str = Field(..., description="primary_key | unique | foreign_key | check.")
     columns: list[str] = Field(default_factory=list, description="Covered columns.")
-    ref_table: str | None = Field(None, alias="refTable", description="FK referenced table.")
-    ref_columns: list[str] = Field(default_factory=list, alias="refColumns", description="FK referenced columns.")
-    on_delete: str | None = Field(None, alias="onDelete", description="ON DELETE action.")
-    check_expr: str | None = Field(None, alias="checkExpr", description="CHECK expression.")
+    ref_table: str | None = Field(None, serialization_alias="refTable", description="FK referenced table.")
+    ref_columns: list[str] = Field(default_factory=list, serialization_alias="refColumns", description="FK referenced columns.")
+    on_delete: str | None = Field(None, serialization_alias="onDelete", description="ON DELETE action.")
+    check_expr: str | None = Field(None, serialization_alias="checkExpr", description="CHECK expression.")
 
 
 class ColumnChanges(BaseModel):
@@ -105,7 +105,7 @@ class BaseOperation(BaseModel):
 class CreateTableOperation(BaseOperation):
     operation: Literal["CREATE_TABLE"] = "CREATE_TABLE"
     table: str = Field(..., description="Fully-qualified table name.")
-    schema: str | None = Field(None, description="Schema/owner.")
+    schema_: str | None = Field(None, serialization_alias="schema", description="Schema/owner.")
     columns: list[ColumnDefinition] = Field(default_factory=list)
     constraints: list[ConstraintDefinition] = Field(default_factory=list)
 
@@ -113,13 +113,13 @@ class CreateTableOperation(BaseOperation):
 class DropTableOperation(BaseOperation):
     operation: Literal["DROP_TABLE"] = "DROP_TABLE"
     table: str
-    if_exists: bool = Field(False, alias="ifExists")
+    if_exists: bool = Field(False, serialization_alias="ifExists")
 
 
 class RenameTableOperation(BaseOperation):
     operation: Literal["RENAME_TABLE"] = "RENAME_TABLE"
-    from_table: str = Field(..., alias="fromTable")
-    to_table: str = Field(..., alias="toTable")
+    from_table: str = Field(..., serialization_alias="fromTable")
+    to_table: str = Field(..., serialization_alias="toTable")
 
 
 # --- Column ---
@@ -146,8 +146,8 @@ class ModifyColumnOperation(BaseOperation):
 class RenameColumnOperation(BaseOperation):
     operation: Literal["RENAME_COLUMN"] = "RENAME_COLUMN"
     table: str
-    from_name: str = Field(..., alias="fromName")
-    to_name: str = Field(..., alias="toName")
+    from_name: str = Field(..., serialization_alias="fromName")
+    to_name: str = Field(..., serialization_alias="toName")
 
 
 # --- Constraint ---
@@ -161,8 +161,8 @@ class AddConstraintOperation(BaseOperation):
 class DropConstraintOperation(BaseOperation):
     operation: Literal["DROP_CONSTRAINT"] = "DROP_CONSTRAINT"
     table: str
-    constraint_name: str = Field(..., alias="constraintName")
-    constraint_type: str | None = Field(None, alias="constraintType")
+    constraint_name: str = Field(..., serialization_alias="constraintName")
+    constraint_type: str | None = Field(None, serialization_alias="constraintType")
 
 
 # --- Index ---
@@ -170,14 +170,14 @@ class DropConstraintOperation(BaseOperation):
 class CreateIndexOperation(BaseOperation):
     operation: Literal["CREATE_INDEX"] = "CREATE_INDEX"
     table: str
-    index_name: str = Field(..., alias="indexName")
+    index_name: str = Field(..., serialization_alias="indexName")
     columns: list[str] = Field(default_factory=list)
     unique: bool = False
 
 
 class DropIndexOperation(BaseOperation):
     operation: Literal["DROP_INDEX"] = "DROP_INDEX"
-    index_name: str = Field(..., alias="indexName")
+    index_name: str = Field(..., serialization_alias="indexName")
     table: str | None = None
 
 
@@ -186,9 +186,9 @@ class DropIndexOperation(BaseOperation):
 class CreateSequenceOperation(BaseOperation):
     operation: Literal["CREATE_SEQUENCE"] = "CREATE_SEQUENCE"
     sequence: str
-    schema: str | None = None
-    start_with: int = Field(1, alias="startWith")
-    increment_by: int = Field(1, alias="incrementBy")
+    schema_: str | None = Field(None, serialization_alias="schema")
+    start_with: int = Field(1, serialization_alias="startWith")
+    increment_by: int = Field(1, serialization_alias="incrementBy")
 
 
 class DropSequenceOperation(BaseOperation):
@@ -208,7 +208,7 @@ class CommentOperation(BaseOperation):
 
 class UnknownOperation(BaseOperation):
     operation: Literal["UNKNOWN"] = "UNKNOWN"
-    statement_type: str = Field(..., alias="statementType")
+    statement_type: str = Field(..., serialization_alias="statementType")
 
 
 # ─────────────────────────────────────────────────────────────
