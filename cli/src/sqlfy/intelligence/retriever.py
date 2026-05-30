@@ -195,9 +195,9 @@ class EmbeddingRetriever:
     _MODEL = 'voyage-3'
 
     def __init__(self, chunks: list[VectorChunk], api_key: Optional[str] = None, 
-                 cached_embeddings: Optional[any] = None) -> None:
+                 cached_embeddings: Optional[Any] = None) -> None:
         self._chunks = chunks
-        from ...config import settings as _settings
+        from ..config import settings as _settings
         self._key    = api_key or _settings.api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         if not self._key:
             raise ValueError(
@@ -262,7 +262,7 @@ class EmbeddingRetriever:
 # ─────────────────────────────────────────────
 
 def make_retriever(chunks: list[VectorChunk], use_embeddings: bool = False,
-                   api_key: Optional[str] = None, cached_embeddings: Optional[any] = None) -> Retriever:
+                   api_key: Optional[str] = None, cached_embeddings: Optional[Any] = None) -> Retriever:
     """
     Return the best available retriever.
 

@@ -26,6 +26,7 @@ try:
     import networkx as nx
     HAS_NETWORKX = True
 except ImportError:
+    nx = None  # type: ignore[assignment]
     HAS_NETWORKX = False
 
 
@@ -75,6 +76,7 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
             "NetworkX is required for dependency analysis. "
             "Install with: pip install networkx"
         )
+    assert nx is not None
     
     # Import here to avoid circular dependency
     from ..migration_graph import build_migration_graph

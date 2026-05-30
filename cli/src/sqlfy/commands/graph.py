@@ -2,11 +2,19 @@
 
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import reconstruct, reconstruct_at
 from ..output.grapher import Grapher
 from ._utils import load_files, write_output
+
+
+class _ExportKwargs(TypedDict):
+    resolution: float
+    min_cohesion: float
+    enable_splitting: bool
+
 
 
 def cmd_graph(
@@ -59,7 +67,7 @@ def cmd_graph(
     out_dir.mkdir(parents=True, exist_ok=True)
     enable_splitting = not no_split
 
-    export_kwargs = dict(resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
+    export_kwargs: _ExportKwargs = {"resolution": resolution, "min_cohesion": min_cohesion, "enable_splitting": enable_splitting}
 
     if fmt == "json":
         p = out_dir / "graph.json"

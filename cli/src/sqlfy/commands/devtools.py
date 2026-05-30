@@ -253,7 +253,8 @@ def cmd_lineage(
         if at
         else reconstruct(files, dialect=dialect)
     )
-    lineage = extract_column_lineage(graph, files)
+    lineage_files = [(f['filename'], f['sql']) for f in files]
+    lineage = extract_column_lineage(graph, lineage_files)
     fmt = (format or "text").lower()
 
     if unused_columns:
@@ -319,7 +320,7 @@ def cmd_lineage(
 
     else:
         if fmt == "json":
-            output = format_lineage_json(lineage)
+            output = json.dumps(format_lineage_json(lineage), indent=2)
         else:
             pk_count = sum(1 for c in lineage.values() if c.is_pk)
             fk_count = sum(1 for c in lineage.values() if c.is_fk)
@@ -458,7 +459,7 @@ def cmd_cost(
     fmt = (format or "text").lower()
     if throughput is not None:
         try:
-            throughput_bps = float(throughput) * 1024.0 * 1024.0
+            throughput_bps = int(float(throughput) * 1024.0 * 1024.0)
         except Exception:
             print(f"Error: invalid --throughput value: {throughput}", file=sys.stderr)
             return 1

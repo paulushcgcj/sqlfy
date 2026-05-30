@@ -18,6 +18,8 @@ try:
     from sqlfluff.core.config import FluffConfig
     SQLFLUFF_AVAILABLE = True
 except ImportError:
+    Linter = None  # type: ignore[assignment,misc]
+    FluffConfig = None  # type: ignore[assignment,misc]
     SQLFLUFF_AVAILABLE = False
 
 
@@ -49,6 +51,8 @@ def _check_sqlfluff() -> None:
         raise ValueError(
             "sqlfluff is not installed. Install with: pip install sqlfluff>=3.0.0"
         )
+    assert Linter is not None
+    assert FluffConfig is not None
 
 
 def lint_migration(
@@ -73,6 +77,8 @@ def lint_migration(
         ValueError: If sqlfluff is not installed
     """
     _check_sqlfluff()
+    assert Linter is not None
+    assert FluffConfig is not None
 
     try:
         if config_path:
@@ -87,7 +93,7 @@ def lint_migration(
         for violation in result.violations:
             violations.append(LintViolation(
                 rule_code=violation.rule_code(),
-                message=violation.description,
+                message=str(violation.description) if violation.description is not None else '',
                 line=violation.line_no,
                 column=violation.line_pos,
                 severity='error' if violation.rule_code().startswith('PRS') else 'warning',
@@ -111,7 +117,7 @@ def lint_migration(
             score=0,
             violations=[],
             dialect=dialect,
-            error=str(e) or repr(e),
+            error=str(e) if e else repr(e),
         )
 
 
@@ -188,6 +194,8 @@ def fix_migration(
     available or the installed version does not expose the fix API.
     """
     _check_sqlfluff()
+    assert Linter is not None
+    assert FluffConfig is not None
 
     try:
         if config_path:
@@ -198,19 +206,19 @@ def fix_migration(
 
         # sqlfluff Linter provides a fix_string() helper in modern versions.
         if hasattr(linter, 'fix_string'):
-            fixed = linter.fix_string(sql, fname=filename)
+            fixed = linter.fix_string(sql, fname=filename)  # type: ignore[union-attr]
         elif hasattr(linter, 'fix'):  # older compatibility fallback
-            fixed = linter.fix(sql, fname=filename)
+            fixed = linter.fix(sql, fname=filename)  # type: ignore[union-attr,arg-type]
         else:
             raise ValueError('Installed sqlfluff does not support automatic fixes')
 
         # fix_string may return a string or a tuple-like result depending on version
         if isinstance(fixed, (list, tuple)) and fixed:
-            fixed_sql = fixed[0]
+            fixed_sql: str = str(fixed[0])
         else:
             fixed_sql = fixed if isinstance(fixed, str) else str(fixed)
 
-        return fixed_sql
+        return fixed_sql  # type: ignore[return-value]
 
     except Exception as e:
         raise

@@ -156,6 +156,8 @@ class FolderHealthReport:
             HealthMigrationStatus as _HealthMigrationStatus,
             HealthScore as _HealthScore,
             HealthScoreBreakdown as _HealthScoreBreakdown,
+            Status as _Status,
+            HealthGrade as _HealthGrade,
         )
         model = _HealthResult(
             folder=self.folder,
@@ -176,7 +178,7 @@ class FolderHealthReport:
             migrations=[
                 _HealthMigrationStatus(
                     filename=m.filename,
-                    status=m.status,
+                    status=_Status(m.status),
                     errors=m.errors,
                     warnings=m.warnings,
                     has_drop_table=m.has_drop_table,
@@ -186,7 +188,7 @@ class FolderHealthReport:
             ],
             health_score=_HealthScore(
                 score=self.health_score.score,
-                grade=self.health_score.grade,
+                grade=_HealthGrade(self.health_score.grade),
                 breakdown=_HealthScoreBreakdown(
                     base=self.health_score.breakdown.get('base', 100),
                     error_penalty=self.health_score.breakdown.get('error_penalty', 0),

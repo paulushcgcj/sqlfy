@@ -44,7 +44,7 @@ def cmd_chat(
     """Interactive multi-turn schema chat session."""
     from ..commands.ai import cmd_chat as _cmd
     _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-         at=at, out=out, embed=embed, api_key=api_key, k=k)
+         at=at, embed=embed, api_key=api_key, k=k)
 
 
 @app.command("query")

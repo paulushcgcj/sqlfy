@@ -231,7 +231,7 @@ def cmd_drift(
             versions = []
             for file_dict in target_files:
                 parsed = parse_migration_filename(file_dict["filename"])
-                if parsed["version"]:
+                if parsed and parsed["version"]:
                     try:
                         versions.append(int(parsed["version"].split(".")[0]))
                     except (ValueError, AttributeError):

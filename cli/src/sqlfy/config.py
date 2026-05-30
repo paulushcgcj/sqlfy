@@ -35,7 +35,7 @@ _TOML_KEYS = {
 }
 
 
-def _load_toml_config() -> dict:
+def _load_toml_config() -> dict[str, str]:
     """Load config from sqlfy.toml files (cwd first, then ~/.config/sqlfy)."""
     candidates = [
         Path.cwd() / "sqlfy.toml",
@@ -45,7 +45,7 @@ def _load_toml_config() -> dict:
         if path.exists():
             try:
                 data = tomllib.loads(path.read_text(encoding="utf-8"))
-                return {k: v for k, v in data.get("sqlfy", {}).items() if k in _TOML_KEYS}
+                return {k: str(v) for k, v in data.get("sqlfy", {}).items() if k in _TOML_KEYS}
             except Exception:
                 pass
     return {}

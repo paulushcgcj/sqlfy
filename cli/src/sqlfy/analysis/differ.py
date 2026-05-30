@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from ..domain.schema_state import (
@@ -239,6 +240,8 @@ class DiffResult:
             DiffIndexChange as _DiffIndexChange,
             DiffSequenceChange as _DiffSequenceChange,
             DiffRelationshipChange as _DiffRelationshipChange,
+            Change as _Change,
+            Change1 as _Change1,
         )
         stats = self.stats()
         model = _DiffResult(
@@ -262,12 +265,12 @@ class DiffResult:
             table_changes=[
                 _DiffTableChange(
                     full_name=t.full_name,
-                    change=t.change,
+                    change=_Change(t.change),
                     breaking=t.is_breaking(),
                     column_changes=[
                         _DiffColumnChange(
                             name=c.name,
-                            change=c.change,
+                            change=_Change(c.change),
                             before=c.before,
                             after=c.after,
                             diffs=c.field_diffs if c.field_diffs else None,
@@ -278,7 +281,7 @@ class DiffResult:
                     constraint_changes=[
                         _DiffConstraintChange(
                             name=c.name,
-                            change=c.change,
+                            change=_Change1(c.change),
                             type=c.type,
                             columns=c.columns,
                         )
@@ -287,7 +290,7 @@ class DiffResult:
                     index_changes=[
                         _DiffIndexChange(
                             name=i.name,
-                            change=i.change,
+                            change=_Change1(i.change),
                             columns=i.columns,
                             unique=i.unique,
                         )
@@ -299,14 +302,14 @@ class DiffResult:
             sequence_changes=[
                 _DiffSequenceChange(
                     full_name=s.full_name,
-                    change=s.change,
+                    change=_Change(s.change),
                     diffs=s.field_diffs if s.field_diffs else None,
                 )
                 for s in self.sequence_changes
             ],
             relationship_changes=[
                 _DiffRelationshipChange(
-                    change=r.change,
+                    change=_Change1(r.change),
                     from_=r.from_table,
                     from_cols=r.from_columns,
                     to=r.to_table,

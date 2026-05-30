@@ -173,12 +173,14 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
                                 if ref_name:
                                     references.append(ref_name.upper())
             
-            elif isinstance(stmt, exp.AlterTable):
+            elif isinstance(stmt, exp.Alter):
                 # ALTER TABLE
                 table = stmt.this
                 table_name = None
                 
-                if hasattr(table, 'this') and hasattr(table.this, 'name'):
+                if table is None:
+                    pass
+                elif hasattr(table, 'this') and hasattr(table.this, 'name'):
                     table_name = table.this.name
                 elif hasattr(table, 'name'):
                     table_name = table.name
@@ -189,7 +191,7 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
                         alters.append(table_name.upper())
                 
                 # Check for foreign keys in ALTER
-                for action in stmt.expressions:
+                for action in (stmt.expressions or []):
                     if isinstance(action, exp.ForeignKey):
                         ref = action.args.get('reference')
                         if ref:

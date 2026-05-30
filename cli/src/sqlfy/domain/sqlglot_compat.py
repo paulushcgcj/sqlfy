@@ -29,7 +29,7 @@ Usage
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 try:
     import sqlglot
@@ -65,6 +65,8 @@ def _detect_modify_support() -> bool:
     """
     if not _SQLGLOT_AVAILABLE:
         return False
+    assert sqlglot is not None
+    assert exp is not None
 
     try:
         # Test case: simple ALTER TABLE MODIFY statement
@@ -110,6 +112,8 @@ def _detect_rename_column_support() -> bool:
     """
     if not _SQLGLOT_AVAILABLE:
         return False
+    assert sqlglot is not None
+    assert exp is not None
 
     try:
         test_sql = "ALTER TABLE users RENAME COLUMN old_name TO new_name"
@@ -182,6 +186,8 @@ def parse_modify_native(sql: str, dialect: str = "oracle") -> tuple[str, list[Mo
     """
     if not SQLGLOT_HAS_MODIFY:
         raise ValueError("sqlglot does not support native MODIFY parsing")
+    assert sqlglot is not None
+    assert exp is not None
 
     stmt = sqlglot.parse_one(sql, dialect=dialect)
 
@@ -206,7 +212,7 @@ def parse_modify_native(sql: str, dialect: str = "oracle") -> tuple[str, list[Mo
     return table_name.upper(), modifications
 
 
-def _extract_modify_info_from_action(action: exp.Expression) -> Optional[ModifyColumnInfo]:
+def _extract_modify_info_from_action(action: Any) -> Optional[ModifyColumnInfo]:
     """
     Extract ModifyColumnInfo from a sqlglot action node.
 
@@ -240,11 +246,11 @@ def _extract_modify_info_from_action(action: exp.Expression) -> Optional[ModifyC
 
     # Extract nullability
     nullable = None
-    if hasattr(action, 'constraints'):
+    if hasattr(action, 'constraints') and exp is not None:
         for constraint in action.constraints:
             if isinstance(constraint, exp.NotNullColumnConstraint):
                 nullable = False
-            elif isinstance(constraint, exp.NullColumnConstraint):
+            elif hasattr(exp, 'NullColumnConstraint') and isinstance(constraint, exp.NullColumnConstraint):  # type: ignore[attr-defined]
                 nullable = True
 
     # Extract default value

@@ -120,7 +120,7 @@ def cmd_build_graph(
     """
     start_time = time.time()
 
-    out_dir: Path = Path(out_dir or 'graphify-out')
+    out_dir: Path = Path(output_dir or 'graphify-out')
     files = load_files(migrations_dir, json_input)
     version = at
     enable_splitting = not no_split
@@ -228,7 +228,8 @@ def cmd_build_graph(
     # Column lineage (if available)
     try:
         from ..analysis.lineage import extract_column_lineage, find_god_columns
-        lineage = extract_column_lineage(graph, files)
+        lineage_files = [(f['filename'], f['sql']) for f in files]
+        lineage = extract_column_lineage(graph, lineage_files)
         god_cols = find_god_columns(lineage, min_refs=min_refs)
         
         # Save god columns
@@ -402,7 +403,7 @@ def cmd_build_graph(
     
     # Build result
     result = GraphBuildResult(
-        out_dir=out_dir,
+        output_dir=out_dir,
         graph_path=out_dir / 'graph.json',
         html_path=out_dir / 'graph.html',
         report_path=out_dir / 'GRAPH_REPORT.md',

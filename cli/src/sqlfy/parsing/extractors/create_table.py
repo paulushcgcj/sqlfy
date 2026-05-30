@@ -38,6 +38,7 @@ class CreateTableExtractor(BaseExtractor):
                 columns.append(ColumnDefinition(
                     name=col.name, type=col.type, nullable=col.nullable,
                     default=col.default, primary_key=col.primary_key, unique=col.unique,
+                    references=None,
                 ))
             elif isinstance(item, exp.Constraint):
                 c = _parse_table_constraint(item)
@@ -49,6 +50,7 @@ class CreateTableExtractor(BaseExtractor):
                         ref_table=getattr(c, "ref_table", None),
                         ref_columns=getattr(c, "ref_columns", []) or [],
                         on_delete=getattr(c, "on_delete", None),
+                        check_expr=getattr(c, "check_expr", None),
                     ))
         return [CreateTableOperation(
             provenance=provenance, table=table_name, schema_=schema,

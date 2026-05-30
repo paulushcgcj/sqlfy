@@ -109,7 +109,7 @@ def analyze_rollback_feasibility(filename: str, content: str) -> RollbackAnalysi
                     warnings.append(f"Rollback will drop sequence {table_name} - ID generation will reset")
                     partial_score_penalty += 10
             
-            elif isinstance(stmt, exp.AlterTable):
+            elif isinstance(stmt, exp.Alter):
                 # ALTER TABLE operations
                 table_name = _extract_table_name(stmt.this)
                 
@@ -136,7 +136,7 @@ def analyze_rollback_feasibility(filename: str, content: str) -> RollbackAnalysi
                         reverse_ops.append(f"ALTER TABLE {table_name} DROP CONSTRAINT {fk_name};")
                         # FKs are safe to drop/recreate
                     
-                    elif isinstance(action, exp.UniqueColumnConstraint) or isinstance(action, exp.Unique):
+                    elif isinstance(action, exp.UniqueColumnConstraint):
                         # ADD UNIQUE CONSTRAINT
                         operations.append(f"ALTER TABLE {table_name} ADD UNIQUE")
                         reverse_ops.append(f"ALTER TABLE {table_name} DROP CONSTRAINT constraint_name;")
@@ -185,7 +185,7 @@ def analyze_rollback_feasibility(filename: str, content: str) -> RollbackAnalysi
                 is_irreversible = True
                 warnings.append("Cannot undo DELETE - data is permanently lost")
             
-            elif isinstance(stmt, exp.Truncate):
+            elif isinstance(stmt, exp.TruncateTable):
                 # TRUNCATE statements
                 operations.append("TRUNCATE table")
                 is_irreversible = True
@@ -502,6 +502,7 @@ def format_rollback_json(results: list[RollbackAnalysis]) -> str:
         RollbackResult as _RollbackResult,
         RollbackAnalysis as _RollbackAnalysis,
         Summary as _Summary,
+        Feasibility as _Feasibility,
     )
     reversible = sum(1 for r in results if r.feasibility == 'reversible')
     partial = sum(1 for r in results if r.feasibility == 'partial')
@@ -516,7 +517,7 @@ def format_rollback_json(results: list[RollbackAnalysis]) -> str:
         migrations=[
             _RollbackAnalysis(
                 migration=r.migration,
-                feasibility=r.feasibility,
+                feasibility=_Feasibility(r.feasibility),
                 score=r.score,
                 rollback_script=r.rollback_script,
                 warnings=r.warnings,

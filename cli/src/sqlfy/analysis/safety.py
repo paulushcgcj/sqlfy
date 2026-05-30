@@ -284,6 +284,8 @@ def score_migration(
     for stmt in stmts:
         if stmt is None:
             continue
+        if not isinstance(stmt, exp.Expression):
+            continue
         raw_sql = stmt.sql(dialect=dialect)
         risk = _score_statement(stmt, raw_sql)
         statement_risks.append(risk)

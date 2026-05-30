@@ -165,7 +165,7 @@ def infer_domain_label(tables: list[str]) -> str:
     
     # Find most common prefix
     if prefixes:
-        common_prefix = max(prefixes, key=prefixes.get)
+        common_prefix = max(prefixes, key=lambda k: prefixes.get(k) or 0)
         count = prefixes[common_prefix]
         
         # If at least 50% of tables share this prefix, use it

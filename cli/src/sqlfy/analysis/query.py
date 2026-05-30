@@ -478,8 +478,11 @@ class QueryEngine:
                 if color[nb] == GRAY:
                     cycle: list[str] = [nb, node]
                     cur = node
-                    while parent.get(cur) and parent[cur] != nb:
-                        cur = parent[cur]  # type: ignore[assignment]
+                    while True:
+                        next_cur = parent.get(cur)
+                        if not next_cur or next_cur == nb:
+                            break
+                        cur = next_cur
                         cycle.append(cur)
                     cycle_key = frozenset(cycle)
                     if cycle_key not in seen:

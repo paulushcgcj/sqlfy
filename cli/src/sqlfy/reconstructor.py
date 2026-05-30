@@ -139,6 +139,8 @@ class Reconstructor:
         for stmt in stmts:
             if stmt is None:
                 continue
+            if not isinstance(stmt, exp.Expression):
+                continue
             try:
                 acts = self._dispatch(stmt, vsn)
                 result.actions.extend(acts)

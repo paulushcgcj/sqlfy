@@ -33,6 +33,7 @@ try:
     from sqllineage.runner import LineageRunner
     SQLLINEAGE_AVAILABLE = True
 except ImportError:
+    LineageRunner = None  # type: ignore[assignment,misc]
     SQLLINEAGE_AVAILABLE = False
 
 import sqlglot
@@ -277,6 +278,7 @@ def _extract_from_select(
         # Fallback: simple regex-based extraction
         return _extract_simple_lineage(target_name, select_sql, version)
     
+    assert LineageRunner is not None
     try:
         runner = LineageRunner(select_sql, dialect='oracle')
         

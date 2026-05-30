@@ -126,7 +126,7 @@ def _run_community_detection(
     """
     # Try Leiden first (requires graspologic)
     try:
-        from graspologic.partition import leiden
+        from graspologic.partition import leiden  # type: ignore[import-untyped]
         
         # Leiden returns a dict {node: community_id}
         node_to_community = leiden(G, resolution=resolution, random_seed=42)
@@ -302,8 +302,8 @@ def label_communities(
                 schema_counts[schema] += 1
         
         # Find most common type and schema
-        most_common_type = max(type_counts, key=type_counts.get) if type_counts else 'unknown'
-        most_common_schema = max(schema_counts, key=schema_counts.get) if schema_counts else None
+        most_common_type = max(type_counts, key=lambda k: type_counts.get(k) or 0) if type_counts else 'unknown'
+        most_common_schema = max(schema_counts, key=lambda k: schema_counts.get(k) or 0) if schema_counts else None
         
         # Generate label
         if most_common_schema:

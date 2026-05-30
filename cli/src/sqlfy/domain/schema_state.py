@@ -43,7 +43,7 @@ import json
 import hashlib
 import datetime
 from dataclasses import dataclass, field, asdict
-from typing import Optional
+from typing import Any, Optional
 
 from .models import SchemaGraph
 from .utils import type_str
@@ -181,7 +181,7 @@ class SchemaState:
 
     # ── Serialisation ─────────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict:  # type: ignore[override]
         """Convert to a plain dict (JSON-safe)."""
         return _deep_asdict(self)
     
@@ -536,10 +536,10 @@ class SchemaStateBuilder:
 # HELPERS
 # ─────────────────────────────────────────────
 
-def _deep_asdict(obj) -> object:
+def _deep_asdict(obj: object) -> Any:
     """Recursively convert dataclasses to plain dicts, preserve other types."""
     if hasattr(obj, '__dataclass_fields__'):
-        return {k: _deep_asdict(v) for k, v in asdict(obj).items()}
+        return {k: _deep_asdict(v) for k, v in asdict(obj).items()}  # type: ignore[call-overload]
     if isinstance(obj, dict):
         return {k: _deep_asdict(v) for k, v in obj.items()}
     if isinstance(obj, list):

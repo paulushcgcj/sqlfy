@@ -239,12 +239,12 @@ def _extract_table_names(stmt: exp.Expression, raw_sql: str) -> List[str]:
     return out
 
 
-def _get_table_stats(name: str, table_stats: Dict[str, Dict[str, Any]] | None, default_rows: int, default_size: int) -> tuple[int, int]:
+def _get_table_stats(name: str | None, table_stats: Dict[str, Dict[str, Any]] | None, default_rows: int, default_size: int) -> tuple[int, int]:
     """Lookup table stats by exact or short name; return (rows, avg_row_size).
 
     Table stats keys are normalized to lower-case when provided.
     """
-    if not table_stats:
+    if not name or not table_stats:
         return default_rows, default_size
 
     key = name.lower()
@@ -295,6 +295,8 @@ def estimate_migration(
 
     for stmt in stmts:
         if stmt is None:
+            continue
+        if not isinstance(stmt, exp.Expression):
             continue
         raw_sql = stmt.sql(dialect=dialect)
         stmt_ops = _estimate_statement(stmt, raw_sql)

@@ -52,8 +52,7 @@ def cmd_integrity(
 ) -> None:
     """Check referential integrity across the schema."""
     from ..commands.evolution import cmd_integrity as _cmd
-    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-         at=at, out=out)
+    _cmd(migrations_dir=migrations_dir or "", out=out)
 
 
 @app.command("domains")

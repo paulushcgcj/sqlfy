@@ -159,6 +159,7 @@ class SimulationResult:
             SimulateDiff as _SimulateDiff,
             SimulateHealth as _SimulateHealth,
             DiffStats as _DiffStats,
+            HealthGrade as _HealthGrade,
         )
         diff_stats = self.diff.stats()
         model = _SimulateResult(
@@ -188,7 +189,7 @@ class SimulationResult:
             ),
             health=_SimulateHealth(
                 score=self.health_score,
-                grade=self.health_grade,
+                grade=_HealthGrade(self.health_grade),
                 errors=len(self.insights.errors()),
                 warnings=len(self.insights.warnings()),
             ),
@@ -254,7 +255,7 @@ class SchemaSimulator:
             # Simulate hypothetical migration
             # Compute a next version that handles both integer and dotted semantic versions.
             try:
-                next_version = str(int(self.base_version) + 1)
+                next_version = str(int(self.base_version or '0') + 1)
             except (ValueError, TypeError):
                 # Fallback: if dotted (e.g. 1.0.2) increment the last numeric element
                 if isinstance(self.base_version, str) and '.' in self.base_version:
@@ -316,7 +317,7 @@ class SchemaSimulator:
             
             # Return failed result
             return SimulationResult(
-                base_version=self.base_version,
+                base_version=self.base_version or '',
                 base_state=self.base_state,
                 simulated_state=self.base_state,  # Unchanged
                 diff=SchemaDiffer.diff(self.base_state, self.base_state),  # Empty diff
@@ -330,7 +331,7 @@ class SchemaSimulator:
             )
         
         return SimulationResult(
-            base_version=self.base_version,
+            base_version=self.base_version or '',
             base_state=self.base_state,
             simulated_state=sim_state,
             diff=diff,

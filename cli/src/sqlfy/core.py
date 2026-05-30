@@ -80,38 +80,6 @@ def apply_migrations(files: list[dict], dialect: str = "oracle") -> SchemaGraph:
     """
     from .reconstructor import reconstruct
     return reconstruct(files, dialect=dialect)
-    """Parse a Flyway migration filename into version metadata.
-
-    Args:
-        filename: Flyway-style filename like 'V1__create_users.sql'.
-
-    Returns:
-        Dict with 'version', 'description', and 'order' keys.
-    """
-    m = re.match(r"^V([\d.]+)__(.+?)\.sql$", filename, re.I)
-    if not m:
-        return {"version": "0", "description": filename, "order": 0}
-    parts = [int(p) for p in m.group(1).split(".")]
-    order = sum(n * (1000 ** (3 - i)) for i, n in enumerate(parts))
-    return {
-        "version": m.group(1),
-        "description": m.group(2).replace("_", " "),
-        "order": order,
-    }
-
-
-# ─────────────────────────────────────────────
-# APPLY MIGRATIONS (backward-compat wrapper)
-# ─────────────────────────────────────────────
-
-def apply_migrations(files: list[dict], dialect: str = "oracle") -> SchemaGraph:
-    """Reconstruct schema from migration files. Delegates to Reconstructor.
-
-    Kept for backward compatibility. New code should use
-    ``sqlfy.reconstructor.reconstruct()`` directly.
-    """
-    from .reconstructor import reconstruct
-    return reconstruct(files, dialect=dialect)
 
 
 

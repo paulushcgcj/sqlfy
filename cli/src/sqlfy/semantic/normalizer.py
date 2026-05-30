@@ -44,6 +44,7 @@ from .operations import (
     CreateIndexOperation,
     DropIndexOperation,
     CreateSequenceOperation,
+    ColumnChanges,
     CommentOperation,
     UnknownOperation,
 )
@@ -52,9 +53,9 @@ from ..domain.sqlglot_compat import SQLGLOT_HAS_MODIFY, SQLGLOT_HAS_RENAME_COLUM
 log = logging.getLogger(__name__)
 
 
-def _to_col_def(col: "object") -> ColumnDefinition:
+def _to_col_def(col: object) -> ColumnDefinition:
     """Convert internal Column dataclass → ColumnDefinition."""
-    parsed = _parse_column_def(col) if not hasattr(col, "name") else col
+    parsed = _parse_column_def(col) if not hasattr(col, "name") else col  # type: ignore[arg-type]
     return ColumnDefinition(
         name=getattr(parsed, "name", ""),
         type=getattr(parsed, "type", ""),
@@ -62,6 +63,7 @@ def _to_col_def(col: "object") -> ColumnDefinition:
         default=getattr(parsed, "default", None),
         primary_key=getattr(parsed, "primary_key", False),
         unique=getattr(parsed, "unique", False),
+        references=None,
     )
 
 
@@ -74,6 +76,7 @@ def _to_constraint_def(c: "object") -> ConstraintDefinition:
         ref_table=getattr(c, "ref_table", None),
         ref_columns=getattr(c, "ref_columns", []) or [],
         on_delete=getattr(c, "on_delete", None),
+        check_expr=getattr(c, "check_expr", None),
     )
 
 
@@ -105,7 +108,7 @@ class Normalizer:
                 statement_index=idx,
                 raw_sql=stmt.sql(dialect=self.dialect) if stmt else None,
             )
-            results.extend(self._extract(stmt, prov))
+            results.extend(self._extract(stmt, prov))  # type: ignore[arg-type]
         return results
 
     def _extract(self, stmt: exp.Expression, prov: OperationProvenance) -> list[AnyOperation]:
@@ -143,6 +146,7 @@ class Normalizer:
                 columns.append(ColumnDefinition(
                     name=col.name, type=col.type, nullable=col.nullable,
                     default=col.default, primary_key=col.primary_key, unique=col.unique,
+                    references=None,
                 ))
             elif isinstance(item, exp.Constraint):
                 c = _parse_table_constraint(item)
@@ -158,7 +162,7 @@ class Normalizer:
         cols: list[str] = []
         if hasattr(stmt, "args"):
             table_arg = stmt.args.get("this")
-            if hasattr(table_arg, "args") and "table" in table_arg.args:
+            if table_arg is not None and hasattr(table_arg, "args") and "table" in table_arg.args:
                 table_name = _table_full(table_arg.args["table"])
             for col_node in (stmt.find_all(exp.Column)):
                 cols.append(col_node.name)
@@ -170,7 +174,8 @@ class Normalizer:
         this = stmt.this
         seq_name = _table_full(this) if hasattr(this, "name") else str(this)
         schema, _ = _table_schema_name(this) if hasattr(this, "args") else (None, seq_name)
-        return CreateSequenceOperation(provenance=prov, sequence=seq_name, schema_=schema)
+        return CreateSequenceOperation(provenance=prov, sequence=seq_name, schema_=schema,
+                                       start_with=1, increment_by=1)
 
     # ── DROP ────────────────────────────────────────────────
 
@@ -209,6 +214,8 @@ class Normalizer:
                                                column=ColumnDefinition(
                                                    name=col.name, type=col.type,
                                                    nullable=col.nullable, default=col.default,
+                                                   primary_key=col.primary_key, unique=col.unique,
+                                                   references=None,
                                                ))
                 if isinstance(item, exp.Constraint):
                     c = _parse_table_constraint(item)
@@ -233,13 +240,17 @@ class Normalizer:
             )
         # MODIFY column (dialect-specific)
         if SQLGLOT_HAS_MODIFY:
-            result = parse_modify_native(action)
-            if result:
-                return ModifyColumnOperation(
-                    provenance=prov, table=table,
-                    column=result["column"],
-                    changes={"type": result.get("new_type"), "nullable": result.get("nullable")},
-                )
+            try:
+                _table_name, modifications = parse_modify_native(str(action))
+                if modifications:
+                    mod = modifications[0]
+                    return ModifyColumnOperation(
+                        provenance=prov, table=table,
+                        column=mod.column_name,
+                        changes=ColumnChanges(type=mod.data_type, nullable=mod.nullable, default=mod.default),
+                    )
+            except Exception:
+                pass
         return None
 
     # ── COMMAND (regex fallback) ─────────────────────────────

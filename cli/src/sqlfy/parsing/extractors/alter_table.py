@@ -7,6 +7,7 @@ from __future__ import annotations
 import sqlglot.expressions as exp
 from ...semantic.operations import (
     AnyOperation, OperationProvenance, ColumnDefinition, ConstraintDefinition,
+    ColumnChanges,
     AddColumnOperation, DropColumnOperation, ModifyColumnOperation,
     RenameColumnOperation, AddConstraintOperation, DropConstraintOperation,
 )
@@ -46,6 +47,9 @@ class AlterTableExtractor(BaseExtractor):
                         column=ColumnDefinition(
                             name=col.name, type=col.type,
                             nullable=col.nullable, default=col.default,
+                            primary_key=col.primary_key,
+                            unique=col.unique,
+                            references=None,
                         ),
                     )
                 if isinstance(item, exp.Constraint):
@@ -60,6 +64,7 @@ class AlterTableExtractor(BaseExtractor):
                                 ref_table=getattr(c, "ref_table", None),
                                 ref_columns=getattr(c, "ref_columns", []) or [],
                                 on_delete=getattr(c, "on_delete", None),
+                                check_expr=getattr(c, "check_expr", None),
                             ),
                         )
         if isinstance(action, exp.Drop):
@@ -83,11 +88,15 @@ class AlterTableExtractor(BaseExtractor):
                 to_name=action.args["to"].name,
             )
         if SQLGLOT_HAS_MODIFY:
-            result = parse_modify_native(action)
-            if result:
-                return ModifyColumnOperation(
-                    provenance=prov, table=table,
-                    column=result["column"],
-                    changes={"type": result.get("new_type"), "nullable": result.get("nullable")},
-                )
+            try:
+                _table_name, modifications = parse_modify_native(str(action))
+                if modifications:
+                    mod = modifications[0]
+                    return ModifyColumnOperation(
+                        provenance=prov, table=table,
+                        column=mod.column_name,
+                        changes=ColumnChanges(type=mod.data_type, nullable=mod.nullable, default=mod.default),
+                    )
+            except Exception:
+                pass
         return None

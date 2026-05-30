@@ -172,7 +172,7 @@ class Asker:
                 fingerprint = compute_schema_fingerprint(files)
                 chunk_cache = ChunkCache()
                 # We'll cache embeddings later if using EmbeddingRetriever
-                chunk_cache.put(fingerprint, self._chunks, metadata={"dialect": graph.dialect})
+                chunk_cache.put(fingerprint, self._chunks, metadata={"dialect": getattr(graph, 'dialect', 'oracle')})
         
         # Build retriever (may use cached embeddings if available)
         self._retriever = make_retriever(

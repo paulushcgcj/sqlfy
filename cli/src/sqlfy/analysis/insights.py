@@ -146,11 +146,12 @@ class InsightsReport:
             InsightsSummary as _InsightsSummary,
             InsightFinding as _InsightFinding,
             Findings as _Findings,
+            InsightSeverity as _InsightSeverity,
         )
         def _finding(f: Finding) -> _InsightFinding:
             return _InsightFinding(
                 code=f.code,
-                severity=f.severity,
+                severity=_InsightSeverity(f.severity),
                 category=f.category,
                 message=f.message,
                 detail=f.detail,
@@ -263,8 +264,11 @@ def _has_cycle(adj_directed: dict[str, set[str]]) -> list[list[str]]:
                 # Found a cycle — reconstruct it
                 cycle = [nb, node]
                 cur   = node
-                while parent.get(cur) and parent[cur] != nb:
-                    cur = parent[cur]  # type: ignore[assignment]
+                while True:
+                    next_cur = parent.get(cur)
+                    if not next_cur or next_cur == nb:
+                        break
+                    cur = next_cur
                     cycle.append(cur)
                 cycles.append(list(reversed(cycle)))
             elif color[nb] == WHITE:

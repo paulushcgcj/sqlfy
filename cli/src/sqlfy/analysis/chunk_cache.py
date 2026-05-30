@@ -10,7 +10,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ..domain.models import VectorChunk
 
@@ -19,6 +19,7 @@ try:
     import numpy as np
     HAS_NUMPY = True
 except ImportError:
+    np = None  # type: ignore[assignment]
     HAS_NUMPY = False
 
 # Cache root directory
@@ -59,7 +60,7 @@ class ChunkCache:
         self.cache_dir = cache_dir or _CHUNK_CACHE_ROOT
         self.cache_dir.mkdir(exist_ok=True, parents=True)
     
-    def get(self, fingerprint: str) -> Optional[tuple[list[VectorChunk], Optional[any]]]:
+    def get(self, fingerprint: str) -> Optional[tuple[list[VectorChunk], Optional[Any]]]:
         """Load cached chunks and embeddings.
         
         Args:
@@ -109,6 +110,7 @@ class ChunkCache:
         embeddings = None
         embeddings_file = cache_path / "embeddings.npy"
         if HAS_NUMPY and embeddings_file.exists():
+            assert np is not None
             try:
                 embeddings = np.load(embeddings_file)
             except (OSError, ValueError):
@@ -120,7 +122,7 @@ class ChunkCache:
         self,
         fingerprint: str,
         chunks: list[VectorChunk],
-        embeddings: Optional[any] = None,
+        embeddings: Optional[Any] = None,
         metadata: Optional[dict] = None,
     ) -> None:
         """Save chunks and embeddings to cache.
@@ -167,6 +169,7 @@ class ChunkCache:
         
         # Write embeddings if available
         if HAS_NUMPY and embeddings is not None:
+            assert np is not None
             embeddings_file = cache_path / "embeddings.npy"
             try:
                 np.save(embeddings_file, embeddings)
