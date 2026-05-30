@@ -6,7 +6,6 @@ Feature #18: Migration Provenance Tracking
 import json
 import sys
 from pathlib import Path
-import argparse
 
 from ..analysis.provenance import collect_provenance, write_manifest, verify_manifest
 from ._utils import write_output
@@ -68,30 +67,33 @@ def _do_record(manifest: dict, migrations_dir: str, out: str | None) -> int:
         return 3
 
 
-def cmd_provenance(args: argparse.Namespace) -> int:
-    migrations_dir = getattr(args, "migrations_dir", None)
+def cmd_provenance(
+    *,
+    migrations_dir: str | None = None,
+    format: str = "text",
+    out: str | None = None,
+    verify: str | None = None,
+    record: bool = False,
+    no_recursive: bool = False,
+    include_untracked: bool = False,
+) -> int:
     if not migrations_dir:
         print("Error: migrations_dir required", file=sys.stderr)
         return 1
 
-    fmt = getattr(args, "format", "text")
-    out = getattr(args, "out", None)
+    fmt = (format or "text").lower()
+    recursive = not no_recursive
 
-    recursive = not getattr(args, "no_recursive", False)
-    include_untracked = getattr(args, "include_untracked", False)
-
-    if getattr(args, "verify", None):
-        return _do_verify(args.verify, migrations_dir, fmt, out, recursive=recursive, include_untracked=include_untracked)
+    if verify:
+        return _do_verify(verify, migrations_dir, fmt, out, recursive=recursive, include_untracked=include_untracked)
 
     try:
-        recursive = not getattr(args, "no_recursive", False)
-        include_untracked = getattr(args, "include_untracked", False)
         manifest = collect_provenance(migrations_dir, recursive=recursive, include_untracked=include_untracked)
     except Exception as e:
         print(f"Error collecting provenance: {e}", file=sys.stderr)
         return 2
 
-    if getattr(args, "record", False):
+    if record:
         return _do_record(manifest, migrations_dir, out)
 
     if fmt == "json":

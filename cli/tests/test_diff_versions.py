@@ -50,7 +50,7 @@ def test_diff_versions_v1_to_v2_adds_table(tmp_path, capsys):
     })
 
     args = _make_args(migrations_dir=str(tmp_path), from_version="1", to_version="2")
-    cmd_diff_versions(args)
+    cmd_diff_versions(**vars(args))
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
@@ -65,7 +65,7 @@ def test_diff_versions_text_output(tmp_path, capsys):
     })
 
     args = _make_args(migrations_dir=str(tmp_path), from_version="1", to_version="2", format="text")
-    cmd_diff_versions(args)
+    cmd_diff_versions(**vars(args))
 
     captured = capsys.readouterr()
     assert "SCHEMA STATE DIFF" in captured.out or "tablesAdded" in captured.out.lower() or "ORDERS" in captured.out
@@ -79,7 +79,7 @@ def test_diff_versions_same_version_produces_no_changes(tmp_path, capsys):
     })
 
     args = _make_args(migrations_dir=str(tmp_path), from_version="2", to_version="2")
-    cmd_diff_versions(args)
+    cmd_diff_versions(**vars(args))
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
@@ -94,7 +94,7 @@ def test_diff_versions_no_versions_uses_latest(tmp_path, capsys):
     })
 
     args = _make_args(migrations_dir=str(tmp_path), from_version=None, to_version=None)
-    cmd_diff_versions(args)
+    cmd_diff_versions(**vars(args))
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
@@ -112,7 +112,7 @@ def test_diff_versions_from_only_compares_partial_to_full(tmp_path, capsys):
 
     # from_version=1 means state_a is V1 (users only), state_b is latest (users + orders)
     args = _make_args(migrations_dir=str(tmp_path), from_version="1", to_version=None)
-    cmd_diff_versions(args)
+    cmd_diff_versions(**vars(args))
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
@@ -128,7 +128,7 @@ def test_diff_versions_to_only_compares_full_to_partial(tmp_path, capsys):
 
     # from_version=None means state_a is latest, to_version=1 means state_b is V1
     args = _make_args(migrations_dir=str(tmp_path), from_version=None, to_version="1")
-    cmd_diff_versions(args)
+    cmd_diff_versions(**vars(args))
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)

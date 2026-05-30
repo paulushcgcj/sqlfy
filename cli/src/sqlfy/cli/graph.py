@@ -14,11 +14,6 @@ app = typer.Typer(help="Graph construction and visualization commands.", no_args
 _DIALECT_HELP = "SQL dialect: oracle, postgres, mysql, sqlite"
 
 
-def _ns(**kwargs):
-    import argparse
-    return argparse.Namespace(**kwargs)
-
-
 @app.command("show")
 def cmd_graph(
     migrations_dir: Optional[str] = typer.Argument(None),
@@ -30,8 +25,8 @@ def cmd_graph(
 ) -> None:
     """Display the schema graph."""
     from ..commands.graph import cmd_graph as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, format=fmt))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, format=fmt)
 
 
 @app.command("build")
@@ -47,9 +42,8 @@ def cmd_build_graph(
 ) -> None:
     """Build and export NetworkX graph with community detection."""
     from ..commands.build_graph import cmd_build_graph as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             out=out, format=fmt, resolution=resolution, min_cohesion=min_cohesion,
-             directed=directed))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         output_dir=out, resolution=resolution, min_cohesion=min_cohesion)
 
 
 @app.command("migrations")
@@ -62,5 +56,5 @@ def cmd_graph_migrations(
 ) -> None:
     """Build migration dependency/timeline graph."""
     from ..commands.graph import cmd_graph_migrations as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             out=out, format=fmt))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         out=out, format=fmt)

@@ -2,7 +2,6 @@
 
 import sys
 import json
-import argparse
 from pathlib import Path
 
 from ..domain.schema_state import SchemaStateBuilder
@@ -11,18 +10,23 @@ from ..analysis.differ import SchemaDiffer, diff_files
 from ._utils import load_files, write_output
 
 
-def cmd_diff(args: argparse.Namespace) -> None:
+def cmd_diff(
+    *,
+    state_a: str,
+    state_b: str,
+    dialect: str = "oracle",
+    format: str = "text",
+    out: str | None = None,
+) -> None:
     """Compare two schema states or migration directories."""
     import os
 
     def is_json_file(p: str) -> bool:
         return os.path.isfile(p) and p.endswith(".json")
 
-    if is_json_file(args.state_a) and is_json_file(args.state_b):
-        result = diff_files(args.state_a, args.state_b)
+    if is_json_file(state_a) and is_json_file(state_b):
+        result = diff_files(state_a, state_b)
     else:
-        dialect = getattr(args, "dialect", "oracle")
-
         def load_dir(path: str):
             p = Path(path)
             if not p.is_dir():
@@ -36,39 +40,54 @@ def cmd_diff(args: argparse.Namespace) -> None:
             print(f"Loaded {len(files)} migration(s) from {path}", file=sys.stderr)
             return SchemaStateBuilder.from_graph(reconstruct(files, dialect=dialect))
 
-        result = SchemaDiffer.diff(load_dir(args.state_a), load_dir(args.state_b))
+        result = SchemaDiffer.diff(load_dir(state_a), load_dir(state_b))
 
-    fmt = (args.format or "text").lower()
-    write_output(result.to_json() if fmt == "json" else result.to_text(), args.out)
+    fmt = (format or "text").lower()
+    write_output(result.to_json() if fmt == "json" else result.to_text(), out)
 
 
-def cmd_diff_versions(args: argparse.Namespace) -> None:
-    """Compare two version snapshots from the same migration set via --json-input."""
-    files = load_files(args.migrations_dir, args.json_input)
-    dialect = getattr(args, "dialect", "oracle")
-    from_ver = getattr(args, "from_version", None)
-    to_ver = getattr(args, "to_version", None)
+def cmd_diff_versions(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    from_version: str | None = None,
+    to_version: str | None = None,
+    format: str = "json",
+    out: str | None = None,
+) -> None:
+    """Compare two version snapshots from the same migration set."""
+    files = load_files(migrations_dir, json_input)
 
     state_a = SchemaStateBuilder.from_graph(
-        reconstruct_at(files, from_ver, dialect=dialect) if from_ver else reconstruct(files, dialect=dialect)
+        reconstruct_at(files, from_version, dialect=dialect) if from_version else reconstruct(files, dialect=dialect)
     )
     state_b = SchemaStateBuilder.from_graph(
-        reconstruct_at(files, to_ver, dialect=dialect) if to_ver else reconstruct(files, dialect=dialect)
+        reconstruct_at(files, to_version, dialect=dialect) if to_version else reconstruct(files, dialect=dialect)
     )
 
     result = SchemaDiffer.diff(state_a, state_b)
-    fmt = (args.format or "json").lower()
-    write_output(result.to_json() if fmt == "json" else result.to_text(), args.out)
+    fmt = (format or "json").lower()
+    write_output(result.to_json() if fmt == "json" else result.to_text(), out)
 
 
-def cmd_rollback_analysis(args: argparse.Namespace) -> None:
+def cmd_rollback_analysis(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    out: str | None = None,
+    format: str = "text",
+    generate: bool = False,
+) -> None:
     """Analyze migration rollback feasibility."""
-    files = load_files(args.migrations_dir, args.json_input, use_cache=False)
+    files = load_files(migrations_dir, json_input, use_cache=False)
     from ..analysis.rollback import analyze_migrations, format_rollback_text, format_rollback_json
 
     results = analyze_migrations(files)
-    fmt = getattr(args, "format", "text")
-    write_output(format_rollback_json(results) if fmt == "json" else format_rollback_text(results), args.out)
+    fmt = (format or "text").lower()
+    write_output(format_rollback_json(results) if fmt == "json" else format_rollback_text(results), out)
 
     reversible = sum(1 for r in results if r.feasibility == "reversible")
     partial = sum(1 for r in results if r.feasibility == "partial")
@@ -77,49 +96,67 @@ def cmd_rollback_analysis(args: argparse.Namespace) -> None:
     print(f"  ✓ {reversible} reversible, ⚠️  {partial} partial, ✗ {irreversible} irreversible", file=sys.stderr)
 
 
-def cmd_simulate(args: argparse.Namespace) -> None:
+def cmd_simulate(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    out: str | None = None,
+    sql: str | None = None,
+    file: str | None = None,
+    format: str = "text",
+    diff: bool = False,
+    strict: bool = False,
+) -> None:
     """Simulate schema evolution with hypothetical SQL."""
     from ..analysis.simulator import SchemaSimulator
 
-    files = load_files(args.migrations_dir, args.json_input)
-    dialect = getattr(args, "dialect", "oracle")
-    simulator = SchemaSimulator(files, base_version=getattr(args, "at", None), dialect=dialect)
+    files = load_files(migrations_dir, json_input)
+    simulator = SchemaSimulator(files, base_version=at, dialect=dialect)
 
-    if getattr(args, "sql", None):
-        result = simulator.simulate_sql(args.sql)
-    elif getattr(args, "file", None):
-        result = simulator.simulate_file(args.file)
+    if sql:
+        result = simulator.simulate_sql(sql)
+    elif file:
+        result = simulator.simulate_file(file)
     else:
         print("Error: Must provide --sql or --file", file=sys.stderr)
         sys.exit(1)
 
-    fmt = (args.format or "text").lower()
-    write_output(result.to_json() if fmt == "json" else result.to_text(), args.out)
+    fmt = (format or "text").lower()
+    write_output(result.to_json() if fmt == "json" else result.to_text(), out)
 
-    if getattr(args, "diff", False):
+    if diff:
         print("\n" + "=" * 60 + "\nDIFF:\n" + "=" * 60)
         print(result.diff.to_text())
 
-    if getattr(args, "strict", False) and not result.is_safe():
+    if strict and not result.is_safe():
         sys.exit(1)
 
 
-def cmd_integrity(args: argparse.Namespace) -> None:
+def cmd_integrity(
+    *,
+    migrations_dir: str,
+    format: str = "text",
+    update_manifest: bool = False,
+    out: str | None = None,
+    strict: bool = False,
+) -> None:
     """Check migration file integrity using SHA256 hashes."""
-    from ..analysis.integrity import check_integrity, update_manifest
+    from ..analysis.integrity import check_integrity, update_manifest as _update_manifest
 
-    migrations_dir = Path(args.migrations_dir)
-    fmt = (getattr(args, "format", "text") or "text").lower()
+    migrations_dir_path = Path(migrations_dir)
+    fmt = (format or "text").lower()
 
-    if getattr(args, "update_manifest", False):
-        update_manifest(migrations_dir)
+    if update_manifest:
+        _update_manifest(migrations_dir_path)
         if fmt == "json":
-            write_output(json.dumps({"updated": True}, indent=2), getattr(args, "out", None))
+            write_output(json.dumps({"updated": True}, indent=2), out)
         else:
             print("✓ Manifest updated")
         return
 
-    report = check_integrity(migrations_dir)
+    report = check_integrity(migrations_dir_path)
 
     if fmt == "json":
         output = json.dumps({
@@ -129,8 +166,8 @@ def cmd_integrity(args: argparse.Namespace) -> None:
             "missing": report.missing,
             "new": report.new,
         }, indent=2, ensure_ascii=False)
-        write_output(output, getattr(args, "out", None))
-        if getattr(args, "strict", False) and report.modified:
+        write_output(output, out)
+        if strict and report.modified:
             sys.exit(1)
         return
 
@@ -154,32 +191,41 @@ def cmd_integrity(args: argparse.Namespace) -> None:
             for m in report.new:
                 print(f"  {m['filename']} (V{m['version']})")
 
-    if getattr(args, "strict", False) and report.modified:
+    if strict and report.modified:
         print("\nError: Modified migrations detected (--strict mode)")
         sys.exit(1)
 
 
-def cmd_drift(args: argparse.Namespace) -> None:
+def cmd_drift(
+    *,
+    base_migrations: str,
+    target_migrations: str,
+    dialect: str = "oracle",
+    format: str = "text",
+    generate_migration: bool = False,
+    next_version: str | None = None,
+    description: str = "catch_up_drift",
+    out: str | None = None,
+) -> None:
     """Detect schema drift between two migration folders and optionally generate repair SQL."""
     from ..analysis.drift_repair import analyze_drift, generate_repair_migration
 
-    base_files = load_files(args.base_migrations, None, use_cache=not getattr(args, "no_cache", False))
-    dialect = getattr(args, "dialect", "oracle")
+    base_files = load_files(base_migrations, None, use_cache=False)
     base_graph = reconstruct(base_files, dialect=dialect)
 
-    target_files = load_files(args.target_migrations, None, use_cache=not getattr(args, "no_cache", False))
+    target_files = load_files(target_migrations, None, use_cache=False)
     target_graph = reconstruct(target_files, dialect=dialect)
 
-    base_label = Path(args.base_migrations).name if args.base_migrations else "Base"
-    target_label = Path(args.target_migrations).name if args.target_migrations else "Target"
+    base_label = Path(base_migrations).name if base_migrations else "Base"
+    target_label = Path(target_migrations).name if target_migrations else "Target"
 
     report = analyze_drift(base_graph, target_graph, base_label=base_label, target_label=target_label)
-    fmt = getattr(args, "format", "text")
-    write_output(report.to_json() if fmt == "json" else report.to_text(), args.out)
+    fmt = (format or "text").lower()
+    write_output(report.to_json() if fmt == "json" else report.to_text(), out)
 
-    if getattr(args, "generate_migration", False) and not report.is_clean:
-        if getattr(args, "next_version", None):
-            version = args.next_version
+    if generate_migration and not report.is_clean:
+        if next_version:
+            version = next_version
         else:
             from ..analysis.ordering import parse_migration_filename
             versions = []
@@ -192,9 +238,8 @@ def cmd_drift(args: argparse.Namespace) -> None:
                         pass
             version = str(max(versions) + 1) if versions else "1"
 
-        description = getattr(args, "description", "catch_up_drift")
         migration_content = generate_repair_migration(report, version, description)
-        migration_path = Path(args.target_migrations) / f"V{version}__{description}.sql"
+        migration_path = Path(target_migrations) / f"V{version}__{description}.sql"
         migration_path.write_text(migration_content, encoding="utf-8")
         print(f"\n✓ Generated {migration_path}", file=sys.stderr)
 

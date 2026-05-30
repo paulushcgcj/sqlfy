@@ -406,14 +406,24 @@ def main() -> None:
 
     if first_positional in KNOWN_SUBCOMMANDS or "--help" in argv or "-h" in argv:
         args = _subcommand_parser().parse_args(argv)
-        result = args.func(args)
+        _meta = frozenset({'func', 'subcommand'})
+        kw = {k: v for k, v in vars(args).items() if k not in _meta}
+        result = args.func(**kw)
         if isinstance(result, int):
             sys.exit(result)
     else:
         args = _legacy_parser().parse_args(argv)
         if args.all:
             args.json = True
-        legacy_main(args)
+        legacy_main(
+            migrations_dir=args.migrations_dir,
+            json_input=getattr(args, 'json_input', None),
+            dialect=getattr(args, 'dialect', 'oracle'),
+            all=args.all,
+            chunks=args.chunks,
+            as_json=args.json,
+            out=args.out,
+        )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 sqlfy.cli.devtools
 ==================
 Typer app for developer tool commands: lint, validate, naming, deps,
-lineage, classify, safety, domains, stability, cost.
+lineage, classify, safety, domains, stability, cost, cache.
 """
 from __future__ import annotations
 from typing import Optional
@@ -10,12 +10,6 @@ import typer
 
 app = typer.Typer(help="Developer tooling and schema quality commands.", no_args_is_help=True)
 
-def _ns(**kw):
-    import argparse; return argparse.Namespace(**kw)
-
-def _shared(migrations_dir, json_input, dialect, at, out, fmt):
-    return dict(migrations_dir=migrations_dir, json_input=json_input,
-                dialect=dialect, at=at, out=out, format=fmt)
 
 @app.command("lint")
 def cmd_lint(
@@ -26,7 +20,8 @@ def cmd_lint(
 ) -> None:
     """Lint migration SQL files for quality and style."""
     from ..commands.devtools import cmd_lint as _cmd
-    _cmd(_ns(path=path, format=fmt, out=out, min_score=min_score))
+    _cmd(path=path, format=fmt, out=out, min_score=min_score or 0)
+
 
 @app.command("validate")
 def cmd_validate(
@@ -37,7 +32,8 @@ def cmd_validate(
 ) -> None:
     """Validate migration ordering and detect issues."""
     from ..commands.devtools import cmd_validate as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, format=fmt, out=out, fix_numbering=fix_numbering))
+    _cmd(migrations_dir=migrations_dir, format=fmt, out=out, fix_numbering=fix_numbering)
+
 
 @app.command("naming")
 def cmd_naming(
@@ -48,7 +44,11 @@ def cmd_naming(
 ) -> None:
     """Enforce migration naming conventions."""
     from ..commands.devtools import cmd_naming as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, format=fmt, out=out, pattern=pattern))
+    kw: dict = dict(migrations_dir=migrations_dir, format=fmt, out=out)
+    if pattern is not None:
+        kw["pattern"] = pattern
+    _cmd(**kw)
+
 
 @app.command("deps")
 def cmd_deps(
@@ -59,7 +59,8 @@ def cmd_deps(
 ) -> None:
     """Analyze migration dependencies and detect issues."""
     from ..commands.devtools import cmd_deps as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, format=fmt, out=out, critical_path=critical_path))
+    _cmd(migrations_dir=migrations_dir, format=fmt, out=out, critical_path=critical_path)
+
 
 @app.command("lineage")
 def cmd_lineage(
@@ -79,10 +80,11 @@ def cmd_lineage(
 ) -> None:
     """Column-level lineage and data flow analysis."""
     from ..commands.devtools import cmd_lineage as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, column=column, format=fmt, downstream=downstream,
-             upstream=upstream, unused_columns=unused_columns, god_columns=god_columns,
-             min_refs=min_refs, max_depth=max_depth))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, column=column, format=fmt,
+         upstream=upstream, unused_columns=unused_columns, god_columns=god_columns,
+         min_refs=min_refs, max_depth=max_depth)
+
 
 @app.command("classify")
 def cmd_classify(
@@ -96,8 +98,9 @@ def cmd_classify(
 ) -> None:
     """Classify migrations by semantic category."""
     from ..commands.devtools import cmd_classify as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, format=fmt, category=category))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         out=out, format=fmt, category=category)
+
 
 @app.command("safety")
 def cmd_safety(
@@ -111,8 +114,9 @@ def cmd_safety(
 ) -> None:
     """Score migrations by safety level."""
     from ..commands.devtools import cmd_safety as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, format=fmt, threshold=threshold))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         out=out, format=fmt, threshold=threshold)
+
 
 @app.command("domains")
 def cmd_domains(
@@ -125,8 +129,9 @@ def cmd_domains(
 ) -> None:
     """Detect semantic business domains via community detection."""
     from ..commands.analysis import cmd_domains as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, format=fmt))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, format=fmt)
+
 
 @app.command("stability")
 def cmd_stability(
@@ -139,8 +144,9 @@ def cmd_stability(
 ) -> None:
     """Calculate schema stability metrics and churn rates."""
     from ..commands.analysis import cmd_stability as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, format=fmt))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, format=fmt)
+
 
 @app.command("cost")
 def cmd_cost(
@@ -149,5 +155,14 @@ def cmd_cost(
     out: Optional[str] = typer.Option(None, "--out"),
 ) -> None:
     """Estimate migration execution cost (heuristic)."""
-    from ..commands.provenance import cmd_cost as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, format=fmt, out=out))
+    from ..commands.devtools import cmd_cost as _cmd
+    _cmd(migrations_dir=migrations_dir, format=fmt, out=out)
+
+
+@app.command("cache")
+def cmd_cache(
+    cache_action: str = typer.Argument(..., help="Action: clear | info"),
+) -> None:
+    """Manage the file-based caching system."""
+    from ..commands.devtools import cmd_cache as _cmd
+    _cmd(cache_action=cache_action)

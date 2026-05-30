@@ -2,7 +2,6 @@
 
 import sys
 import json
-import argparse
 
 from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import reconstruct, reconstruct_at
@@ -12,17 +11,24 @@ from ..analysis.insights import InsightsEngine
 from ._utils import load_files, write_output, format_human_chunks, graph_to_dict, chunks_to_list, format_state_summary
 
 
-def cmd_dump(args: argparse.Namespace) -> None:
+def cmd_dump(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    format: str = "json",
+    out: str | None = None,
+) -> None:
     """Output the Schema State Dictionary as JSON, YAML, or human summary."""
-    files = load_files(args.migrations_dir, args.json_input)
-    dialect = getattr(args, "dialect", "oracle")
+    files = load_files(migrations_dir, json_input)
     graph = (
-        reconstruct_at(files, version=args.at, dialect=dialect)
-        if args.at
+        reconstruct_at(files, version=at, dialect=dialect)
+        if at
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph)
-    fmt = (args.format or "json").lower()
+    fmt = (format or "json").lower()
     if fmt == "yaml":
         output = state.to_yaml()
     elif fmt == "json":
@@ -32,20 +38,27 @@ def cmd_dump(args: argparse.Namespace) -> None:
     else:
         print(f'Error: unknown format "{fmt}". Choose json, yaml, or summary.', file=sys.stderr)
         sys.exit(1)
-    write_output(output, args.out)
+    write_output(output, out)
 
 
-def cmd_manifest(args: argparse.Namespace) -> None:
+def cmd_manifest(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    format: str = "json",
+    out: str | None = None,
+) -> None:
     """Output graph manifest with high-level metadata."""
-    files = load_files(args.migrations_dir, args.json_input)
-    dialect = getattr(args, "dialect", "oracle")
+    files = load_files(migrations_dir, json_input)
     graph = (
-        reconstruct_at(files, version=args.at, dialect=dialect)
-        if getattr(args, "at", None)
+        reconstruct_at(files, version=at, dialect=dialect)
+        if at
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph)
-    fmt = (getattr(args, "format", "json") or "json").lower()
+    fmt = (format or "json").lower()
     if fmt == "text":
         import json as _json
         data = _json.loads(state.to_manifest())
@@ -65,41 +78,56 @@ def cmd_manifest(args: argparse.Namespace) -> None:
         output = "\n".join(lines)
     else:
         output = state.to_manifest()
-    write_output(output, args.out)
+    write_output(output, out)
 
 
-def cmd_chunks(args: argparse.Namespace) -> None:
+def cmd_chunks(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    format: str = "json",
+    out: str | None = None,
+) -> None:
     """Output LLM vector chunks from the schema."""
-    files = load_files(args.migrations_dir, args.json_input)
-    dialect = getattr(args, "dialect", "oracle")
+    files = load_files(migrations_dir, json_input)
     graph = (
-        reconstruct_at(files, args.at, dialect=dialect)
-        if args.at
+        reconstruct_at(files, at, dialect=dialect)
+        if at
         else reconstruct(files, dialect=dialect)
     )
     chunks = build_chunks(graph)
-    fmt = (args.format or "json").lower()
+    fmt = (format or "json").lower()
     if fmt == "json":
         output = json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False)
     else:
         output = format_human_chunks(chunks)
-    write_output(output, args.out)
+    write_output(output, out)
 
 
-def cmd_export(args: argparse.Namespace) -> None:
+def cmd_export(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    out: str | None = None,
+    insights: bool = False,
+    title: str = "",
+) -> None:
     """Export schema as a self-contained HTML documentation file."""
-    files = load_files(args.migrations_dir, args.json_input)
-    dialect = getattr(args, "dialect", "oracle")
+    files = load_files(migrations_dir, json_input)
     graph = (
-        reconstruct_at(files, args.at, dialect=dialect)
-        if getattr(args, "at", None)
+        reconstruct_at(files, at, dialect=dialect)
+        if at
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph)
-    report = InsightsEngine.analyse(state) if getattr(args, "insights", False) else None
-    title = getattr(args, "title", "") or f"Schema Documentation — V{state.version}"
+    report = InsightsEngine.analyse(state) if insights else None
+    title = title or f"Schema Documentation — V{state.version}"
     html = Exporter.to_html(state, report=report, title=title)
-    out = args.out or "schema_docs.html"
+    out = out or "schema_docs.html"
     write_output(html, out)
     print(f"HTML documentation written to {out}", file=sys.stderr)
     print(f"  Tables   : {state.stats['table_count']}", file=sys.stderr)
@@ -107,32 +135,40 @@ def cmd_export(args: argparse.Namespace) -> None:
     print(f"  Size     : {len(html):,} chars", file=sys.stderr)
 
 
-def legacy_main(args: argparse.Namespace) -> None:
+def legacy_main(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    all: bool = False,
+    chunks: bool = False,
+    as_json: bool = False,
+    out: str | None = None,
+) -> None:
     """Backward-compatible flag-based interface."""
-    files = load_files(args.migrations_dir, getattr(args, "json_input", None))
-    dialect = getattr(args, "dialect", "oracle")
-    if getattr(args, "all", False):
+    files = load_files(migrations_dir, json_input)
+    if all:
         graph = reconstruct(files, dialect=dialect)
-        chunks = build_chunks(graph)
+        graph_chunks = build_chunks(graph)
         output = json.dumps(
-            {"graph": graph_to_dict(graph), "chunks": chunks_to_list(chunks)},
+            {"graph": graph_to_dict(graph), "chunks": chunks_to_list(graph_chunks)},
             indent=2,
             ensure_ascii=False,
         )
-    elif getattr(args, "chunks", False):
+    elif chunks:
         graph = reconstruct(files, dialect=dialect)
-        chunks = build_chunks(graph)
+        graph_chunks = build_chunks(graph)
         output = (
-            json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False)
-            if getattr(args, "json", False)
-            else format_human_chunks(chunks)
+            json.dumps(chunks_to_list(graph_chunks), indent=2, ensure_ascii=False)
+            if as_json
+            else format_human_chunks(graph_chunks)
         )
     else:
         from ._utils import format_human_graph
         graph = reconstruct(files, dialect=dialect)
         output = (
             json.dumps(graph_to_dict(graph), indent=2, ensure_ascii=False)
-            if getattr(args, "json", False)
+            if as_json
             else format_human_graph(graph)
         )
-    write_output(output, getattr(args, "out", None))
+    write_output(output, out)

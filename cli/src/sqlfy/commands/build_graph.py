@@ -27,7 +27,6 @@ from __future__ import annotations
 import sys
 import json
 import time
-import argparse
 from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -99,26 +98,35 @@ class GraphBuildResult:
         return json.dumps(self.to_dict(), indent=2)
 
 
-def cmd_build_graph(args: argparse.Namespace) -> None:
+def cmd_build_graph(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    output_dir: str | None = None,
+    resolution: float = 1.0,
+    min_cohesion: float = 0.5,
+    no_split: bool = False,
+    min_refs: int = 20,
+    no_queries: bool = False,
+    no_viz: bool = False,
+) -> None:
     """
     Build complete schema knowledge graph.
-    
+
     Orchestrates all graph-related features into a single workflow.
     Produces a self-contained graphify-out/ directory.
     """
     start_time = time.time()
-    
-    # Parse arguments
-    output_dir = Path(getattr(args, 'output_dir', None) or 'graphify-out')
-    files = load_files(args.migrations_dir, getattr(args, 'json_input', None))
-    dialect = getattr(args, 'dialect', 'oracle')
-    version = getattr(args, 'at', None)
-    resolution = getattr(args, 'resolution', 1.0)
-    min_cohesion = getattr(args, 'min_cohesion', 0.5)
-    enable_splitting = not getattr(args, 'no_split', False)
-    min_refs = getattr(args, 'min_refs', 20)
-    skip_queries = getattr(args, 'no_queries', False)
-    skip_viz = getattr(args, 'no_viz', False)
+
+    output_dir_path = Path(output_dir or 'graphify-out')
+    files = load_files(migrations_dir, json_input)
+    version = at
+    enable_splitting = not no_split
+    skip_queries = no_queries
+    skip_viz = no_viz
+    output_dir = output_dir_path
     
     # Create output directories
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -134,7 +142,7 @@ def cmd_build_graph(args: argparse.Namespace) -> None:
     print("║         Schema Knowledge Graph Builder                   ║", file=sys.stderr)
     print("╚══════════════════════════════════════════════════════════╝", file=sys.stderr)
     print(file=sys.stderr)
-    print(f"📂 Building graph from: {args.migrations_dir}", file=sys.stderr)
+    print(f"📂 Building graph from: {migrations_dir}", file=sys.stderr)
     print(f"📍 Output directory: {output_dir}", file=sys.stderr)
     print(file=sys.stderr)
     
@@ -211,7 +219,7 @@ def cmd_build_graph(args: argparse.Namespace) -> None:
         f.write(insights_report.to_json())
     
     # Health score
-    health_analyzer_report = HealthAnalyzer.analyze(state, insights_report, args.migrations_dir or '.')
+    health_analyzer_report = HealthAnalyzer.analyze(state, insights_report, migrations_dir or '.')
     health_score = health_analyzer_report.health_score.score
     print(f"   ✓ Computing health score ({health_score}/100)", file=sys.stderr)
     

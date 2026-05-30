@@ -9,12 +9,6 @@ import typer
 
 app = typer.Typer(help="Natural language schema intelligence commands.", no_args_is_help=True)
 
-def _ns(**kw):
-    import argparse; return argparse.Namespace(**kw)
-
-def _rag_defaults(migrations_dir, json_input, dialect, at, out, embed, api_key, k):
-    return dict(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-                at=at, out=out, embed=embed, api_key=api_key, k=k)
 
 @app.command("ask")
 def cmd_ask(
@@ -31,8 +25,10 @@ def cmd_ask(
 ) -> None:
     """Ask a natural language question about the schema (RAG)."""
     from ..commands.ai import cmd_ask as _cmd
-    _cmd(_ns(**_rag_defaults(migrations_dir, json_input, dialect, at, out, embed, api_key, k),
-             question=question, format=fmt))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, embed=embed, api_key=api_key, k=k,
+         question=question, format=fmt)
+
 
 @app.command("chat")
 def cmd_chat(
@@ -47,7 +43,9 @@ def cmd_chat(
 ) -> None:
     """Interactive multi-turn schema chat session."""
     from ..commands.ai import cmd_chat as _cmd
-    _cmd(_ns(**_rag_defaults(migrations_dir, json_input, dialect, at, out, embed, api_key, k)))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, embed=embed, api_key=api_key, k=k)
+
 
 @app.command("query")
 def cmd_query(
@@ -61,5 +59,5 @@ def cmd_query(
 ) -> None:
     """Run a structured schema query."""
     from ..commands.ai import cmd_query as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, query_type=query_type, format=fmt))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, query_type=query_type, format=fmt)

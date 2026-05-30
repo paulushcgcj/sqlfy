@@ -10,8 +10,6 @@ import typer
 
 app = typer.Typer(help="Schema evolution and change-analysis commands.", no_args_is_help=True)
 
-def _ns(**kw):
-    import argparse; return argparse.Namespace(**kw)
 
 @app.command("diff")
 def cmd_diff(
@@ -22,7 +20,8 @@ def cmd_diff(
 ) -> None:
     """Compare two schema state dictionaries or migration directories."""
     from ..commands.evolution import cmd_diff as _cmd
-    _cmd(_ns(state_a=state_a, state_b=state_b, format=fmt, out=out))
+    _cmd(state_a=state_a, state_b=state_b, format=fmt, out=out)
+
 
 @app.command("diff-versions")
 def cmd_diff_versions(
@@ -36,8 +35,9 @@ def cmd_diff_versions(
 ) -> None:
     """Compare two version snapshots of the same migration set."""
     from ..commands.evolution import cmd_diff_versions as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             from_version=from_version, to_version=to_version, format=fmt, out=out))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         from_version=from_version, to_version=to_version, format=fmt, out=out)
+
 
 @app.command("rollback-analysis")
 def cmd_rollback_analysis(
@@ -51,8 +51,9 @@ def cmd_rollback_analysis(
 ) -> None:
     """Analyze migration rollback feasibility."""
     from ..commands.evolution import cmd_rollback_analysis as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, format=fmt, generate=generate))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, format=fmt, generate=generate)
+
 
 @app.command("simulate")
 def cmd_simulate(
@@ -68,8 +69,9 @@ def cmd_simulate(
 ) -> None:
     """Simulate applying DDL to the current schema without persisting."""
     from ..commands.evolution import cmd_simulate as _cmd
-    _cmd(_ns(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-             at=at, out=out, sql=sql, file=file, format=fmt, diff=diff))
+    _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
+         at=at, out=out, sql=sql, file=file, format=fmt, diff=diff)
+
 
 @app.command("drift")
 def cmd_drift(
@@ -84,6 +86,6 @@ def cmd_drift(
 ) -> None:
     """Detect schema drift between two migration folders."""
     from ..commands.evolution import cmd_drift as _cmd
-    _cmd(_ns(base_migrations=base_migrations, target_migrations=target_migrations,
-             dialect=dialect, format=fmt, out=out, generate_migration=generate_migration,
-             next_version=next_version, description=description))
+    _cmd(base_migrations=base_migrations, target_migrations=target_migrations,
+         dialect=dialect, format=fmt, out=out, generate_migration=generate_migration,
+         next_version=next_version, description=description)
