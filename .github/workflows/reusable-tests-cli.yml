@@ -32,7 +32,7 @@ jobs:
         working-directory: cli
 
       - name: Generate contract schemas
-        run: uv run python -m sqlfy.build.generate_contracts
+        run: uv run python -m sqlfy.contract_gen.generate_contracts
         working-directory: cli
 
       - name: Run tests

@@ -16,7 +16,7 @@ codegen: codegen-ts codegen-py
 
 ## contracts: Generate JSON Schema build artifacts from the contract registry
 contracts:
-	cd cli && python -m sqlfy.build.generate_contracts
+	cd cli && python -m sqlfy.contract_gen.generate_contracts
 
 ## test: Run Python CLI test suite
 test:

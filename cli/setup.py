@@ -22,7 +22,7 @@ environment that setuptools uses for PEP 517 editable wheels.
 For CI or release pipelines that need the schema artifacts, run the generator
 as an explicit step AFTER installation:
 
-    uv run python -m sqlfy.build.generate_contracts
+    uv run python -m sqlfy.contract_gen.generate_contracts
     # or
     make contracts
 """
@@ -54,7 +54,7 @@ def _bootstrap_contracts_import(src_path: str) -> None:
 
     We register a lightweight stub for the top-level ``sqlfy`` package
     whose ``__path__`` still points at the real source tree.  All
-    sub-packages (``sqlfy.contracts``, ``sqlfy.build``, ``sqlfy.models``)
+    sub-packages (``sqlfy.contracts``, ``sqlfy.contract_gen``, ``sqlfy.models``)
     are discovered and loaded normally through that path; only the
     ``__init__.py`` of the root package is skipped.
     """
@@ -99,7 +99,7 @@ class CustomBuildPy(build_py):
         _bootstrap_contracts_import(src_path)
 
         try:
-            from sqlfy.build.generate_contracts import generate_all  # type: ignore[import]
+            from sqlfy.contract_gen.generate_contracts import generate_all  # type: ignore[import]
 
             generate_all()
         except Exception as exc:
