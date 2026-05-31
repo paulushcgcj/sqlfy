@@ -31,6 +31,10 @@ jobs:
         run: uv sync --all-extras --group dev
         working-directory: cli
 
+      - name: Generate contract schemas
+        run: uv run python -m sqlfy.build.generate_contracts
+        working-directory: cli
+
       - name: Run tests
         run: uv run pytest -v --tb=short --junit-xml=test-results.xml
         working-directory: cli

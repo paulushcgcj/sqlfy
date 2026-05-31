@@ -11,20 +11,20 @@ Python package (they are standalone build artifacts).
 Usage
 -----
     python setup.py build           # build + generate contracts
-    pip install -e .                # editable install also triggers build_py
+    python setup.py build_py        # same
 
-The contract generation step is intentionally cheap: it only imports
-``sqlfy.contracts.registry`` and calls Pydantic's ``model_json_schema()``.
-No SQL parsing, no disk I/O beyond writing a handful of JSON files.
+Contract generation is skipped silently when the package is being installed
+in editable mode (``uv sync`` / ``pip install -e .``).  In that context the
+source tree is already live, no artifact publishing occurs, and the project
+dependencies (sqlglot, networkx, etc.) are not present in the isolated build
+environment that setuptools uses for PEP 517 editable wheels.
 
-Build-environment note
-----------------------
-Contract generation only needs ``pydantic`` (already a project dependency).
-To avoid triggering the heavy ``sqlfy/__init__.py`` (which imports sqlglot,
-networkx, etc.) in an isolated build environment, ``CustomBuildPy.run()``
-pre-registers a minimal stub for the ``sqlfy`` package so that only the
-contracts sub-package and ``sqlfy.models`` are imported.  The normal
-``build_py`` step then compiles and copies the *real* package as usual.
+For CI or release pipelines that need the schema artifacts, run the generator
+as an explicit step AFTER installation:
+
+    uv run python -m sqlfy.build.generate_contracts
+    # or
+    make contracts
 """
 
 from __future__ import annotations
@@ -35,6 +35,17 @@ from pathlib import Path
 
 from setuptools import setup
 from setuptools.command.build_py import build_py
+
+
+def _is_editable_build(dist) -> bool:
+    """Return True when setuptools is building an editable wheel.
+
+    During ``uv sync`` / ``pip install -e .``, setuptools invokes
+    ``build_editable`` which internally calls ``build_py``.  Contract
+    generation is not useful in that context and will fail because the
+    project's runtime dependencies are absent from the isolated build env.
+    """
+    return "editable_wheel" in (dist.command_obj or {})
 
 
 def _bootstrap_contracts_import(src_path: str) -> None:
@@ -48,10 +59,22 @@ def _bootstrap_contracts_import(src_path: str) -> None:
     ``__init__.py`` of the root package is skipped.
     """
     if "sqlfy" not in sys.modules:
+        import importlib.machinery
+
+        sqlfy_src = str(Path(src_path) / "sqlfy")
         stub = types.ModuleType("sqlfy")
-        stub.__path__ = [str(Path(src_path) / "sqlfy")]  # type: ignore[attr-defined]
+        stub.__path__ = [sqlfy_src]  # type: ignore[attr-defined]
         stub.__package__ = "sqlfy"
-        stub.__spec__ = None  # type: ignore[assignment]
+        # Provide a minimal ModuleSpec so Python 3.14's import machinery
+        # can resolve sub-packages correctly.
+        spec = importlib.machinery.ModuleSpec(
+            "sqlfy",
+            loader=None,
+            origin=str(Path(sqlfy_src) / "__init__.py"),
+            is_package=True,
+        )
+        spec.submodule_search_locations = [sqlfy_src]
+        stub.__spec__ = spec  # type: ignore[assignment]
         sys.modules["sqlfy"] = stub
 
 
@@ -59,14 +82,20 @@ class CustomBuildPy(build_py):
     """Subclass of ``build_py`` that generates contract schemas before packaging."""
 
     def run(self) -> None:
-        # Ensure the src/ layout is on sys.path so the import works even
-        # when running setup.py before an editable install is complete.
+        # Skip during editable installs — artifacts are not produced and
+        # project deps are absent from the isolated PEP 517 build env.
+        if _is_editable_build(self.distribution):
+            print(
+                "[contracts] Skipping schema generation (editable install).",
+                file=sys.stderr,
+            )
+            super().run()
+            return
+
         src_path = str(Path(__file__).resolve().parent / "src")
         if src_path not in sys.path:
             sys.path.insert(0, src_path)
 
-        # Bypass sqlfy/__init__.py to avoid importing sqlglot/networkx in the
-        # isolated build environment — only pydantic is required for schema gen.
         _bootstrap_contracts_import(src_path)
 
         try:
@@ -74,10 +103,9 @@ class CustomBuildPy(build_py):
 
             generate_all()
         except Exception as exc:
-            # Contract generation failure is a build error.
+            # Contract generation failure is a build error for full builds.
             raise SystemExit(f"[contracts] Build step failed: {exc}") from exc
 
-        # Delegate to the standard build_py logic.
         super().run()
 
 
