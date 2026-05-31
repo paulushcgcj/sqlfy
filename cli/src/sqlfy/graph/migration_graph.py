@@ -190,12 +190,12 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
                     if table_name:
                         alters.append(table_name.upper())
                 
-                # Check for foreign keys in ALTER
-                for action in (stmt.expressions or []):
-                    if isinstance(action, exp.ForeignKey):
-                        ref = action.args.get('reference')
+                # Check for foreign keys in ALTER (walk full AST — ForeignKey may
+                # be nested inside AddConstraint or other wrapper nodes)
+                for node in stmt.walk():
+                    if isinstance(node, exp.ForeignKey):
+                        ref = node.args.get('reference')
                         if ref:
-                            # Extract referenced table name from nested structure
                             ref_table_name = _extract_reference_table(ref)
                             if ref_table_name:
                                 references.append(ref_table_name.upper())
