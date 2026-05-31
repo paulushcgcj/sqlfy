@@ -15,28 +15,24 @@ jobs:
       checks: write
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: cli/requirements.txt
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: uv sync --all-extras --group dev
         working-directory: cli
 
       - name: Run tests
-        run: python -m pytest -v --tb=short
-        working-directory: cli
-
-      - name: Generate test report
-        if: always()
-        run: python -m pytest -v --tb=short --junit-xml=test-results.xml
+        run: uv run pytest -v --tb=short --junit-xml=test-results.xml
         working-directory: cli
 
       - name: Upload test results

@@ -24,24 +24,27 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+        run: uv python install 3.14
 
       - name: Install dependencies
         run: |
           cd cli
-          pip install pyinstaller
-          pip install -e .
+          uv sync
+          uv pip install pyinstaller
 
       - name: Build binary (Unix)
         if: runner.os != 'Windows'
         run: |
           cd cli
-          pyinstaller \
+          uv run pyinstaller \
             --name sqlfy \
             --onefile \
             --console \
@@ -58,7 +61,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd cli
-          pyinstaller `
+          uv run pyinstaller `
             --name sqlfy `
             --onefile `
             --console `
