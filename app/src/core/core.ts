@@ -4,6 +4,7 @@
 // No DOM, no Node.js APIs
 // ─────────────────────────────────────────────
 
+import type { VectorChunk } from './types';
 import type {
   MigrationFile,
   Column,
@@ -14,7 +15,6 @@ import type {
   SchemaGraph,
   LayoutPoint,
 } from '@/core/local-types';
-import type { VectorChunk } from './types';
 
 // ─────────────────────────────────────────────
 // SQL TOKENISER UTILITIES

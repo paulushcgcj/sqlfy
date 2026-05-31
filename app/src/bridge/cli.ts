@@ -17,7 +17,16 @@
  */
 
 import type { MigrationFile, SchemaGraph } from '@/core/local-types';
-import type { VectorChunk, InsightFinding, InsightsResult, HealthGrade, HealthMigrationStatus, HealthResult, SimulateResult, DiffResult } from '@/core/types';
+import type {
+  VectorChunk,
+  _InsightFinding,
+  InsightsResult,
+  _HealthGrade,
+  _HealthMigrationStatus,
+  HealthResult,
+  SimulateResult,
+  DiffResult,
+} from '@/core/types';
 
 import { applyMigrations, buildChunks } from '@/core/core';
 
