@@ -210,7 +210,7 @@ def cmd_build_graph(
         json.dump({'god_nodes': god_nodes, 'count': god_node_count, 'min_refs': min_refs}, f, indent=2)
     
     # Insights
-    insights_report = InsightsEngine.analyse(state)
+    insights_report = InsightsEngine.analyse(state, files=files)
     insights_count = len(insights_report.findings)
     print(f"   ✓ Running insights engine ({insights_count} findings)", file=sys.stderr)
     
@@ -306,13 +306,13 @@ def cmd_build_graph(
     print("🎨 Phase 5: Visualizations", file=sys.stderr)
     
     # NetworkX JSON + HTML + Report (always generated)
-    export_graph_json(nx_graph, output_path=out_dir / 'graph.json', 
-                      resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
+    export_graph_json(nx_graph, communities=comm_result.communities,
+                      output_path=out_dir / 'graph.json')
     print("   ✓ Generating graph.json (NetworkX format)", file=sys.stderr)
     viz_count += 1
-    
-    export_graph_html(nx_graph, output_path=out_dir / 'graph.html',
-                      resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
+
+    export_graph_html(nx_graph, communities=comm_result.communities,
+                      output_path=out_dir / 'graph.html')
     print("   ✓ Generating graph.html (interactive vis.js)", file=sys.stderr)
     viz_count += 1
     
@@ -364,14 +364,14 @@ def cmd_build_graph(
     print("📝 Phase 6: Report Generation", file=sys.stderr)
     
     # Comprehensive GRAPH_REPORT.md
-    export_graph_report(nx_graph, output_path=out_dir / 'GRAPH_REPORT.md',
-                        resolution=resolution, min_cohesion=min_cohesion, enable_splitting=enable_splitting)
+    export_graph_report(nx_graph, communities=comm_result.communities,
+                        output_path=out_dir / 'GRAPH_REPORT.md')
     print("   ✓ Writing GRAPH_REPORT.md (comprehensive analysis)", file=sys.stderr)
-    
+
     # Manifest metadata
     manifest = state.to_manifest()
     with open(out_dir / 'manifest.json', 'w', encoding='utf-8') as f:
-        json.dump(manifest, f, indent=2)
+        f.write(manifest)
     print("   ✓ Writing manifest.json (metadata)", file=sys.stderr)
     
     print(file=sys.stderr)

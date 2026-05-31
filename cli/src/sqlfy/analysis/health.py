@@ -220,50 +220,52 @@ class HealthAnalyzer:
         """
         # Count total migrations
         total_migrations = len(state.source_files)
-        
-        # Analyze each migration file
+
+        # Derive per-file error/warning counts from the InsightsReport instead of
+        # re-implementing the same regex checks.  Migration-specific findings embed
+        # the filename as the prefix before the first ": " in their message.
+        _migration_codes = {
+            'ADD_NOT_NULL_NO_DEFAULT',
+            'SELECT_STAR_VIEW',
+            'LARGE_DELETE_NO_WHERE',
+            'TRIGGER_WITH_BUSINESS_LOGIC',
+        }
+        from collections import defaultdict as _defaultdict
+        _per_file_errors: dict[str, int] = _defaultdict(int)
+        _per_file_warnings: dict[str, int] = _defaultdict(int)
+        for _finding in insights_report.findings:
+            if _finding.code not in _migration_codes:
+                continue
+            colon_pos = _finding.message.find(': ')
+            if colon_pos > 0:
+                fname = _finding.message[:colon_pos]
+                if _finding.severity == 'error':
+                    _per_file_errors[fname] += 1
+                elif _finding.severity == 'warning':
+                    _per_file_warnings[fname] += 1
+
+        # Analyze each migration file (only scan SQL for irreversible operations,
+        # which InsightsEngine does not cover).
         migration_statuses = []
         for file_entry in state.source_files:
             filename = file_entry.get('filename', 'unknown')
-            sql = file_entry.get('sql', '').upper()
-            
-            # Detect errors/warnings directly in this migration's SQL
-            # We'll look for specific anti-pattern signatures in the SQL itself
-            errors = 0
-            warnings = 0
+            sql_upper = file_entry.get('sql', '').upper()
+
+            errors = _per_file_errors[filename]
+            warnings = _per_file_warnings[filename]
             infos = 0
-            
-            # Check for ADD NOT NULL without DEFAULT (error)
-            if 'ADD' in sql and 'NOT NULL' in sql:
-                # Check if it has DEFAULT
-                if 'DEFAULT' not in sql:
-                    errors += 1
-            
-            # Check for SELECT * in views (warning)
-            if 'CREATE VIEW' in sql and 'SELECT *' in sql:
-                warnings += 1
-            
-            # Check for DELETE without WHERE (warning)
-            if 'DELETE FROM' in sql and 'WHERE' not in sql:
-                warnings += 1
-            
-            # Check for complex triggers (warning)
-            if 'CREATE TRIGGER' in sql and len(sql) > 500:
-                if 'IF' in sql or 'CASE' in sql:
-                    warnings += 1
-            
-            # Check for irreversible operations
-            has_drop_table = 'DROP TABLE' in sql
-            has_drop_column = 'DROP COLUMN' in sql or 'DROP (' in sql
-            
-            # Determine status
+
+            # Irreversible-operation detection (DROP TABLE / DROP COLUMN)
+            has_drop_table = 'DROP TABLE' in sql_upper
+            has_drop_column = 'DROP COLUMN' in sql_upper or 'DROP (' in sql_upper
+
             if has_drop_table or has_drop_column:
                 status = 'irreversible'
             elif errors > 0:
                 status = 'unsafe'
             else:
                 status = 'safe'
-            
+
             migration_statuses.append(MigrationStatus(
                 filename=filename,
                 status=status,

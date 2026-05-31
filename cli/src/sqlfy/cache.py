@@ -46,11 +46,11 @@ def _save_stat_index() -> None:
     except Exception:
         try:
             os.close(fd)
-        except:
+        except OSError:
             pass
         try:
             os.unlink(tmp)
-        except:
+        except OSError:
             pass
 
 
@@ -136,11 +136,11 @@ def save_cached(path: Path, result: dict) -> None:
     except Exception:
         try:
             os.close(fd)
-        except:
+        except OSError:
             pass
         try:
             os.unlink(tmp)
-        except:
+        except OSError:
             pass
 
 

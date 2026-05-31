@@ -63,6 +63,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..domain.schema_state import SchemaState, TableState
+from .query import QueryEngine
 
 
 # ─────────────────────────────────────────────
@@ -293,14 +294,29 @@ _ID_SUFFIX_PATTERN = re.compile(r'(?:_id|_key|_fk|_ref)$', re.I)
 _VARCHAR_TYPES     = {'VARCHAR', 'VARCHAR2', 'CHAR', 'NVARCHAR', 'NCHAR', 'TEXT'}
 _NUMBER_TYPES      = {'NUMBER', 'INTEGER', 'INT', 'NUMERIC', 'DECIMAL', 'BIGINT', 'SMALLINT'}
 
+# Migration-specific anti-pattern regexes — compiled once at module level (Fix #5)
+_ALTER_ADD_PATTERN = re.compile(
+    r'ALTER\s+TABLE\s+(\w+)\s+ADD\s+\(\s*(\w+)\s+([^;]+)\);',
+    re.IGNORECASE | re.DOTALL,
+)
+_VIEW_PATTERN    = re.compile(r'CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(\w+)', re.IGNORECASE)
+_TRIGGER_PATTERN = re.compile(r'CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+(\w+)', re.IGNORECASE)
+_DELETE_PATTERN  = re.compile(r'DELETE\s+FROM\s+(\w+)(?!\s+WHERE)', re.IGNORECASE | re.DOTALL)
+
 
 class InsightsEngine:
     """Stateless analyser — call InsightsEngine.analyse(state)."""
 
     @staticmethod
-    def analyse(state: SchemaState) -> InsightsReport:
+    def analyse(
+        state: SchemaState,
+        files: list[dict] | None = None,
+    ) -> InsightsReport:
         report = InsightsReport(version=state.version, fingerprint=state.fingerprint)
         add    = report.findings.append
+
+        # Build QueryEngine once — reused for cycle and island detection (Fix #9).
+        _engine = QueryEngine(state)
 
         rel_tables_out = defaultdict(list)   # from_table → [rels]
         rel_tables_in  = defaultdict(list)   # to_table   → [rels]
@@ -309,14 +325,6 @@ class InsightsEngine:
             rel_tables_in[r.to_table].append(r)
 
         known_tables = set(state.tables.keys())
-
-        # ── Directed adjacency for cycle detection ──────────────────────
-        dir_adj: dict[str, set[str]] = defaultdict(set)
-        for r in state.relationships:
-            dir_adj[r.from_table].add(r.to_table)
-
-        # ── Undirected adjacency for island detection ───────────────────
-        undir_adj = _build_adjacency(state)
 
         # ── Per-table FK column set ─────────────────────────────────────
         fk_col_map: dict[str, set[str]] = defaultdict(set)
@@ -437,15 +445,11 @@ class InsightsEngine:
                         fix='Add NOT NULL to all PK columns.',
                     ))
 
-        # CIRCULAR_FK
-        cycles = _has_cycle(dict(dir_adj))
-        seen_cycles: set[frozenset] = set()
-        for cycle in cycles:
-            key = frozenset(cycle)
-            if key in seen_cycles:
-                continue
-            seen_cycles.add(key)
-            cycle_str = ' → '.join(cycle)
+        # CIRCULAR_FK — delegate to QueryEngine.cycles() (Fix #7)
+        cycles_result = _engine.cycles()
+        for row in cycles_result.rows:
+            # row['path'] is "A → B → C → A"; strip the loop-back for the message
+            cycle_str = row['path'].rsplit(' → ', 1)[0]
             add(Finding(
                 code='CIRCULAR_FK', severity='warning', category='referential',
                 message=f'Circular FK reference detected: {cycle_str}',
@@ -532,17 +536,18 @@ class InsightsEngine:
         # CONNECTIVITY — ISLANDS
         # ═══════════════════════════════════════
 
-        components = _connected_components(undir_adj)
-        # Only flag as islands if there are multiple non-trivial connected components
-        non_trivial = [c for c in components if len(c) > 1]
-        if len(non_trivial) > 1:
-            for idx, comp in enumerate(sorted(non_trivial, key=len, reverse=True)):
-                if idx == 0:
-                    continue  # largest component is the "main" schema — not an island
-                tables_str = ', '.join(sorted(comp))
+        # ISLAND — use QueryEngine.islands() to avoid rebuilding adjacency (Fix #9)
+        islands_result = _engine.islands()
+        if islands_result.meta.get('component_count', 0) > 1:
+            island_components: dict[str, list[str]] = defaultdict(list)
+            for _row in islands_result.rows:
+                if _row['is_island'] and _row.get('size', 1) > 1:
+                    island_components[_row['component']].append(_row['table'])
+            for comp_tables in island_components.values():
+                tables_str = ', '.join(sorted(comp_tables))
                 add(Finding(
                     code='ISLAND', severity='warning', category='connectivity',
-                    message=(f'Island detected: {len(comp)} tables are connected '
+                    message=(f'Island detected: {len(comp_tables)} tables are connected '
                              f'to each other but isolated from the main schema.'),
                     detail=f'Island tables: {tables_str}',
                     fix='Check whether these tables should reference main-schema tables via FK.',
@@ -552,20 +557,16 @@ class InsightsEngine:
         # MIGRATION-SPECIFIC ANTI-PATTERNS
         # ═══════════════════════════════════════
 
-        # Analyze source SQL for migration-specific anti-patterns
-        for file_entry in state.source_files:
+        # MIGRATION-SPECIFIC — use 'files' parameter when provided; fall back to
+        # state.source_files for backward-compatibility (Fix #10).
+        _source_files = files if files is not None else state.source_files
+        for file_entry in _source_files:
             sql = file_entry.get('sql', '')
             sql_upper = sql.upper()
             filename = file_entry.get('filename', 'unknown')
-            
-            # ADD_NOT_NULL_NO_DEFAULT - detect ALTER TABLE ADD with NOT NULL but no DEFAULT
-            # Matches: ALTER TABLE table ADD ( column type NOT NULL )
-            # Use a simpler pattern - match until we see ) followed by ; or end of string
-            alter_add_pattern = re.compile(
-                r'ALTER\s+TABLE\s+(\w+)\s+ADD\s+\(\s*(\w+)\s+([^;]+)\);',
-                re.IGNORECASE | re.DOTALL
-            )
-            for match in alter_add_pattern.finditer(sql):
+
+            # ADD_NOT_NULL_NO_DEFAULT — use module-level compiled pattern (Fix #5)
+            for match in _ALTER_ADD_PATTERN.finditer(sql):
                 table_name = match.group(1)
                 col_name = match.group(2)
                 col_def = match.group(3).upper()
@@ -583,10 +584,9 @@ class InsightsEngine:
                         fix=f'Add DEFAULT clause: ADD ({col_name} <type> DEFAULT <value> NOT NULL)',
                     ))
 
-            # SELECT_STAR_VIEW - detect CREATE VIEW with SELECT *
+            # SELECT_STAR_VIEW
             if 'CREATE VIEW' in sql_upper and 'SELECT *' in sql_upper:
-                view_pattern = re.compile(r'CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(\w+)', re.IGNORECASE)
-                match = view_pattern.search(sql)
+                match = _VIEW_PATTERN.search(sql)
                 if match:
                     view_name = match.group(1)
                     add(Finding(
@@ -598,12 +598,10 @@ class InsightsEngine:
                         fix=f'Explicitly list columns in CREATE VIEW {view_name} definition.',
                     ))
 
-            # TRIGGER_WITH_BUSINESS_LOGIC - detect complex triggers
+            # TRIGGER_WITH_BUSINESS_LOGIC
             if 'CREATE TRIGGER' in sql_upper or 'CREATE OR REPLACE TRIGGER' in sql_upper:
-                # Check for business logic indicators (IF, CASE, complex expressions)
                 if ('IF ' in sql_upper or 'CASE ' in sql_upper) and len(sql) > 500:
-                    trigger_pattern = re.compile(r'CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+(\w+)', re.IGNORECASE)
-                    match = trigger_pattern.search(sql)
+                    match = _TRIGGER_PATTERN.search(sql)
                     if match:
                         trigger_name = match.group(1)
                         add(Finding(
@@ -615,9 +613,8 @@ class InsightsEngine:
                             fix='Consider moving business logic to application layer or stored procedures.',
                         ))
 
-            # LARGE_DELETE_NO_WHERE - detect DELETE statements without WHERE clause
-            delete_pattern = re.compile(r'DELETE\s+FROM\s+(\w+)(?!\s+WHERE)', re.IGNORECASE | re.DOTALL)
-            for match in delete_pattern.finditer(sql):
+            # LARGE_DELETE_NO_WHERE
+            for match in _DELETE_PATTERN.finditer(sql):
                 table_name = match.group(1)
                 # Skip if this is part of a longer statement (might have WHERE later)
                 remaining = sql[match.end():match.end()+100].upper()

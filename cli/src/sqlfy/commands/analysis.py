@@ -27,7 +27,7 @@ def cmd_insights(
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    report = InsightsEngine.analyse(state)
+    report = InsightsEngine.analyse(state, files=files)
 
     if severity:
         sev = severity.lower()
@@ -60,7 +60,7 @@ def cmd_health(
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    report = InsightsEngine.analyse(state)
+    report = InsightsEngine.analyse(state, files=files)
     health_report = HealthAnalyzer.analyze(state, report, migrations_dir or ".")
 
     fmt = (format or "text").lower()

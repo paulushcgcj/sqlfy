@@ -19,6 +19,7 @@ from sqlfy.domain.schema_state import SchemaStateBuilder
 from sqlfy.output.grapher import Grapher
 from sqlfy.output.excalidraw_exporter import to_excalidraw
 from sqlfy.output.drawio_exporter import to_drawio
+from ._utils import load_files
 
 
 @click.command()
@@ -64,16 +65,9 @@ def export_cmd(migrations_dir, format, output, output_dir, title, dialect):
         # Export all formats to directory
         sqlfy export migrations/ --format all --output-dir exports/
     """
-    # Load migrations
-    migrations_path = Path(migrations_dir)
-    files = []
-    
-    for sql_file in sorted(migrations_path.glob('*.sql')):
-        files.append({
-            'filename': sql_file.name,
-            'sql': sql_file.read_text(encoding='utf-8'),
-        })
-    
+    # Load migrations using the shared cached loader
+    files = load_files(migrations_dir, None)
+
     if not files:
         click.echo(f"No .sql files found in {migrations_dir}", err=True)
         raise click.Abort()
