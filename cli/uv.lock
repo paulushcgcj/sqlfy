@@ -999,10 +999,8 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-dev = [
-    { name = "datamodel-code-generator" },
-    { name = "pyright" },
-    { name = "pytest" },
+lint = [
+    { name = "sqlfluff" },
 ]
 yaml = [
     { name = "pyyaml" },
@@ -1010,26 +1008,30 @@ yaml = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "datamodel-code-generator" },
     { name = "pyright" },
+    { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.25" },
     { name = "networkx", specifier = ">=3.0" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pyyaml", marker = "extra == 'yaml'" },
     { name = "rich", specifier = ">=13" },
+    { name = "sqlfluff", marker = "extra == 'lint'", specifier = ">=3.0.0" },
     { name = "sqlglot", specifier = ">=25.0.0" },
     { name = "sqllineage", specifier = ">=1.5.0" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["yaml", "dev"]
+provides-extras = ["yaml", "lint"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pyright", specifier = ">=1.1.409" }]
+dev = [
+    { name = "datamodel-code-generator", specifier = ">=0.25" },
+    { name = "pyright", specifier = ">=1.1.409" },
+    { name = "pytest", specifier = ">=8" },
+]
 
 [[package]]
 name = "sqlglot"

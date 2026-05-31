@@ -18,8 +18,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-yaml = ["pyyaml"]
-dev = ["pytest>=8", "datamodel-code-generator>=0.25", "pyright>=1.1"]
+yaml  = ["pyyaml"]
+lint  = ["sqlfluff>=3.0.0"]   # SQL linter — optional, used by the lint command
 # embeddings = ["voyageai"]   # only needed with --embed flag
 
 [project.scripts]
@@ -48,5 +48,7 @@ venv = ".venv"
 
 [dependency-groups]
 dev = [
+    "pytest>=8",
+    "datamodel-code-generator>=0.25",
     "pyright>=1.1.409",
 ]

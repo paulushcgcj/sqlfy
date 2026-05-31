@@ -49,7 +49,7 @@ uv pip install dist/sqlfy-*.whl
 
 ```bash
 # Sync dependencies (creates .venv automatically)
-uv sync --all-extras
+uv sync --all-extras --group dev
 
 # Activate the virtual environment
 source .venv/bin/activate  # macOS/Linux
