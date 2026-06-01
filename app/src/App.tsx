@@ -6,6 +6,7 @@ import AskPanel from './components/schema/AskPanel';
 import DiffPanel from './components/schema/DiffPanel';
 import GraphExportPanel from './components/schema/GraphExportPanel';
 import GraphTab from './components/schema/GraphTab';
+import HealthDashboard from './components/schema/HealthDashboard';
 import InsightsPanel from './components/schema/InsightsPanel';
 import LlmTab from './components/schema/LlmTab';
 import MigrationsTab from './components/schema/MigrationsTab';
@@ -23,6 +24,7 @@ type Tab =
   | 'schema'
   | 'insights'
   | 'graph-export'
+  | 'health'
   | 'simulate'
   | 'diff';
 
@@ -140,10 +142,16 @@ export default function App() {
           ⑦ Graph Export
         </button>
         <button
+          className={`tab${activeTab === 'health' ? ' active' : ''}`}
+          onClick={() => switchTab('health')}
+        >
+          ⑧ Health
+        </button>
+        <button
           className={`tab${activeTab === 'simulate' ? ' active' : ''}`}
           onClick={() => switchTab('simulate')}
         >
-          ⑧ Simulate
+          ⑨ Simulate
         </button>
         <button
           className={`tab${activeTab === 'diff' ? ' active' : ''}`}
@@ -207,6 +215,10 @@ export default function App() {
 
         <Activity mode={activeTab === 'graph-export' ? 'visible' : 'hidden'}>
           {graph && <GraphExportPanel files={files} />}
+        </Activity>
+
+        <Activity mode={activeTab === 'health' ? 'visible' : 'hidden'}>
+          <HealthDashboard files={files} />
         </Activity>
 
         <Activity mode={activeTab === 'simulate' ? 'visible' : 'hidden'}>
