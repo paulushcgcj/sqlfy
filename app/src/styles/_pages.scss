@@ -1,0 +1,97 @@
+// Pages — common layout and styling for page components
+
+.page-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px);
+  width: 100%;
+  padding: 0;
+}
+
+.page-header {
+  padding: 2rem 2rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface-secondary);
+
+  h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .page-subtitle {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+
+  p {
+    margin: 0.5rem 0;
+
+    strong {
+      color: var(--text-primary);
+    }
+  }
+}
+
+// Button styles — shared across pages
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.btn-primary {
+    background: var(--accent);
+    color: white;
+
+    &:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+  }
+
+  &.btn-secondary {
+    background: var(--surface-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-secondary);
+    }
+  }
+
+  &.btn-success {
+    background: var(--color-success, #22c55e);
+    color: white;
+
+    &:hover:not(:disabled) {
+      background: var(--color-success-hover, #16a34a);
+    }
+  }
+}
