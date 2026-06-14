@@ -786,23 +786,38 @@ sqlfy query ./migrations indexes --unique-only
 #### `sqlfy impact`
 
 ```bash
-sqlfy impact <migrations-dir> <object-id> [--depth N] [--direction in|out] 
-             [--format text|json] [--at VERSION] [--out FILE]
+sqlfy impact <migrations-dir> [OBJECT_ID]
+             [--table TABLE ...]
+             [--from-diff [GIT_REF]]
+             [--depth N]
+             [--direction in|out]
+             [--format text|json]
+             [--at VERSION]
+             [--out FILE]
 ```
 
-Analyze impact of changes to a schema object using graph traversal. Finds all objects (tables, views, columns, etc.) that would be affected by changes to the specified object. Supports direct dependencies (depth 1), transitive dependencies (depth > 1), critical path identification, and grouping by object type.
+Analyze the transitive impact of schema object changes using graph traversal.
+Finds all objects (tables, columns, etc.) that would be affected by changes
+to one or more source objects. Supports single-object analysis (positional
+`OBJECT_ID`), multi-object (`--table`), and automatic discovery from a
+git diff (`--from-diff`).
 
 | Flag | Description |
 |---|---|
-| `object-id` | Schema object to analyze (e.g., APP.USERS, APP.USERS.EMAIL) |
+| `OBJECT_ID` | Schema object to analyze (e.g. `APP.USERS`). Optional when `--from-diff` is used |
+| `--table TABLE` | Repeatable; additional table(s) to include in analysis |
+| `--from-diff` | Read git diff to discover changed tables automatically. Optional `GIT_REF` (default: staged changes) |
 | `--depth N` | Maximum traversal depth (default: 5) |
-| `--direction in\|out` | Traversal direction: out=affected by, in=depends on (default: out) |
+| `--direction in\|out` | Traversal direction: `out`=downstream impact, `in`=upstream deps |
 
 **Examples:**
 ```bash
-sqlfy impact ./migrations APP.USERS                 # Impact of USER table
-sqlfy impact ./migrations APP.USERS.EMAIL --depth 3
-sqlfy impact ./migrations APP.ORDERS --direction in --format json
+sqlfy impact ./migrations APP.USERS                        # Single table
+sqlfy impact ./migrations --from-diff HEAD~1               # Diff between commits
+sqlfy impact ./migrations --from-diff                       # Staged changes only
+sqlfy impact ./migrations --from-diff main --table APP.REF  # Diff + extra table
+sqlfy impact ./migrations --table APP.A --table APP.B       # Multiple tables
+sqlfy impact ./migrations --from-diff HEAD~1 --format json  # JSON output
 ```
 
 #### `sqlfy lineage`
