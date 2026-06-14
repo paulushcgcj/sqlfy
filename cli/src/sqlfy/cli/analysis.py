@@ -21,11 +21,14 @@ def cmd_insights(
     dialect: str = typer.Option("oracle", "--dialect"),
     at: Optional[str] = typer.Option(None, "--at"),
     out: Optional[str] = typer.Option(None, "--out"),
+    detect_domains: bool = typer.Option(False, "--detect-domains",
+        help="Run domain detection on the fly for god-table & surprising-join analysis"),
+    resolution: float = typer.Option(1.0, "--resolution"),
 ) -> None:
     """Run schema analysis and display insights."""
     from ..commands.analysis import cmd_insights as _cmd
     _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-         at=at, out=out)
+         at=at, out=out, detect_domains=detect_domains, resolution=resolution)
 
 
 @app.command("health")

@@ -18,6 +18,8 @@ def cmd_insights(
     out: str | None = None,
     severity: str | None = None,
     strict: bool = False,
+    detect_domains: bool = False,
+    resolution: float = 1.0,
 ) -> None:
     """Analyse the schema and report insights (orphans, missing PKs, circular FKs, etc.)."""
     files = load_files(migrations_dir, json_input)
@@ -27,7 +29,22 @@ def cmd_insights(
         else reconstruct(files, dialect=dialect)
     )
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    report = InsightsEngine.analyse(state, files=files)
+
+    # Optionally detect communities for god-table & surprising-join analysis
+    communities: dict[int, list[str]] | None = None
+    if detect_domains:
+        from ..graph.builder import build_networkx_graph
+        from ..clustering import detect_communities
+        nx_graph = build_networkx_graph(graph, directed=False)
+        comm_result = detect_communities(
+            nx_graph,
+            resolution=resolution,
+            min_cohesion=0.1,
+            enable_splitting=True,
+        )
+        communities = comm_result.communities
+
+    report = InsightsEngine.analyse(state, files=files, communities=communities)
 
     if severity:
         sev = severity.lower()

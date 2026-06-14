@@ -210,7 +210,7 @@ def cmd_build_graph(
         json.dump({'god_nodes': god_nodes, 'count': god_node_count, 'min_refs': min_refs}, f, indent=2)
     
     # Insights
-    insights_report = InsightsEngine.analyse(state, files=files)
+    insights_report = InsightsEngine.analyse(state, files=files, communities=comm_result.communities)
     insights_count = len(insights_report.findings)
     print(f"   ✓ Running insights engine ({insights_count} findings)", file=sys.stderr)
     
