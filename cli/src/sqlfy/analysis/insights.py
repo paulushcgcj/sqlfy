@@ -96,6 +96,66 @@ class Finding:
 
 
 # ─────────────────────────────────────────────
+# GOD-TABLE FINDING
+# ─────────────────────────────────────────────
+
+@dataclass
+class GodTableFinding:
+    table_name: str
+    degree: int
+    in_degree: int
+    out_degree: int
+    community_id: Optional[int] = None
+    community_label: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        d: dict = {
+            'tableName': self.table_name,
+            'degree': self.degree,
+            'inDegree': self.in_degree,
+            'outDegree': self.out_degree,
+        }
+        if self.community_id is not None:
+            d['communityId'] = self.community_id
+        if self.community_label is not None:
+            d['communityLabel'] = self.community_label
+        return d
+
+
+# ─────────────────────────────────────────────
+# SURPRISING JOIN FINDING
+# ─────────────────────────────────────────────
+
+@dataclass
+class SurprisingJoinFinding:
+    from_table: str
+    to_table: str
+    via_column: str
+    from_community: Optional[int] = None
+    to_community: Optional[int] = None
+    from_community_label: Optional[str] = None
+    to_community_label: Optional[str] = None
+    surprise_score: float = 0.0
+
+    def to_dict(self) -> dict:
+        d: dict = {
+            'fromTable': self.from_table,
+            'toTable': self.to_table,
+            'viaColumn': self.via_column,
+            'surpriseScore': self.surprise_score,
+        }
+        if self.from_community is not None:
+            d['fromCommunity'] = self.from_community
+        if self.to_community is not None:
+            d['toCommunity'] = self.to_community
+        if self.from_community_label is not None:
+            d['fromCommunityLabel'] = self.from_community_label
+        if self.to_community_label is not None:
+            d['toCommunityLabel'] = self.to_community_label
+        return d
+
+
+# ─────────────────────────────────────────────
 # REPORT
 # ─────────────────────────────────────────────
 
@@ -104,6 +164,8 @@ class InsightsReport:
     version:     str
     fingerprint: str
     findings:    list[Finding] = field(default_factory=list)
+    god_tables:  list[GodTableFinding] = field(default_factory=list)
+    surprising_joins: list[SurprisingJoinFinding] = field(default_factory=list)
 
     # ── Accessors ──────────────────────────────────────────────────────
 
@@ -139,6 +201,8 @@ class InsightsReport:
                 'healthy':  self.is_healthy(),
             },
             'findings':    by_sev,
+            'godTables':   [g.to_dict() for g in self.god_tables],
+            'surprisingJoins': [s.to_dict() for s in self.surprising_joins],
         }
 
     def to_json(self, indent: int = 2) -> str:
@@ -148,6 +212,8 @@ class InsightsReport:
             InsightFinding as _InsightFinding,
             Findings as _Findings,
             InsightSeverity as _InsightSeverity,
+            GodTableFinding as _GodTableFinding,
+            SurprisingJoinFinding as _SurprisingJoinFinding,
         )
         def _finding(f: Finding) -> _InsightFinding:
             return _InsightFinding(
@@ -159,6 +225,26 @@ class InsightsReport:
                 fix=f.fix,
                 table=f.table,
                 column=f.column,
+            )
+        def _god(g: GodTableFinding) -> _GodTableFinding:
+            return _GodTableFinding(
+                table_name=g.table_name,
+                degree=g.degree,
+                in_degree=g.in_degree,
+                out_degree=g.out_degree,
+                community_id=g.community_id,
+                community_label=g.community_label,
+            )
+        def _surprising(s: SurprisingJoinFinding) -> _SurprisingJoinFinding:
+            return _SurprisingJoinFinding(
+                from_table=s.from_table,
+                to_table=s.to_table,
+                via_column=s.via_column,
+                from_community=s.from_community,
+                to_community=s.to_community,
+                from_community_label=s.from_community_label,
+                to_community_label=s.to_community_label,
+                surprise_score=s.surprise_score,
             )
         model = _InsightsResult(
             version=self.version,
@@ -175,6 +261,8 @@ class InsightsReport:
                 warning=[_finding(f) for f in self.warnings()],
                 info=[_finding(f) for f in self.infos()],
             ),
+            god_tables=[_god(g) for g in self.god_tables],
+            surprising_joins=[_surprising(s) for s in self.surprising_joins],
         )
         return model.model_dump_json(by_alias=True, indent=indent)
 
@@ -209,6 +297,29 @@ class InsightsReport:
 
         if not self.findings:
             a('  No issues detected — schema looks healthy!')
+            a('')
+
+        # ── God Tables ─────────────────────────────────────────────────
+        if self.god_tables:
+            a(f'  {"━" * 44}')
+            a(f'  ♛  GOD TABLES (top {len(self.god_tables)})')
+            a(f'  {"━" * 44}')
+            for g in self.god_tables:
+                tag = f'  [{g.community_label}]' if g.community_label else ''
+                a(f'\n  {g.table_name}{tag}')
+                a(f'  degree={g.degree}  (in={g.in_degree} out={g.out_degree})')
+            a('')
+
+        # ── Surprising Cross-Domain Joins ──────────────────────────────
+        if self.surprising_joins:
+            a(f'  {"━" * 44}')
+            a(f'  ⚡  SURPRISING CROSS-DOMAIN JOINS (top {len(self.surprising_joins)})')
+            a(f'  {"━" * 44}')
+            for s in self.surprising_joins:
+                from_label = s.from_community_label or str(s.from_community) if s.from_community is not None else '?'
+                to_label   = s.to_community_label   or str(s.to_community)   if s.to_community   is not None else '?'
+                a(f'\n  {s.from_table}.{s.via_column}  →  {s.to_table}')
+                a(f'  surprise={s.surprise_score:.2f}  ({from_label} → {to_label})')
             a('')
 
         return '\n'.join(lines)
@@ -285,6 +396,136 @@ def _has_cycle(adj_directed: dict[str, set[str]]) -> list[list[str]]:
 
 
 # ─────────────────────────────────────────────
+# GOD-TABLE DETECTION
+# ─────────────────────────────────────────────
+
+def _detect_god_tables(
+    state: SchemaState,
+    top_n: int = 10,
+    communities: dict[int, list[str]] | None = None,
+) -> list[GodTableFinding]:
+    """Find tables with abnormally high FK degree (>2σ above mean)."""
+    if not state.tables:
+        return []
+
+    # Build community lookup
+    node_to_community: dict[str, int] = {}
+    if communities:
+        for cid, tables in communities.items():
+            for t in tables:
+                node_to_community[t] = cid
+
+    # Compute degree per table from relationships
+    in_degree: dict[str, int] = defaultdict(int)
+    out_degree: dict[str, int] = defaultdict(int)
+    for r in state.relationships:
+        out_degree[r.from_table] += 1
+        in_degree[r.to_table] += 1
+
+    degrees: dict[str, int] = {}
+    for t in state.tables:
+        degrees[t] = in_degree.get(t, 0) + out_degree.get(t, 0)
+
+    if not degrees:
+        return []
+
+    # Compute mean and std dev
+    vals = list(degrees.values())
+    n = len(vals)
+    mean = sum(vals) / n
+    variance = sum((v - mean) ** 2 for v in vals) / n
+    std_dev = variance ** 0.5
+
+    # Filter: > 2σ above mean, or top_n when std_dev is 0
+    threshold = mean + 2 * std_dev if std_dev > 0 else float('inf')
+
+    candidates = [(t, d) for t, d in degrees.items() if d > threshold]
+    candidates.sort(key=lambda x: x[1], reverse=True)
+
+    if std_dev == 0 and candidates:
+        # All degrees are the same — just take top_n
+        pass
+    elif not candidates and std_dev == 0:
+        # Uniform degree — take top_n by degree descending
+        candidates = sorted(degrees.items(), key=lambda x: x[1], reverse=True)
+
+    if not candidates:
+        return []
+
+    results: list[GodTableFinding] = []
+    for table_name, degree in candidates[:top_n]:
+        comm_id = node_to_community.get(table_name)
+        results.append(GodTableFinding(
+            table_name=table_name,
+            degree=degree,
+            in_degree=in_degree.get(table_name, 0),
+            out_degree=out_degree.get(table_name, 0),
+            community_id=comm_id,
+        ))
+
+    return results
+
+
+# ─────────────────────────────────────────────
+# SURPRISING JOIN DETECTION
+# ─────────────────────────────────────────────
+
+def _detect_surprising_joins(
+    state: SchemaState,
+    communities: dict[int, list[str]] | None = None,
+    top_n: int = 20,
+) -> list[SurprisingJoinFinding]:
+    """Find cross-community FK edges with surprise scores."""
+    if not communities or not state.relationships:
+        return []
+
+    # Build node → community map
+    node_to_community: dict[str, int] = {}
+    for cid, tables in communities.items():
+        for t in tables:
+            node_to_community[t] = cid
+
+    # Build neighbour sets per table for shared-neighbour computation
+    neighbours: dict[str, set[str]] = defaultdict(set)
+    for r in state.relationships:
+        neighbours[r.from_table].add(r.to_table)
+        neighbours[r.to_table].add(r.from_table)
+
+    findings: list[SurprisingJoinFinding] = []
+
+    for r in state.relationships:
+        from_comm = node_to_community.get(r.from_table)
+        to_comm   = node_to_community.get(r.to_table)
+
+        # Skip if same community or missing community info
+        if from_comm is None or to_comm is None or from_comm == to_comm:
+            continue
+
+        # Compute surprise score:
+        #   1.0 - (shared_neighbours / total_neighbours)
+        from_nbrs = neighbours.get(r.from_table, set()) - {r.to_table}
+        to_nbrs   = neighbours.get(r.to_table, set()) - {r.from_table}
+        total     = len(from_nbrs | to_nbrs)
+        shared    = len(from_nbrs & to_nbrs)
+        surprise  = 1.0 - (shared / total) if total > 0 else 1.0
+
+        # Column name for the FK
+        via_column = ', '.join(r.from_columns) if r.from_columns else '?'
+
+        findings.append(SurprisingJoinFinding(
+            from_table=r.from_table,
+            to_table=r.to_table,
+            via_column=via_column,
+            from_community=from_comm,
+            to_community=to_comm,
+            surprise_score=round(surprise, 4),
+        ))
+
+    findings.sort(key=lambda f: f.surprise_score, reverse=True)
+    return findings[:top_n]
+
+
+# ─────────────────────────────────────────────
 # INSIGHTS ENGINE
 # ─────────────────────────────────────────────
 
@@ -311,6 +552,7 @@ class InsightsEngine:
     def analyse(
         state: SchemaState,
         files: list[dict] | None = None,
+        communities: dict[int, list[str]] | None = None,
     ) -> InsightsReport:
         report = InsightsReport(version=state.version, fingerprint=state.fingerprint)
         add    = report.findings.append
@@ -629,6 +871,35 @@ class InsightsEngine:
                         detail='This will delete all rows from the table.',
                         fix='Add WHERE clause to limit deletion, or use TRUNCATE if intentional.',
                     ))
+
+        # ═══════════════════════════════════════
+        # GOD TABLES
+        # ═══════════════════════════════════════
+
+        report.god_tables = _detect_god_tables(state, communities=communities)
+        for g in report.god_tables:
+            tag = f'  [{g.community_label}]' if g.community_label else ''
+            add(Finding(
+                code='GOD_TABLE', severity='info', category='connectivity',
+                table=g.table_name,
+                message=f'Table {g.table_name} is a god table (degree={g.degree}).{tag}',
+                detail=f'Total FK edges: in={g.in_degree} out={g.out_degree}',
+                fix='Consider splitting this table or reviewing its excessive coupling.',
+            ))
+
+        # ═══════════════════════════════════════
+        # SURPRISING CROSS-DOMAIN JOINS
+        # ═══════════════════════════════════════
+
+        report.surprising_joins = _detect_surprising_joins(state, communities=communities)
+        for s in report.surprising_joins:
+            add(Finding(
+                code='SURPRISING_JOIN', severity='info', category='connectivity',
+                message=f'{s.from_table}.{s.via_column} → {s.to_table} '
+                        f'(surprise={s.surprise_score:.2f})',
+                detail='Cross-community FK edge — verify this coupling is intentional.',
+                fix='Consider whether these tables belong to the same domain.',
+            ))
 
         # Sort: errors first, then warnings, then info; within severity by table name
         sev_order = {'error': 0, 'warning': 1, 'info': 2}

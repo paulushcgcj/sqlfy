@@ -82,7 +82,49 @@
             "info":    { "description": "Info findings.",    "type": "array", "items": { "$ref": "#/$defs/InsightFinding" }, "readOnly": true }
           },
           "readOnly": true
+        },
+        "godTables": {
+          "description": "Tables with abnormally high FK degree, sorted by degree descending.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/GodTableFinding" },
+          "readOnly": true
+        },
+        "surprisingJoins": {
+          "description": "Cross-community FK edges sorted by surprise score descending.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/SurprisingJoinFinding" },
+          "readOnly": true
         }
+      }
+    },
+    "GodTableFinding": {
+      "description": "A table with abnormally high FK degree (god table).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tableName", "degree", "inDegree", "outDegree"],
+      "properties": {
+        "tableName":      { "description": "Table name.", "type": "string", "readOnly": true },
+        "degree":         { "description": "Total FK edges in + out.", "type": "integer", "readOnly": true },
+        "inDegree":       { "description": "Incoming FK count.", "type": "integer", "readOnly": true },
+        "outDegree":      { "description": "Outgoing FK count.", "type": "integer", "readOnly": true },
+        "communityId":    { "description": "Community/domain ID.", "type": "integer" },
+        "communityLabel": { "description": "Community/domain label.", "type": "string" }
+      }
+    },
+    "SurprisingJoinFinding": {
+      "description": "A cross-domain FK join between tables in different communities.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromTable", "toTable", "viaColumn", "surpriseScore"],
+      "properties": {
+        "fromTable":         { "description": "Source table.", "type": "string", "readOnly": true },
+        "toTable":           { "description": "Target table.", "type": "string", "readOnly": true },
+        "viaColumn":         { "description": "FK column name.", "type": "string", "readOnly": true },
+        "fromCommunity":     { "description": "Source community ID.", "type": "integer" },
+        "toCommunity":       { "description": "Target community ID.", "type": "integer" },
+        "fromCommunityLabel": { "description": "Source community label.", "type": "string" },
+        "toCommunityLabel":  { "description": "Target community label.", "type": "string" },
+        "surpriseScore":    { "description": "Surprise score (0.0–1.0).", "type": "number", "readOnly": true }
       }
     },
     "HealthGrade": {

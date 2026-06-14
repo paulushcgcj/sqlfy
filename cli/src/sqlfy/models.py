@@ -111,6 +111,42 @@ class Findings(BaseModel):
     info: list[InsightFinding] = Field(..., description='Info findings.')
 
 
+class GodTableFinding(BaseModel):
+    """
+    A table with abnormally high FK degree (god table).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+        populate_by_name=True,
+    )
+    table_name: str = Field(..., description='Table name.', serialization_alias='tableName')
+    degree: int = Field(..., description='Total FK edges in + out.')
+    in_degree: int = Field(..., description='Incoming FK count.', serialization_alias='inDegree')
+    out_degree: int = Field(..., description='Outgoing FK count.', serialization_alias='outDegree')
+    community_id: int | None = Field(None, description='Community/domain ID.', serialization_alias='communityId')
+    community_label: str | None = Field(None, description='Community/domain label.', serialization_alias='communityLabel')
+
+
+class SurprisingJoinFinding(BaseModel):
+    """
+    A cross-domain FK join between tables in different communities.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+        populate_by_name=True,
+    )
+    from_table: str = Field(..., description='Source table.', serialization_alias='fromTable')
+    to_table: str = Field(..., description='Target table.', serialization_alias='toTable')
+    via_column: str = Field(..., description='FK column name.', serialization_alias='viaColumn')
+    from_community: int | None = Field(None, description='Source community ID.', serialization_alias='fromCommunity')
+    to_community: int | None = Field(None, description='Target community ID.', serialization_alias='toCommunity')
+    from_community_label: str | None = Field(None, description='Source community label.', serialization_alias='fromCommunityLabel')
+    to_community_label: str | None = Field(None, description='Target community label.', serialization_alias='toCommunityLabel')
+    surprise_score: float = Field(..., description='Surprise score (0.0–1.0).', serialization_alias='surpriseScore')
+
+
 class InsightsResult(BaseModel):
     """
     Full response from sqlfy insights --format json.
@@ -124,6 +160,16 @@ class InsightsResult(BaseModel):
     fingerprint: str = Field(..., description='State fingerprint.')
     summary: InsightsSummary = Field(..., description='Aggregated counts.')
     findings: Findings = Field(..., description='Findings grouped by severity.')
+    god_tables: list[GodTableFinding] = Field(
+        default_factory=list,
+        description='Tables with abnormally high FK degree, sorted by degree descending.',
+        serialization_alias='godTables',
+    )
+    surprising_joins: list[SurprisingJoinFinding] = Field(
+        default_factory=list,
+        description='Cross-community FK edges sorted by surprise score descending.',
+        serialization_alias='surprisingJoins',
+    )
 
 
 class HealthGrade(StrEnum):
