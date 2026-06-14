@@ -373,3 +373,73 @@ def format_impact_json(result: ImpactResult) -> str:
         total_count=result.total_count,
     )
     return model.model_dump_json(by_alias=True, indent=2)
+
+
+def format_impact_from_diff_text(
+    result: ImpactResult,
+    graph: nx.Graph[Any] | nx.DiGraph[Any],
+    ref_display: str = "diff",
+) -> str:
+    """Human-readable text output for ``--from-diff`` mode."""
+    lines: list[str] = []
+
+    lines.append(f"Changed by diff ({ref_display}):")
+    for f in result.migration_files:
+        lines.append(f"  {f}")
+    lines.append("")
+
+    if result.changed_tables:
+        lines.append("Downstream impact:")
+        for tbl in sorted(result.changed_tables):
+            lines.append(f"  {tbl} (changed)")
+            direct_for_tbl = [
+                n for n in result.depth_map
+                if result.depth_map.get(n) == 1
+                and n != tbl
+            ]
+            for affected in sorted(direct_for_tbl):
+                if graph.has_edge(tbl, affected):
+                    edge_data = graph.get_edge_data(tbl, affected)
+                    label = ""
+                    if edge_data:
+                        for _key, data in edge_data.items() if isinstance(edge_data, dict) else [(None, edge_data)]:
+                            rel = data.get("relationship", "") if isinstance(data, dict) else getattr(data, "relationship", "")
+                            if rel == "foreign_key":
+                                fk_cols = data.get("columns", "") if isinstance(data, dict) else getattr(data, "columns", "")
+                                if fk_cols:
+                                    label = f" (FK: {fk_cols})"
+                                else:
+                                    label = " (FK)"
+                            break
+                    lines.append(f"    └─ {affected}{label}")
+        lines.append("")
+
+    downstream_total = result.total_count
+    lines.append(
+        f"Summary: {len(result.changed_tables)} changed table(s), "
+        f"{downstream_total} downstream table(s) affected."
+    )
+
+    return "\n".join(lines)
+
+
+def format_impact_from_diff_json(
+    result: ImpactResult,
+    ref_display: str = "diff",
+) -> str:
+    """JSON output for ``--from-diff`` mode using the ``ImpactV1`` contract."""
+    from ..contracts.impact.v1 import ImpactV1
+
+    model = ImpactV1(
+        object_id=result.object_id,
+        direct=result.direct,
+        transitive=result.transitive,
+        depth_map=result.depth_map,
+        by_type=result.by_type,
+        critical_paths=result.critical_paths,
+        max_depth=result.max_depth,
+        total_count=result.total_count,
+        changed_tables=result.changed_tables,
+        migration_files=result.migration_files,
+    )
+    return model.model_dump_json(by_alias=True, indent=2)

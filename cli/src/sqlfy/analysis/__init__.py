@@ -10,7 +10,15 @@ from .validator import validate_graph_structure, validate_node_types, validate_e
 from .asker import Asker, ChatSession
 from .query import QueryEngine
 from .retriever import KeywordRetriever, EmbeddingRetriever, make_retriever
-from .impact import analyze_impact, ImpactResult, format_impact_text, format_impact_json
+from .impact import (
+    analyze_impact,
+    ImpactResult,
+    format_impact_text,
+    format_impact_json,
+    format_impact_from_diff_text,
+    format_impact_from_diff_json,
+    merge_impact_results,
+)
 
 __all__ = [
     # Diff
@@ -27,4 +35,5 @@ __all__ = [
     'KeywordRetriever', 'EmbeddingRetriever', 'make_retriever',
     # Impact
     'analyze_impact', 'ImpactResult', 'format_impact_text', 'format_impact_json',
+    'format_impact_from_diff_text', 'format_impact_from_diff_json', 'merge_impact_results',
 ]
