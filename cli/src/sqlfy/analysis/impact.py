@@ -53,12 +53,18 @@ class ImpactResult:
     
     max_depth: int = 0
     """Maximum depth reached in traversal."""
-    
+
+    changed_tables: list[str] = field(default_factory=list)
+    """Tables identified as changed by ``--from-diff``."""
+
+    migration_files: list[str] = field(default_factory=list)
+    """Migration ``.sql`` files changed in the diff."""
+
     @property
     def total_count(self) -> int:
         """Total number of affected objects (excluding source)."""
         return len(self.direct) + len(self.transitive)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -70,7 +76,59 @@ class ImpactResult:
             'critical_paths': self.critical_paths,
             'max_depth': self.max_depth,
             'total_count': self.total_count,
+            'changed_tables': self.changed_tables,
+            'migration_files': self.migration_files,
         }
+
+
+def merge_impact_results(
+    results: list[ImpactResult],
+    changed_tables: list[str] | None = None,
+    migration_files: list[str] | None = None,
+) -> ImpactResult:
+    """Merge multiple ``ImpactResult`` instances into a consolidated report.
+
+    Parameters
+    ----------
+    results:
+        Individual impact results, one per source table.
+    changed_tables:
+        Tables identified as changed (e.g. from ``--from-diff``).
+    migration_files:
+        Migration files that triggered the analysis.
+
+    Returns
+    -------
+    A single ``ImpactResult`` with unioned fields.
+    """
+    direct: set[str] = set()
+    transitive: set[str] = set()
+    depth_map: dict[str, int] = {}
+    by_type: dict[str, set[str]] = {}
+    critical_paths: list[list[str]] = []
+    max_depth = 0
+
+    for r in results:
+        direct.update(r.direct)
+        transitive.update(r.transitive)
+        depth_map.update(r.depth_map)
+        for t, nodes in r.by_type.items():
+            by_type.setdefault(t, set()).update(nodes)
+        critical_paths.extend(r.critical_paths)
+        if r.max_depth > max_depth:
+            max_depth = r.max_depth
+
+    return ImpactResult(
+        object_id="__from_diff__",
+        direct=sorted(direct),
+        transitive=sorted(transitive),
+        depth_map=depth_map,
+        by_type={t: sorted(n) for t, n in by_type.items()},
+        critical_paths=critical_paths,
+        max_depth=max_depth,
+        changed_tables=sorted(changed_tables) if changed_tables else [],
+        migration_files=sorted(migration_files) if migration_files else [],
+    )
 
 
 def analyze_impact(
@@ -313,5 +371,73 @@ def format_impact_json(result: ImpactResult) -> str:
         critical_paths=result.critical_paths,
         max_depth=result.max_depth,
         total_count=result.total_count,
+    )
+    return model.model_dump_json(by_alias=True, indent=2)
+
+
+def format_impact_from_diff_text(
+    result: ImpactResult,
+    graph: nx.Graph[Any] | nx.DiGraph[Any],
+    ref_display: str = "diff",
+) -> str:
+    """Human-readable text output for ``--from-diff`` mode."""
+    lines: list[str] = []
+
+    lines.append(f"Changed by diff ({ref_display}):")
+    for f in result.migration_files:
+        lines.append(f"  {f}")
+    lines.append("")
+
+    if result.changed_tables:
+        lines.append("Downstream impact:")
+        for tbl in sorted(result.changed_tables):
+            lines.append(f"  {tbl} (changed)")
+            direct_for_tbl = [
+                n for n in result.depth_map
+                if result.depth_map.get(n) == 1
+                and n != tbl
+            ]
+            for affected in sorted(direct_for_tbl):
+                if graph.has_edge(tbl, affected):
+                    edge_data = graph.get_edge_data(tbl, affected)
+                    label = ""
+                    if edge_data and isinstance(edge_data, dict):
+                        rel = edge_data.get("relationship", "")
+                        if rel == "foreign_key":
+                            fk_cols = edge_data.get("columns", "")
+                            if fk_cols:
+                                label = f" (FK: {fk_cols})"
+                            else:
+                                label = " (FK)"
+                    lines.append(f"    └─ {affected}{label}")
+        lines.append("")
+
+    downstream_total = result.total_count
+    lines.append(
+        f"Summary: {len(result.changed_tables)} changed table(s), "
+        f"{downstream_total} downstream table(s) affected."
+    )
+
+    return "\n".join(lines)
+
+
+def format_impact_from_diff_json(
+    result: ImpactResult,
+    ref_display: str = "diff",
+) -> str:
+    """JSON output for ``--from-diff`` mode using the ``ImpactV1`` contract."""
+    from ..contracts.impact.v1 import ImpactV1
+
+    model = ImpactV1(
+        object_id=result.object_id,
+        direct=result.direct,
+        transitive=result.transitive,
+        depth_map=result.depth_map,
+        by_type=result.by_type,
+        critical_paths=result.critical_paths,
+        max_depth=result.max_depth,
+        total_count=result.total_count,
+        changed_tables=result.changed_tables,
+        migration_files=result.migration_files,
     )
     return model.model_dump_json(by_alias=True, indent=2)

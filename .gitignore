@@ -364,3 +364,5 @@ graphify-out
 .github/copilot-instructions.md
 docs/
 sqlfy-out
+.opencode/
+*.code-workspace

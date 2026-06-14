@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import GraphTab from '@/components/schema/GraphTab';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Graph page — interactive schema graph visualization.
@@ -12,7 +12,10 @@ export function GraphPage() {
       <div className="page-container">
         <div className="empty-state">
           <p>📊 Schema graph not generated yet.</p>
-          <p>Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate the graph.</p>
+          <p>
+            Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate the
+            graph.
+          </p>
         </div>
       </div>
     );
@@ -22,7 +25,9 @@ export function GraphPage() {
     <div className="page-container">
       <div className="page-header">
         <h2>② Schema Graph</h2>
-        <p className="page-subtitle">{graph.tables.size} tables, {graph.edges.length} relationships</p>
+        <p className="page-subtitle">
+          {graph.tables.size} tables, {graph.edges.length} relationships
+        </p>
       </div>
       <GraphTab
         graph={graph}

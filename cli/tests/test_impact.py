@@ -11,6 +11,9 @@ from sqlfy.analysis.impact import (
     ImpactResult,
     format_impact_text,
     format_impact_json,
+    format_impact_from_diff_text,
+    format_impact_from_diff_json,
+    merge_impact_results,
 )
 
 
@@ -332,3 +335,233 @@ def test_analyze_impact_real_schema_pattern():
     assert 'table' in result.by_type
     assert 'view' in result.by_type
     assert 'V_ORDER_SUMMARY' in result.by_type['view']
+
+
+# ── New fields (changed_tables, migration_files) ───────────────────────
+
+def test_impact_result_new_fields_defaults():
+    """Test that new fields default to empty lists."""
+    result = ImpactResult(object_id='A')
+    assert result.changed_tables == []
+    assert result.migration_files == []
+
+
+def test_impact_result_to_dict_includes_new_fields():
+    """Test that to_dict includes changed_tables and migration_files."""
+    result = ImpactResult(
+        object_id='A',
+        direct=['B'],
+        transitive=[],
+        depth_map={},
+        by_type={},
+        critical_paths=[],
+        max_depth=1,
+        changed_tables=['FOO'],
+        migration_files=['V1__foo.sql'],
+    )
+    data = result.to_dict()
+    assert data['changed_tables'] == ['FOO']
+    assert data['migration_files'] == ['V1__foo.sql']
+
+
+# ── merge_impact_results ────────────────────────────────────────────────
+
+def test_merge_impact_results_empty():
+    """Test merging empty list returns empty result."""
+    merged = merge_impact_results([])
+    assert merged.object_id == '__from_diff__'
+    assert merged.total_count == 0
+    assert merged.changed_tables == []
+    assert merged.migration_files == []
+
+
+def test_merge_impact_results_single():
+    """Test merging a single result."""
+    r = ImpactResult(
+        object_id='A',
+        direct=['B'],
+        transitive=[],
+        depth_map={'B': 1},
+        by_type={'table': ['B']},
+        critical_paths=[],
+        max_depth=1,
+    )
+    merged = merge_impact_results([r], changed_tables=['A'], migration_files=['V1__a.sql'])
+    assert merged.object_id == '__from_diff__'
+    assert merged.direct == ['B']
+    assert merged.changed_tables == ['A']
+    assert merged.migration_files == ['V1__a.sql']
+    assert merged.total_count == 1
+
+
+def test_merge_impact_results_multiple():
+    """Test merging multiple results from different tables."""
+    r1 = ImpactResult(
+        object_id='A',
+        direct=['B', 'C'],
+        transitive=[],
+        depth_map={'B': 1, 'C': 1},
+        by_type={'table': ['B', 'C']},
+        critical_paths=[],
+        max_depth=1,
+    )
+    r2 = ImpactResult(
+        object_id='D',
+        direct=['E'],
+        transitive=['F'],
+        depth_map={'E': 1, 'F': 2},
+        by_type={'table': ['E', 'F']},
+        critical_paths=[['D', 'E', 'F']],
+        max_depth=2,
+    )
+    merged = merge_impact_results(
+        [r1, r2],
+        changed_tables=['A', 'D'],
+        migration_files=['V1__a.sql', 'V2__d.sql'],
+    )
+    assert merged.object_id == '__from_diff__'
+    assert set(merged.direct) == {'B', 'C', 'E'}
+    assert merged.transitive == ['F']
+    assert merged.max_depth == 2
+    assert len(merged.critical_paths) >= 1
+    assert set(merged.changed_tables) == {'A', 'D'}
+    assert len(merged.migration_files) == 2
+
+
+def test_merge_impact_results_deduplicates():
+    """Test that merging deduplicates across results."""
+    r1 = ImpactResult(object_id='A', direct=['B'], depth_map={'B': 1}, by_type={'table': ['B']},
+                      critical_paths=[], max_depth=1)
+    r2 = ImpactResult(object_id='B', direct=['C'], depth_map={'C': 1}, by_type={'table': ['C']},
+                      critical_paths=[], max_depth=1)
+    merged = merge_impact_results([r1, r2])
+    # B appears in both r1.direct and r2.object_id — direct should be union
+    assert 'B' in merged.direct
+    assert 'C' in merged.direct
+
+
+def test_merge_impact_results_with_changed_tables():
+    """Test that changed_tables and migration_files are passed through."""
+    merged = merge_impact_results(
+        [ImpactResult(object_id='A')],
+        changed_tables=['TABLE_A', 'TABLE_B'],
+        migration_files=['V1__a.sql', 'V2__b.sql'],
+    )
+    assert merged.changed_tables == ['TABLE_A', 'TABLE_B']
+    assert merged.migration_files == ['V1__a.sql', 'V2__b.sql']
+
+
+# ── format_impact_from_diff_text ────────────────────────────────────────
+
+def test_format_impact_from_diff_text_no_affected():
+    """Test from-diff text output when no downstream tables are affected."""
+    r = ImpactResult(
+        object_id='__from_diff__',
+        changed_tables=['T1'],
+        migration_files=['V1__t1.sql'],
+        depth_map={},
+        direct=[],
+        transitive=[],
+        by_type={},
+        critical_paths=[],
+        max_depth=0,
+    )
+    G = nx.DiGraph()
+    text = format_impact_from_diff_text(r, G, ref_display='HEAD~1..HEAD')
+
+    assert 'Changed by diff (HEAD~1..HEAD):' in text
+    assert 'V1__t1.sql' in text
+    assert 'Summary: 1 changed table(s), 0 downstream table(s) affected.' in text
+
+
+def test_format_impact_from_diff_text_with_affected():
+    """Test from-diff text output with affected tables."""
+    r = ImpactResult(
+        object_id='__from_diff__',
+        changed_tables=['A'],
+        migration_files=['V1__a.sql'],
+        depth_map={'B': 1, 'C': 2},
+        direct=['B'],
+        transitive=['C'],
+        by_type={'table': ['B', 'C']},
+        critical_paths=[['A', 'B', 'C']],
+        max_depth=2,
+    )
+    G = nx.DiGraph()
+    G.add_node('A', type='table')
+    G.add_node('B', type='table')
+    G.add_node('C', type='table')
+    G.add_edge('A', 'B', relationship='foreign_key', columns='A.ID → B.A_ID')
+    G.add_edge('B', 'C')
+
+    text = format_impact_from_diff_text(r, G, ref_display='HEAD~1..HEAD')
+
+    assert 'Changed by diff (HEAD~1..HEAD):' in text
+    assert 'V1__a.sql' in text
+    assert 'Downstream impact:' in text
+    assert 'A (changed)' in text
+    assert 'B' in text
+    assert 'FK:' in text
+    assert 'Summary: 1 changed table(s), 2 downstream table(s) affected.' in text
+
+
+def test_format_impact_from_diff_text_no_changed_tables():
+    """Test from-diff text when no changed tables extracted."""
+    r = ImpactResult(
+        object_id='__from_diff__',
+        changed_tables=[],
+        migration_files=[],
+        depth_map={},
+        direct=[],
+        transitive=[],
+        by_type={},
+        critical_paths=[],
+        max_depth=0,
+    )
+    G = nx.DiGraph()
+    text = format_impact_from_diff_text(r, G)
+
+    assert 'Changed by diff (diff):' in text
+    assert 'Summary: 0 changed table(s), 0 downstream table(s) affected.' in text
+
+
+# ── format_impact_from_diff_json ────────────────────────────────────────
+
+def test_format_impact_from_diff_json():
+    """Test that from-diff JSON output includes contract fields."""
+    r = ImpactResult(
+        object_id='__from_diff__',
+        changed_tables=['A', 'B'],
+        migration_files=['V1__a.sql', 'V2__b.sql'],
+        direct=['C'],
+        transitive=[],
+        depth_map={'C': 1},
+        by_type={'table': ['C']},
+        critical_paths=[],
+        max_depth=1,
+    )
+    json_str = format_impact_from_diff_json(r)
+
+    assert '"objectId": "__from_diff__"' in json_str or '"objectId":"__from_diff__"' in json_str
+    assert '"changedTables"' in json_str
+    assert '"migrationFiles"' in json_str
+    assert 'V1__a.sql' in json_str
+    assert '"totalCount": 1' in json_str
+
+
+def test_format_impact_from_diff_json_empty_lists():
+    """Test that JSON output handles empty changed_tables and migration_files."""
+    r = ImpactResult(
+        object_id='__from_diff__',
+        changed_tables=[],
+        migration_files=[],
+        direct=[],
+        transitive=[],
+        depth_map={},
+        by_type={},
+        critical_paths=[],
+        max_depth=0,
+    )
+    json_str = format_impact_from_diff_json(r)
+    assert '"changedTables"' in json_str
+    assert '"migrationFiles"' in json_str

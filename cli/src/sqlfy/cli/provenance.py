@@ -24,9 +24,10 @@ def cmd_provenance(
 
 @app.command("impact")
 def cmd_impact(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    obj: str = typer.Argument(..., metavar="OBJECT_ID",
-                              help="Schema object to analyze (e.g. APP.USERS)"),
+    migrations_dir: Optional[str] = typer.Argument(None,
+        help="Path to migrations directory"),
+    obj: Optional[str] = typer.Argument(None, metavar="OBJECT_ID",
+        help="Schema object to analyze (e.g. APP.USERS). Optional when --from-diff is used."),
     json_input: Optional[str] = typer.Option(None, "--json-input"),
     dialect: str = typer.Option("oracle", "--dialect"),
     at: Optional[str] = typer.Option(None, "--at"),
@@ -34,8 +35,14 @@ def cmd_impact(
     fmt: str = typer.Option("text", "--format"),
     depth: int = typer.Option(5, "--depth"),
     direction: str = typer.Option("out", "--direction"),
+    from_diff: Optional[str] = typer.Option(None, "--from-diff",
+        help="Analyze tables from changes in a git diff. "
+             "Use 'staged' for staged-only changes."),
+    table: Optional[list[str]] = typer.Option(None, "--table",
+        help="Additional table to analyze (repeatable)."),
 ) -> None:
     """Analyze impact of schema object changes."""
     from ..commands.impact import cmd_impact as _cmd
     _cmd(migrations_dir=migrations_dir, json_input=json_input, dialect=dialect,
-         at=at, out=out, object=obj, format=fmt, depth=depth, direction=direction)
+         at=at, out=out, object=obj, table=table, from_diff=from_diff,
+         format=fmt, depth=depth, direction=direction)

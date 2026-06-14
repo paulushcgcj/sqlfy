@@ -51,4 +51,5 @@ dev = [
     "pytest>=8",
     "datamodel-code-generator>=0.25",
     "pyright>=1.1.409",
+    "ruff>=0.11",
 ]

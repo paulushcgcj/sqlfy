@@ -224,8 +224,13 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     # impact
     p = sub.add_parser("impact", help="Analyze impact of schema object changes")
     shared(p)
-    p.add_argument("object", metavar="OBJECT_ID",
-                   help="Schema object to analyze (e.g., APP.USERS, APP.USERS.EMAIL)")
+    p.add_argument("object", metavar="OBJECT_ID", nargs="?",
+                   help="Schema object to analyze (e.g., APP.USERS). Optional when --from-diff is used.")
+    p.add_argument("--table", action="append", metavar="TABLE",
+                   help="Additional table to analyze (repeatable).")
+    p.add_argument("--from-diff", nargs="?", const="staged", metavar="GIT_REF",
+                   help="Analyze tables from changes in a git diff. "
+                        "If no ref is given, uses staged changes.")
     p.add_argument("--depth", type=int, default=5, metavar="N")
     p.add_argument("--direction", choices=["in", "out"], default="out")
     p.add_argument("--format", choices=["text", "json"], default="text")

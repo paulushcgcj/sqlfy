@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import HealthDashboard from '@/components/schema/HealthDashboard';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Health page — schema health score and migration safety analysis.

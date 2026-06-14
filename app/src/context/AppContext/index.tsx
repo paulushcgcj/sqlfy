@@ -1,9 +1,9 @@
 import { createContext, useContext, useState } from 'react';
-import type { ReactNode } from 'react';
 
-import type { MigrationFile } from '@/core/local-types';
 import type { FolderHandle } from '@/bridge/folder';
+import type { MigrationFile } from '@/core/local-types';
 import type { SchemaGraph, VectorChunk } from '@/core/types';
+import type { ReactNode } from 'react';
 
 /**
  * AppContext — shared state for all pages.
@@ -41,10 +41,7 @@ interface AppContextProviderProps {
   initialFiles?: MigrationFile[];
 }
 
-export function AppContextProvider({
-  children,
-  initialFiles = [],
-}: AppContextProviderProps) {
+export function AppContextProvider({ children, initialFiles = [] }: AppContextProviderProps) {
   const [files, setFiles] = useState<MigrationFile[]>(initialFiles);
   const [folderHandle, setFolderHandle] = useState<FolderHandle | null>(null);
   const [graph, setGraph] = useState<SchemaGraph | null>(null);

@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import SimulatePanel from '@/components/schema/SimulatePanel';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Simulate page — simulate DDL changes and preview results.

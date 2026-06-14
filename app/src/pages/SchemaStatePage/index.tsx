@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import SchemaTab from '@/components/schema/SchemaTab';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Schema State page — schema dump and state analysis.
@@ -12,7 +12,10 @@ export function SchemaStatePage() {
       <div className="page-container">
         <div className="empty-state">
           <p>🏗️ Schema state not available yet.</p>
-          <p>Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate the schema.</p>
+          <p>
+            Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate the
+            schema.
+          </p>
         </div>
       </div>
     );
