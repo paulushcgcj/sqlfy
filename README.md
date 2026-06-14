@@ -524,9 +524,12 @@ sqlfy lint migrations/ --no-recursive
 ```bash
 sqlfy insights <migrations-dir> [--format text|json] [--severity error|warning|info] 
                [--strict] [--at VERSION] [--out FILE]
+               [--detect-domains] [--resolution FLOAT]
 ```
 
 Analyse the schema and report Graphify-style insights. Detects orphan tables, missing PKs, unindexed tables, missing FK candidates, unresolved FK targets, nullable PKs/FKs, circular references, wide tables, orphaned sequences, duplicate indexes, and disconnected islands. Also detects migration-specific anti-patterns like ADD NOT NULL without DEFAULT, SELECT * in views, complex triggers, and DELETE without WHERE.
+
+When `--detect-domains` is passed, enables community detection and identifies **god tables** (tables with abnormally high FK degree) and **surprising cross-domain joins** (FK edges between different communities).
 
 | Flag | Description |
 |---|---|
@@ -534,6 +537,8 @@ Analyse the schema and report Graphify-style insights. Detects orphan tables, mi
 | `--format json` | Machine-readable JSON grouped by severity |
 | `--severity LEVEL` | Filter output to `error`, `warning`, or `info` only |
 | `--strict` | Exit with code 1 if any `error`-severity findings exist (useful in CI) |
+| `--detect-domains` | Run community detection to enable god-table & surprising-join analysis |
+| `--resolution FLOAT` | Community detection resolution: >1 = more communities, <1 = fewer (default: 1.0) |
 
 **Finding codes:**
 
@@ -554,6 +559,8 @@ Analyse the schema and report Graphify-style insights. Detects orphan tables, mi
 | `DUPLICATE_INDEX` | warning | modelling |
 | `UNIQUE_WITHOUT_INDEX` | info | modelling |
 | `ISLAND` | warning | connectivity |
+| `GOD_TABLE` | info | connectivity |
+| `SURPRISING_JOIN` | info | connectivity |
 
 **Examples:**
 ```bash
