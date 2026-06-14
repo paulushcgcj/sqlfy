@@ -53,12 +53,18 @@ class ImpactResult:
     
     max_depth: int = 0
     """Maximum depth reached in traversal."""
-    
+
+    changed_tables: list[str] = field(default_factory=list)
+    """Tables identified as changed by ``--from-diff``."""
+
+    migration_files: list[str] = field(default_factory=list)
+    """Migration ``.sql`` files changed in the diff."""
+
     @property
     def total_count(self) -> int:
         """Total number of affected objects (excluding source)."""
         return len(self.direct) + len(self.transitive)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -70,7 +76,59 @@ class ImpactResult:
             'critical_paths': self.critical_paths,
             'max_depth': self.max_depth,
             'total_count': self.total_count,
+            'changed_tables': self.changed_tables,
+            'migration_files': self.migration_files,
         }
+
+
+def merge_impact_results(
+    results: list[ImpactResult],
+    changed_tables: list[str] | None = None,
+    migration_files: list[str] | None = None,
+) -> ImpactResult:
+    """Merge multiple ``ImpactResult`` instances into a consolidated report.
+
+    Parameters
+    ----------
+    results:
+        Individual impact results, one per source table.
+    changed_tables:
+        Tables identified as changed (e.g. from ``--from-diff``).
+    migration_files:
+        Migration files that triggered the analysis.
+
+    Returns
+    -------
+    A single ``ImpactResult`` with unioned fields.
+    """
+    direct: set[str] = set()
+    transitive: set[str] = set()
+    depth_map: dict[str, int] = {}
+    by_type: dict[str, set[str]] = {}
+    critical_paths: list[list[str]] = []
+    max_depth = 0
+
+    for r in results:
+        direct.update(r.direct)
+        transitive.update(r.transitive)
+        depth_map.update(r.depth_map)
+        for t, nodes in r.by_type.items():
+            by_type.setdefault(t, set()).update(nodes)
+        critical_paths.extend(r.critical_paths)
+        if r.max_depth > max_depth:
+            max_depth = r.max_depth
+
+    return ImpactResult(
+        object_id="__from_diff__",
+        direct=sorted(direct),
+        transitive=sorted(transitive),
+        depth_map=depth_map,
+        by_type={t: sorted(n) for t, n in by_type.items()},
+        critical_paths=critical_paths,
+        max_depth=max_depth,
+        changed_tables=sorted(changed_tables) if changed_tables else [],
+        migration_files=sorted(migration_files) if migration_files else [],
+    )
 
 
 def analyze_impact(
