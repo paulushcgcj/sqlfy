@@ -401,16 +401,14 @@ def format_impact_from_diff_text(
                 if graph.has_edge(tbl, affected):
                     edge_data = graph.get_edge_data(tbl, affected)
                     label = ""
-                    if edge_data:
-                        for _key, data in edge_data.items() if isinstance(edge_data, dict) else [(None, edge_data)]:
-                            rel = data.get("relationship", "") if isinstance(data, dict) else getattr(data, "relationship", "")
-                            if rel == "foreign_key":
-                                fk_cols = data.get("columns", "") if isinstance(data, dict) else getattr(data, "columns", "")
-                                if fk_cols:
-                                    label = f" (FK: {fk_cols})"
-                                else:
-                                    label = " (FK)"
-                            break
+                    if edge_data and isinstance(edge_data, dict):
+                        rel = edge_data.get("relationship", "")
+                        if rel == "foreign_key":
+                            fk_cols = edge_data.get("columns", "")
+                            if fk_cols:
+                                label = f" (FK: {fk_cols})"
+                            else:
+                                label = " (FK)"
                     lines.append(f"    └─ {affected}{label}")
         lines.append("")
 
