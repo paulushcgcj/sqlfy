@@ -150,12 +150,14 @@ See the [full command reference on the wiki](https://github.com/paulushcgcj/sqlf
 | `diff-versions` | Compare two version snapshots from the same migration set |
 | `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report) |
 | `graph-migrations` | Visualize migration timeline and dependency graph |
+| `build-graph` | Build complete graphify-out/ directory (unified all-in-one) |
 | `rollback-analysis` | Analyze migration rollback feasibility and generate rollback scripts |
 | `lint` | Lint migration SQL for quality and style using sqlfluff |
 | `insights` | Analyse schema and report findings (orphan tables, missing PKs, etc.) |
 | `health` | Generate migration folder health report with quality score |
 | `simulate` | Simulate schema evolution with hypothetical migrations |
 | `integrity` | Check migration file integrity using SHA256 hashes |
+| `provenance` | Collect git provenance for migration files |
 | `cache` | Manage file-based caching system |
 | `ask` | Ask a natural language question about the schema (RAG) |
 | `chat` | Interactive multi-turn schema chat session |
