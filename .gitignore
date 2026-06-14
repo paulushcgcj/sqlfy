@@ -365,3 +365,4 @@ graphify-out
 docs/
 sqlfy-out
 .opencode/
+*.code-workspace
