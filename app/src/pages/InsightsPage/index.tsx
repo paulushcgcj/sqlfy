@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import InsightsPanel from '@/components/schema/InsightsPanel';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Insights page — schema analysis and anti-pattern detection.
@@ -12,7 +12,9 @@ export function InsightsPage() {
       <div className="page-container">
         <div className="empty-state">
           <p>🔍 Insights require a parsed schema.</p>
-          <p>Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate insights.</p>
+          <p>
+            Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate insights.
+          </p>
         </div>
       </div>
     );

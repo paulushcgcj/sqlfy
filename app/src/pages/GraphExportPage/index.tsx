@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import GraphExportPanel from '@/components/schema/GraphExportPanel';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Graph Export page — export schema in multiple formats (Mermaid, DOT, Excalidraw, Draw.io).
@@ -12,7 +12,9 @@ export function GraphExportPage() {
       <div className="page-container">
         <div className="empty-state">
           <p>📤 Export requires a parsed schema.</p>
-          <p>Go to <strong>Migrations</strong> and click <strong>Parse</strong> to enable exports.</p>
+          <p>
+            Go to <strong>Migrations</strong> and click <strong>Parse</strong> to enable exports.
+          </p>
         </div>
       </div>
     );

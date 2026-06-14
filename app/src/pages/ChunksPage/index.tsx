@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import LlmTab from '@/components/schema/LlmTab';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Chunks page — LLM-ready vector chunks for RAG pipelines.
@@ -12,7 +12,9 @@ export function ChunksPage() {
       <div className="page-container">
         <div className="empty-state">
           <p>🤖 LLM chunks not generated yet.</p>
-          <p>Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate chunks.</p>
+          <p>
+            Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate chunks.
+          </p>
         </div>
       </div>
     );

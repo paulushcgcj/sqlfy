@@ -75,7 +75,8 @@ export function LandingPage() {
         <div className="landing-content">
           <h1>SQLfy — Schema Graph Engine</h1>
           <p className="subtitle">
-            Parse Flyway migrations into an AST, reconstruct your schema state, and export LLM-ready vector context.
+            Parse Flyway migrations into an AST, reconstruct your schema state, and export LLM-ready
+            vector context.
           </p>
 
           <div className="landing-actions">
@@ -113,16 +114,12 @@ export function LandingPage() {
 
           {files.length > 0 && (
             <div className="landing-parse">
-              <button
-                className="btn btn-success"
-                onClick={handleParse}
-                disabled={parsing}
-              >
+              <button className="btn btn-success" onClick={handleParse} disabled={parsing}>
                 {parsing ? '⏳ Parsing...' : '▶ Parse & Generate Schema Graph'}
               </button>
               <p className="parse-hint">
-                This will parse all migrations and generate the schema graph. You can then explore the schema in
-                various ways.
+                This will parse all migrations and generate the schema graph. You can then explore
+                the schema in various ways.
               </p>
             </div>
           )}
@@ -132,18 +129,33 @@ export function LandingPage() {
           <div className="feature-list">
             <h3>Features</h3>
             <ul>
-              <li>📊 <strong>Schema Graph</strong> - Interactive ERD and table explorer</li>
-              <li>🤖 <strong>LLM Chunks</strong> - Pre-formatted vector context for RAG</li>
-              <li>🔍 <strong>Insights</strong> - Detect schema anti-patterns</li>
-              <li>❤️ <strong>Health Score</strong> - Comprehensive health report</li>
-              <li>🔄 <strong>Compare</strong> - Diff schema versions and simulate changes</li>
-              <li>💬 <strong>Ask</strong> - Natural language Q&A with Claude</li>
+              <li>
+                📊 <strong>Schema Graph</strong> - Interactive ERD and table explorer
+              </li>
+              <li>
+                🤖 <strong>LLM Chunks</strong> - Pre-formatted vector context for RAG
+              </li>
+              <li>
+                🔍 <strong>Insights</strong> - Detect schema anti-patterns
+              </li>
+              <li>
+                ❤️ <strong>Health Score</strong> - Comprehensive health report
+              </li>
+              <li>
+                🔄 <strong>Compare</strong> - Diff schema versions and simulate changes
+              </li>
+              <li>
+                💬 <strong>Ask</strong> - Natural language Q&A with Claude
+              </li>
             </ul>
           </div>
 
           <div className="help-box">
             <h3>Need help?</h3>
-            <p>Start by selecting a folder with Flyway migrations, or load the sample migrations to explore the features.</p>
+            <p>
+              Start by selecting a folder with Flyway migrations, or load the sample migrations to
+              explore the features.
+            </p>
           </div>
         </div>
       </div>

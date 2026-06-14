@@ -1,5 +1,5 @@
-import { useAppContext } from '@/context/AppContext';
 import AskPanel from '@/components/schema/AskPanel';
+import { useAppContext } from '@/context/AppContext';
 
 /**
  * Ask page — natural language Q&A with Claude.
@@ -12,7 +12,9 @@ export function AskPage() {
       <div className="page-container">
         <div className="empty-state">
           <p>💬 Ask feature requires LLM chunks.</p>
-          <p>Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate chunks.</p>
+          <p>
+            Go to <strong>Migrations</strong> and click <strong>Parse</strong> to generate chunks.
+          </p>
         </div>
       </div>
     );

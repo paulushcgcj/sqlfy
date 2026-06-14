@@ -105,8 +105,8 @@ async function parseWithTauri(files: MigrationFile[]): Promise<ParseResult> {
 
     // The Python CLI returns snake_case; massage into the TypeScript shape
     return {
-      graph: deserialiseGraph(result.graph),
-      chunks: deserialiseChunks(result.chunks),
+      graph: deserialiseGraph(result.graph as _RawGraph),
+      chunks: deserialiseChunks(result.chunks as _RawChunk[]),
       source: 'cli',
     };
   } finally {
@@ -135,8 +135,8 @@ async function parseWithDevServer(files: MigrationFile[]): Promise<ParseResult> 
 
   const result = (await resp.json()) as { graph: unknown; chunks: unknown[] };
   return {
-    graph: deserialiseGraph(result.graph),
-    chunks: deserialiseChunks(result.chunks),
+    graph: deserialiseGraph(result.graph as _RawGraph),
+    chunks: deserialiseChunks(result.chunks as _RawChunk[]),
     source: 'cli',
   };
 }
@@ -471,34 +471,125 @@ export async function runDiff(
 }
 
 // ─────────────────────────────────────────────
+// RAW CLI RESPONSE TYPES  (Python snake_case)
+// ─────────────────────────────────────────────
+
+interface _RawColumnRef {
+  table: string;
+  column: string;
+}
+
+interface _RawColumn {
+  name: string;
+  type: string;
+  precision: number | null;
+  scale: number | null;
+  nullable: boolean;
+  default: string | null;
+  primary_key: boolean;
+  unique: boolean;
+  references: _RawColumnRef | null;
+}
+
+interface _RawConstraintRef {
+  table: string;
+  columns: string[];
+  on_delete: string | null;
+}
+
+interface _RawConstraint {
+  name: string | null;
+  type: string;
+  columns: string[];
+  references: _RawConstraintRef | null;
+  check_expr: string | null;
+}
+
+interface _RawIndex {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  created_in: string;
+}
+
+interface _RawEdge {
+  id: string;
+  from_table: string;
+  from_cols: string[];
+  to_table: string;
+  to_cols: string[];
+  constraint_name: string | null;
+  on_delete: string | null;
+}
+
+interface _RawTable {
+  id: string;
+  schema: string | null;
+  name: string;
+  full: string;
+  columns: _RawColumn[];
+  constraints: _RawConstraint[];
+  indexes: _RawIndex[];
+  comments: Record<string, string>;
+  created_in: string;
+  modified_in: string[];
+}
+
+interface _RawSequence {
+  name: string;
+  schema: string | null;
+  full: string;
+  start_with: number;
+  increment_by: number;
+  created_in: string;
+}
+
+interface _RawMigHistEntry {
+  version: string;
+  description: string;
+}
+
+interface _RawGraph {
+  tables: Record<string, _RawTable>;
+  sequences: Record<string, _RawSequence>;
+  edges: _RawEdge[];
+  migration_history: _RawMigHistEntry[];
+}
+
+interface _RawChunk {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  meta?: Record<string, unknown>;
+  hint: string;
+}
+
+// ─────────────────────────────────────────────
 // DESERIALISERS  (Python snake_case → TS camelCase)
 // ─────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseGraph(raw: any): SchemaGraph {
+function deserialiseGraph(raw: _RawGraph): SchemaGraph {
   const tables = new Map<string, import('@/core/local-types').Table>();
   const seqs = new Map<string, import('@/core/local-types').Sequence>();
 
-  for (const [key, t] of Object.entries(raw.tables ?? {})) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rt = t as any;
+  for (const [key, rt] of Object.entries(raw.tables ?? {})) {
     tables.set(key, {
       id: rt.id,
       schema: rt.schema,
       name: rt.name,
       full: rt.full,
-      columns: (rt.columns ?? []).map(deserialiseColumn),
-      constraints: (rt.constraints ?? []).map(deserialiseConstraint),
-      indexes: (rt.indexes ?? []).map(deserialiseIndex),
+      columns: rt.columns.map(deserialiseColumn),
+      constraints: rt.constraints.map(deserialiseConstraint),
+      indexes: rt.indexes.map(deserialiseIndex),
       comments: rt.comments ?? {},
       createdIn: rt.created_in,
       modifiedIn: rt.modified_in ?? [],
     });
   }
 
-  for (const [key, s] of Object.entries(raw.sequences ?? {})) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rs = s as any;
+  for (const [key, rs] of Object.entries(raw.sequences ?? {})) {
     seqs.set(key, {
       name: rs.name,
       schema: rs.schema,
@@ -510,16 +601,15 @@ function deserialiseGraph(raw: any): SchemaGraph {
   }
 
   const edges = (raw.edges ?? []).map(deserialiseEdge);
-  const migHist = (raw.migration_history ?? []).map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (m: any) => ({ version: m.version, description: m.description }),
-  );
+  const migHist = (raw.migration_history ?? []).map((m: _RawMigHistEntry) => ({
+    version: m.version,
+    description: m.description,
+  }));
 
   return { tables, seqs, edges, migHist };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseColumn(c: any): import('@/core/local-types').Column {
+function deserialiseColumn(c: _RawColumn): import('@/core/local-types').Column {
   return {
     name: c.name,
     type: c.type,
@@ -533,11 +623,10 @@ function deserialiseColumn(c: any): import('@/core/local-types').Column {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseConstraint(c: any): import('@/core/local-types').Constraint {
+function deserialiseConstraint(c: _RawConstraint): import('@/core/local-types').Constraint {
   return {
     name: c.name,
-    type: c.type,
+    type: c.type as import('@/core/local-types').ConstraintType,
     columns: c.columns ?? [],
     references: c.references
       ? {
@@ -550,13 +639,11 @@ function deserialiseConstraint(c: any): import('@/core/local-types').Constraint 
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseIndex(i: any): import('@/core/local-types').Index {
+function deserialiseIndex(i: _RawIndex): import('@/core/local-types').Index {
   return { name: i.name, columns: i.columns, unique: i.unique, createdIn: i.created_in };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseEdge(e: any): import('@/core/local-types').Edge {
+function deserialiseEdge(e: _RawEdge): import('@/core/local-types').Edge {
   return {
     id: e.id,
     fromTable: e.from_table,
@@ -568,8 +655,7 @@ function deserialiseEdge(e: any): import('@/core/local-types').Edge {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deserialiseChunks(raw: any[]): VectorChunk[] {
+function deserialiseChunks(raw: _RawChunk[]): VectorChunk[] {
   return (raw ?? []).map((c) => ({
     id: c.id,
     type: c.type,

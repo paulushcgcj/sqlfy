@@ -1,17 +1,17 @@
 import { RootRoute, Route, Router } from '@tanstack/react-router';
 
 import RootLayout from '@/layouts/RootLayout';
+import AskPage from '@/pages/AskPage';
+import ChunksPage from '@/pages/ChunksPage';
+import DiffPage from '@/pages/DiffPage';
+import GraphExportPage from '@/pages/GraphExportPage';
+import GraphPage from '@/pages/GraphPage';
+import HealthPage from '@/pages/HealthPage';
+import InsightsPage from '@/pages/InsightsPage';
 import LandingPage from '@/pages/LandingPage';
 import MigrationsPage from '@/pages/MigrationsPage';
-import GraphPage from '@/pages/GraphPage';
-import ChunksPage from '@/pages/ChunksPage';
-import AskPage from '@/pages/AskPage';
 import SchemaStatePage from '@/pages/SchemaStatePage';
-import InsightsPage from '@/pages/InsightsPage';
-import GraphExportPage from '@/pages/GraphExportPage';
-import HealthPage from '@/pages/HealthPage';
 import SimulatePage from '@/pages/SimulatePage';
-import DiffPage from '@/pages/DiffPage';
 
 // Root route with layout
 const rootRoute = new RootRoute({
