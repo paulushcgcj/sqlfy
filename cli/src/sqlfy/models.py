@@ -855,6 +855,49 @@ class RelationshipState(BaseModel):
     cardinality: str = Field(..., description='many_to_one | one_to_one | unknown.')
 
 
+class PiiScanFinding(BaseModel):
+    """
+    One PII finding inside PiiScanResult.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+        populate_by_name=True,
+    )
+    table_name: str = Field(..., serialization_alias='tableName', description='Fully-qualified table name.')
+    column_name: str = Field(..., serialization_alias='columnName', description='Column name.')
+    column_type: str = Field(..., serialization_alias='columnType', description='Column data type.')
+    pii_categories: list[str] = Field(
+        ..., serialization_alias='piiCategories', description='Matching PII categories.'
+    )
+    confidence: float = Field(..., description='Confidence score 0.0-1.0.')
+    evidence: str = Field(..., description='The pattern that triggered the match.')
+
+
+class PiiScanResult(BaseModel):
+    """
+    Full response from sqlfy pii-scan --format json.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+        populate_by_name=True,
+    )
+    findings: list[PiiScanFinding] = Field(..., description='PII column findings.')
+    tables_scanned: int = Field(
+        ..., serialization_alias='tablesScanned', description='Total tables scanned.'
+    )
+    columns_scanned: int = Field(
+        ..., serialization_alias='columnsScanned', description='Total columns scanned.'
+    )
+    pii_table_count: int = Field(
+        ..., serialization_alias='piiTableCount', description='Tables containing PII columns.'
+    )
+    pii_column_count: int = Field(
+        ..., serialization_alias='piiColumnCount', description='Total PII columns found.'
+    )
+
+
 class SchemaState(BaseModel):
     """
     Full response from sqlfy dump --format json.

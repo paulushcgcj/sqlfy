@@ -549,6 +549,33 @@
         "migrationHistory": { "description": "Ordered migration list.", "type": "array", "items": { "$ref": "#/$defs/MigrationHistory" }, "readOnly": true },
         "stats":            { "description": "Summary counts.", "type": "object", "additionalProperties": { "type": "integer" }, "readOnly": true }
       }
+    },
+    "PiiScanResult": {
+      "description": "Full response from sqlfy pii-scan --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["findings", "tablesScanned", "columnsScanned", "piiTableCount", "piiColumnCount"],
+      "properties": {
+        "findings":       { "description": "PII findings.",           "type": "array",  "items": { "$ref": "#/$defs/PiiColumnFinding" }, "readOnly": true },
+        "tablesScanned":  { "description": "Tables scanned.",         "type": "integer", "readOnly": true },
+        "columnsScanned": { "description": "Columns scanned.",        "type": "integer", "readOnly": true },
+        "piiTableCount":  { "description": "Tables with PII.",        "type": "integer", "readOnly": true },
+        "piiColumnCount": { "description": "PII columns found.",      "type": "integer", "readOnly": true }
+      }
+    },
+    "PiiColumnFinding": {
+      "description": "One PII finding from sqlfy pii-scan --format json.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tableName", "columnName", "columnType", "piiCategories", "confidence", "evidence"],
+      "properties": {
+        "tableName":     { "description": "Qualified table name.",         "type": "string",  "readOnly": true },
+        "columnName":    { "description": "Matched column name.",          "type": "string",  "readOnly": true },
+        "columnType":    { "description": "Rendered column type string.",   "type": "string",  "readOnly": true },
+        "piiCategories": { "description": "Matched PII categories.",       "type": "array",   "items": { "type": "string" }, "readOnly": true },
+        "confidence":    { "description": "Match confidence 0.0-1.0.",     "type": "number",  "readOnly": true },
+        "evidence":      { "description": "Pattern that matched.",         "type": "string",  "readOnly": true }
+      }
     }
   }
 }

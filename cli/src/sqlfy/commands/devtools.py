@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from ..analysis import ordering
+from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import reconstruct, reconstruct_at
 from ._utils import load_files, write_output
 
@@ -506,3 +507,77 @@ def cmd_cache(
         print(f"Cache location: {_CACHE_ROOT}")
         print(f"Cached entries: {cache_count}")
         print(f"Total size: {total_size / (1024 * 1024):.2f} MB")
+
+
+def cmd_pii_scan(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    at: str | None = None,
+    format: str = "text",
+    out: str | None = None,
+    min_confidence: float = 0.6,
+    extra_patterns: str | None = None,
+) -> int:
+    """Scan schema columns for PII patterns."""
+    from ..analysis.pii_scanner import scan_pii, format_text
+
+    extra: dict[str, list[str]] | None = None
+    if extra_patterns:
+        ep_path = Path(extra_patterns)
+        if not ep_path.exists():
+            print(f"Error: extra-patterns file not found: {extra_patterns}", file=sys.stderr)
+            return 1
+        try:
+            extra = json.loads(ep_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"Error reading extra-patterns file: {e}", file=sys.stderr)
+            return 1
+
+    files = load_files(migrations_dir, json_input)
+    graph = (
+        reconstruct_at(files, at, dialect=dialect)
+        if at
+        else reconstruct(files, dialect=dialect)
+    )
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
+    result = scan_pii(state, extra_patterns=extra)
+
+    # Filter by min-confidence
+    if min_confidence > 0.0:
+        result.findings = [f for f in result.findings if f.confidence >= min_confidence]
+        result.pii_column_count = len(result.findings)
+        result.pii_table_count = len({f.table_name for f in result.findings})
+
+    fmt = (format or "text").lower()
+
+    if fmt == "json":
+        from ..models import PiiScanFinding as PiiScanFindingModel, PiiScanResult as PiiScanResultModel
+
+        findings = [
+            PiiScanFindingModel(
+                table_name=f.table_name,
+                column_name=f.column_name,
+                column_type=f.column_type,
+                pii_categories=f.pii_categories,
+                confidence=f.confidence,
+                evidence=f.evidence,
+            )
+            for f in result.findings
+        ]
+        model = PiiScanResultModel(
+            findings=findings,
+            tables_scanned=result.tables_scanned,
+            columns_scanned=result.columns_scanned,
+            pii_table_count=result.pii_table_count,
+            pii_column_count=result.pii_column_count,
+        )
+        write_output(model.model_dump_json(by_alias=True, indent=2), out)
+    else:
+        write_output(format_text(result), out)
+
+    if not result.findings:
+        print("No PII columns found.", file=sys.stderr)
+
+    return 0
