@@ -12,7 +12,7 @@ from .commands import (
     cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
     cmd_impact,
     cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety,
-    cmd_cost, cmd_provenance, cmd_naming,
+    cmd_cost, cmd_provenance, cmd_naming, cmd_pii_scan,
 )
 
 KNOWN_SUBCOMMANDS = {
@@ -22,7 +22,7 @@ KNOWN_SUBCOMMANDS = {
     "provenance", "cost",
     "naming",
     "domains", "stability", "validate", "deps", "lineage", "drift",
-    "classify", "safety",
+    "classify", "safety", "pii-scan",
 }
 
 
@@ -388,6 +388,17 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         help="Show per-statement breakdown for each migration",
     )
     p.set_defaults(func=cmd_safety)
+
+    # pii-scan
+    p = sub.add_parser("pii-scan", help="Scan schema columns for PII patterns")
+    shared(p)
+    p.add_argument("--min-confidence", type=float, default=0.6, metavar="FLOAT",
+                   help="Minimum confidence threshold (0.0-1.0, default: 0.6)")
+    p.add_argument("--extra-patterns", metavar="FILE",
+                   help="JSON file with custom PII patterns: {\"category\": [\"regex\", ...]}")
+    p.add_argument("--format", choices=["text", "json"], default="text",
+                   help="Output format (default: text)")
+    p.set_defaults(func=cmd_pii_scan)
 
     return parser
 

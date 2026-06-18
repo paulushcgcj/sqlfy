@@ -135,7 +135,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 
 ## CLI Reference
 
-SQLfy has 31 CLI subcommands covering schema reconstruction, graph visualization, impact analysis, linting, drift detection, domain analysis, RAG Q&A, and more.
+SQLfy has 32 CLI subcommands covering schema reconstruction, graph visualization, impact analysis, linting, drift detection, domain analysis, RAG Q&A, PII scanning, and more.
 
 See the [full command reference on the wiki](https://github.com/paulushcgcj/sqlfy.wiki/wiki/commands/) for documentation on every command, including usage, flags, and examples.
 
@@ -158,6 +158,7 @@ See the [full command reference on the wiki](https://github.com/paulushcgcj/sqlf
 | `simulate` | Simulate schema evolution with hypothetical migrations |
 | `integrity` | Check migration file integrity using SHA256 hashes |
 | `provenance` | Collect git provenance for migration files |
+| `pii-scan` | Scan schema columns for PII patterns (column names and DDL comments) |
 | `cache` | Manage file-based caching system |
 | `ask` | Ask a natural language question about the schema (RAG) |
 | `chat` | Interactive multi-turn schema chat session |

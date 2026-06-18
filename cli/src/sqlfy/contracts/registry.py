@@ -30,6 +30,7 @@ from typing import Iterator, Type
 from pydantic import BaseModel
 
 from .analysis.v1 import HealthV1, InsightsV1
+from .analysis.pii_v1 import PiiScanV1
 from .evolution.v1 import DiffV1, RollbackV1, SimulateV1
 from .graph.v1 import GraphManifestV1
 from .impact.v1 import ImpactV1
@@ -103,6 +104,16 @@ _RAW: list[ContractEntry] = [
             "Includes a 0–100 health score, qualitative grade, and per-file status."
         ),
         model_class=HealthV1,
+    ),
+    ContractEntry(
+        name="pii-scan",
+        version="v1",
+        command="pii-scan",
+        description=(
+            "PII column scan result produced by the pii-scan command. "
+            "Lists columns matching PII patterns with confidence scores."
+        ),
+        model_class=PiiScanV1,
     ),
     # ── Impact ────────────────────────────────────────────────────────────
     ContractEntry(
