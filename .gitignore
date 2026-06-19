@@ -366,3 +366,6 @@ docs/
 sqlfy-out
 .opencode/
 *.code-workspace
+sqlfy.code-workspace
+.opencode/opencode.json
+.opencode/plugins/graphify.js
