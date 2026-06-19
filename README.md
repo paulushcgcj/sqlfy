@@ -8,6 +8,23 @@ Flyway SQL files  →  sqlglot AST  →  Reconstructor  →  Schema Graph / Sche
 
 ---
 
+## Installation
+
+**Mac / Linux**
+```bash
+curl -fsSL https://raw.githubusercontent.com/paulushcgcj/sqlfy/main/install.sh | bash
+```
+
+**Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/paulushcgcj/sqlfy/main/install.ps1 | iex
+```
+
+> **macOS note:** If you get a security warning, run once:
+> `xattr -d com.apple.quarantine /usr/local/bin/sqlfy`
+
+---
+
 ## Overview
 
 SQLfy reads a set of Flyway migration files in version order, parses each DDL statement into an abstract syntax tree, and reconstructs the **final state** of your database schema. From that state it produces:

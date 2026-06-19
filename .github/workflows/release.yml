@@ -6,163 +6,61 @@ on:
       - 'v*'
 
 jobs:
-  build-binaries:
-    name: Build ${{ matrix.os }} binary
-    runs-on: ${{ matrix.os }}
+  build:
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            artifact_name: sqlfy
-            asset_name: sqlfy-macos-arm64.zip
           - os: ubuntu-latest
-            artifact_name: sqlfy
-            asset_name: sqlfy-linux-amd64.zip
+            target: linux-x86_64
+          - os: macos-13
+            target: macos-x86_64
+          - os: macos-latest
+            target: macos-aarch64
           - os: windows-latest
-            artifact_name: sqlfy.exe
-            asset_name: sqlfy-windows-amd64.zip
-    
+            target: windows-x86_64
+
+    runs-on: ${{ matrix.os }}
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
         with:
-          enable-cache: true
+          python-version: "3.12"
 
-      - name: Set up Python
-        run: uv python install 3.14
+      - uses: astral-sh/setup-uv@v5
 
-      - name: Install dependencies
-        run: |
-          cd cli
-          uv sync
-          uv pip install pyinstaller
+      - run: uv sync --frozen
+        working-directory: cli
 
-      - name: Build binary (Unix)
+      - name: Build
+        run: uv run pyinstaller --onefile --name sqlfy pyinstaller_entry.py
+        working-directory: cli
+
+      - name: Rename (Unix)
         if: runner.os != 'Windows'
-        run: |
-          cd cli
-          uv run pyinstaller \
-            --name sqlfy \
-            --onefile \
-            --console \
-            --noconfirm \
-            --clean \
-            --collect-all sqlfy \
-            --collect-all sqlglot \
-            --hidden-import=sqlglot \
-            --hidden-import=sqlglot.dialects.oracle \
-            --hidden-import=networkx \
-            pyinstaller_entry.py
+        run: mv cli/dist/sqlfy cli/dist/sqlfy-${{ matrix.target }}
 
-      - name: Build binary (Windows)
+      - name: Rename (Windows)
         if: runner.os == 'Windows'
-        run: |
-          cd cli
-          uv run pyinstaller `
-            --name sqlfy `
-            --onefile `
-            --console `
-            --noconfirm `
-            --clean `
-            --collect-all sqlfy `
-            --collect-all sqlglot `
-            --hidden-import=sqlglot `
-            --hidden-import=sqlglot.dialects.oracle `
-            --hidden-import=networkx `
-            pyinstaller_entry.py
+        run: mv cli/dist/sqlfy.exe cli/dist/sqlfy-${{ matrix.target }}.exe
 
-      - name: Create release package (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p release-package
-          cp cli/dist/${{ matrix.artifact_name }} release-package/
-          cp README.md release-package/
-          cd release-package
-          zip -r ../${{ matrix.asset_name }} .
-
-      - name: Create release package (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          New-Item -ItemType Directory -Force -Path release-package
-          Copy-Item cli\dist\${{ matrix.artifact_name }} release-package\
-          Copy-Item README.md release-package\
-          Compress-Archive -Path release-package\* -DestinationPath ${{ matrix.asset_name }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}
+          name: binary-${{ matrix.target }}
+          path: cli/dist/sqlfy*
 
-  create-release:
-    name: Create GitHub Release
-    needs: build-binaries
+  release:
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          merge-multiple: true
+          path: dist/
 
-      - name: Display structure
-        run: ls -R artifacts
-
-      - name: Extract version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         with:
-          name: Release v${{ steps.get_version.outputs.VERSION }}
-          body: |
-            ## SQLfy v${{ steps.get_version.outputs.VERSION }}
-            
-            Schema Graph Engine — Parse Flyway migrations into knowledge graphs and LLM-ready context.
-            
-            ### 📦 Downloads
-            
-            Choose the right package for your platform:
-            
-            | Platform | File | Installation |
-            |----------|------|--------------|
-            | **macOS** (Apple Silicon) | `sqlfy-macos-arm64.zip` | `unzip sqlfy-macos-arm64.zip && chmod +x sqlfy && ./sqlfy --help` |
-            | **Linux** (x86_64) | `sqlfy-linux-amd64.zip` | `unzip sqlfy-linux-amd64.zip && chmod +x sqlfy && ./sqlfy --help` |
-            | **Windows** (x86_64) | `sqlfy-windows-amd64.zip` | `Expand-Archive sqlfy-windows-amd64.zip` then run `sqlfy.exe` |
-            
-            Each package includes:
-            - Standalone binary (no Python required)
-            - README.md documentation
-            
-            ### 🚀 Quick Start
-            
-            ```bash
-            # Extract and run
-            unzip sqlfy-*.zip
-            ./sqlfy dump ./your-migrations --format summary
-            ```
-            
-            ### 📝 Full documentation
-            
-            See [README.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for complete command reference.
-            
-            ---
-            
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.ref_name }}
-          files: |
-            artifacts/sqlfy-macos-arm64.zip/sqlfy-macos-arm64.zip
-            artifacts/sqlfy-linux-amd64.zip/sqlfy-linux-amd64.zip
-            artifacts/sqlfy-windows-amd64.zip/sqlfy-windows-amd64.zip
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: dist/*
