@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import fcntl
+import io
 import signal
 import sys
 import threading
 import time
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from pathlib import Path
 
@@ -53,11 +55,15 @@ class WatchHandler(FileSystemEventHandler):
             return True
         
         try:
-            self.lock_fd = open(self.lock_path, "w")
-            fcntl.flock(self.lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
-        except (IOError, OSError):
-            self.lock_fd = None
+            fd = self.lock_path.open("w")  # noqa: SIM115
+            try:
+                fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.lock_fd = fd
+                return True
+            except OSError:
+                fd.close()
+                return False
+        except OSError:
             return False
 
     def _release_lock(self) -> None:
@@ -65,10 +71,10 @@ class WatchHandler(FileSystemEventHandler):
         if self.lock_fd is not None:
             try:
                 fcntl.flock(self.lock_fd.fileno(), fcntl.LOCK_UN)
-                self.lock_fd.close()
-            except (IOError, OSError):
+            except OSError:
                 pass
             finally:
+                self.lock_fd.close()
                 self.lock_fd = None
 
     def _check_shrink_safety(self, old_node_count: int, new_node_count: int) -> bool:
@@ -99,7 +105,6 @@ class WatchHandler(FileSystemEventHandler):
     def _run_commands(self) -> dict[str, str]:
         """Run all configured commands and return their status."""
         results = {}
-        migrations_dir_path = Path(self.migrations_dir)
 
         # Get old node count for shrink-safety check
         old_node_count = 0
@@ -145,9 +150,6 @@ class WatchHandler(FileSystemEventHandler):
         try:
             # Execute the command - capture stdout/stderr
             # We need to redirect to prevent double output
-            import io
-            from contextlib import redirect_stdout, redirect_stderr
-
             stdout_capture = io.StringIO()
             stderr_capture = io.StringIO()
 
@@ -202,7 +204,7 @@ class WatchHandler(FileSystemEventHandler):
             # Check if lock is available
             if not self._acquire_lock():
                 print(
-                    f"Warning: Rebuild already in progress, skipping.",
+                    "Warning: Rebuild already in progress, skipping.",
                     file=sys.stderr,
                 )
                 return
