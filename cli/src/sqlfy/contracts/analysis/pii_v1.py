@@ -12,23 +12,49 @@ This defines the JSON output shape for PII scanning results.
 
 from __future__ import annotations
 
-from typing import ClassVar, List
+from typing import ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
 from ..common.base import ContractBase
 
 
 class PiiColumnFindingV1(BaseModel):
     """A single PII column finding."""
-    
-    model_config = ContractBase.model_config
-    
-    tableName: str = Field(..., description="Name of the table containing the PII column")
-    columnName: str = Field(..., description="Name of the column identified as PII")
-    columnType: str = Field(..., description="Data type of the column")
-    piiCategories: List[str] = Field(..., description="List of PII categories that matched (e.g., ['email', 'name'])")
-    confidence: float = Field(..., description="Confidence score from 0.0 to 1.0")
-    evidence: str = Field(..., description="The regex pattern that matched")
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+
+    table_name: str = Field(
+        ...,
+        description="Name of the table containing the PII column",
+        serialization_alias="tableName",
+    )
+    column_name: str = Field(
+        ...,
+        description="Name of the column identified as PII",
+        serialization_alias="columnName",
+    )
+    column_type: str = Field(
+        ...,
+        description="Data type of the column",
+        serialization_alias="columnType",
+    )
+    pii_categories: list[str] = Field(
+        ...,
+        description="List of PII categories that matched (e.g., ['email', 'name'])",
+        serialization_alias="piiCategories",
+    )
+    confidence: float = Field(
+        ...,
+        description="Confidence score from 0.0 to 1.0",
+    )
+    evidence: str = Field(
+        ...,
+        description="The regex pattern that matched",
+    )
 
 
 class PiiScanV1(ContractBase):
@@ -45,8 +71,27 @@ class PiiScanV1(ContractBase):
     )
     CONTRACT_COMMAND: ClassVar[str] = "pii-scan"
 
-    tablesScanned: int = Field(..., description="Total number of tables scanned")
-    columnsScanned: int = Field(..., description="Total number of columns scanned")
-    piiTableCount: int = Field(..., description="Number of tables containing PII columns")
-    piiColumnCount: int = Field(..., description="Number of PII columns found")
-    findings: List[PiiColumnFindingV1] = Field(..., description="List of PII column findings")
+    tables_scanned: int = Field(
+        ...,
+        description="Total number of tables scanned",
+        serialization_alias="tablesScanned",
+    )
+    columns_scanned: int = Field(
+        ...,
+        description="Total number of columns scanned",
+        serialization_alias="columnsScanned",
+    )
+    pii_table_count: int = Field(
+        ...,
+        description="Number of tables containing PII columns",
+        serialization_alias="piiTableCount",
+    )
+    pii_column_count: int = Field(
+        ...,
+        description="Number of PII columns found",
+        serialization_alias="piiColumnCount",
+    )
+    findings: list[PiiColumnFindingV1] = Field(
+        ...,
+        description="List of PII column findings",
+    )
