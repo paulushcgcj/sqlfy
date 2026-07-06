@@ -28,6 +28,7 @@ from .graph import cmd_graph, cmd_graph_migrations
 from .impact import cmd_impact
 from .provenance import cmd_provenance
 from .schema import cmd_chunks, cmd_dump, cmd_export, cmd_manifest, legacy_main
+from .watch import cmd_watch
 
 __all__ = [
     "cmd_dump", "cmd_manifest", "cmd_chunks", "cmd_export", "legacy_main",
@@ -41,4 +42,5 @@ __all__ = [
     "cmd_naming",
     "cmd_provenance",
     "cmd_pii_scan",
+    "cmd_watch",
 ]
