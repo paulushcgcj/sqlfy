@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
+# Import directly from modules to avoid full package import issues
 from sqlfy.domain.schema_state import SchemaState, TableState, ColumnState
-from sqlfy.analysis.pii_scanner import scan_pii, PII_PATTERNS, PiiColumnFinding
+from sqlfy.analysis.pii_scanner import scan_pii, PII_PATTERNS
 
 
 def _build_test_schema():
@@ -28,10 +29,14 @@ def _build_test_schema():
             ColumnState(name="CREATED_AT", data_type="TIMESTAMP", nullable=False),
             ColumnState(name="UPDATED_AT", data_type="TIMESTAMP", nullable=True),
         ],
+        constraints=[],
+        indexes=[],
+        comment="Customer information",
         created_in="V1",
         modified_in=[],
-        pk_columns=["ID"],
-        comment="Customer information"
+        column_count=8,
+        has_pk=True,
+        pk_columns=["ID"]
     )
     
     order_table = TableState(
@@ -44,10 +49,14 @@ def _build_test_schema():
             ColumnState(name="ORDER_DATE", data_type="DATE", nullable=False),
             ColumnState(name="CUSTOMER_ID", data_type="NUMBER", nullable=False, is_fk=True),
         ],
+        constraints=[],
+        indexes=[],
+        comment="Order information",
         created_in="V2",
         modified_in=[],
-        pk_columns=["ID"],
-        comment="Order information"
+        column_count=4,
+        has_pk=True,
+        pk_columns=["ID"]
     )
     
     address_table = TableState(
@@ -63,10 +72,14 @@ def _build_test_schema():
             ColumnState(name="STATE", data_type="VARCHAR(50)", nullable=True),
             ColumnState(name="CUSTOMER_ID", data_type="NUMBER", nullable=False, is_fk=True),
         ],
+        constraints=[],
+        indexes=[],
+        comment="Customer address",
         created_in="V3",
         modified_in=[],
-        pk_columns=["ID"],
-        comment="Customer address"
+        column_count=6,
+        has_pk=True,
+        pk_columns=["ID"]
     )
     
     tables = {
@@ -224,8 +237,13 @@ class TestPiiScanner:
             columns=[
                 ColumnState(name="CUST_EMAIL", data_type="VARCHAR(255)"),
             ],
+            constraints=[],
+            indexes=[],
+            comment=None,
             created_in="V1",
             modified_in=[],
+            column_count=1,
+            has_pk=False,
             pk_columns=[],
         )
         
@@ -258,8 +276,13 @@ class TestPiiScanner:
             columns=[
                 ColumnState(name="ADDR_LINE1", data_type="VARCHAR(255)"),
             ],
+            constraints=[],
+            indexes=[],
+            comment=None,
             created_in="V1",
             modified_in=[],
+            column_count=1,
+            has_pk=False,
             pk_columns=[],
         )
         

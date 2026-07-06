@@ -520,7 +520,7 @@ def cmd_pii_scan(
     at: str | None = None,
 ) -> int:
     """Scan schema columns for PII (Personally Identifiable Information) patterns."""
-    from ..analysis.pii_scanner import scan_pii, PII_PATTERNS
+    from ..analysis.pii_scanner import scan_pii
     from ..reconstructor import reconstruct, reconstruct_at
     
     files = load_files(migrations_dir, json_input)
