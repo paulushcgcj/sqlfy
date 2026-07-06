@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..analysis import ordering
 from ..reconstructor import reconstruct, reconstruct_at
+from ..domain.schema_state import SchemaStateBuilder
 from ._utils import load_files, write_output
 
 
@@ -531,7 +532,7 @@ def cmd_pii_scan(
     else:
         graph = reconstruct(files, dialect=dialect)
     
-    state = graph.state
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
     
     # Load extra patterns if provided
     extra_patterns_dict = None
