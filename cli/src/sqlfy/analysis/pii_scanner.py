@@ -65,7 +65,7 @@ def scan_pii(
     findings: List[PiiColumnFinding] = []
     tables_scanned = len(state.tables)
     columns_scanned = 0
-    for table in state.tables:
+    for table in state.tables.values():
         for column in table.columns:
             columns_scanned += 1
             column_name = column.name.casefold()

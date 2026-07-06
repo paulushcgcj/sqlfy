@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-# Import directly from modules to avoid full package import issues
 from sqlfy.domain.schema_state import SchemaState, TableState, ColumnState
 from sqlfy.analysis.pii_scanner import scan_pii, PII_PATTERNS
 
