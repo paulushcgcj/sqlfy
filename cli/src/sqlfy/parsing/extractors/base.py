@@ -4,8 +4,11 @@ sqlfy.parsing.extractors.base
 Abstract base for DDL operation extractors.
 """
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+
 import sqlglot.expressions as exp
+
 from ...semantic.operations import AnyOperation, OperationProvenance
 
 

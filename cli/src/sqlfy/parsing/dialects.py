@@ -7,11 +7,12 @@ All dialect logic lives in a single canonical location (sqlfy.dialects).
 This module exists only for backward-compatibility imports within the
 parsing package.
 """
+from __future__ import annotations
 
 from ..dialects import (  # noqa: F401
     DialectAdapter,
+    MySQLAdapter,
     OracleAdapter,
     PostgresAdapter,
-    MySQLAdapter,
     SQLiteAdapter,
 )

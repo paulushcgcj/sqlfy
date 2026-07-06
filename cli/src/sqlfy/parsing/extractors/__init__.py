@@ -12,13 +12,14 @@ Usage::
         ops = extractor.extract(stmt, provenance)
 """
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import sqlglot.expressions as exp
 
+from .alter_table import AlterTableExtractor
 from .base import BaseExtractor
 from .create_table import CreateTableExtractor
-from .alter_table import AlterTableExtractor
 from .drop import DropExtractor
 
 if TYPE_CHECKING:

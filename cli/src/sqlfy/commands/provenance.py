@@ -2,12 +2,13 @@
 
 Feature #18: Migration Provenance Tracking
 """
+from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
 
-from ..analysis.provenance import collect_provenance, write_manifest, verify_manifest
+from ..analysis.provenance import collect_provenance, verify_manifest, write_manifest
 from ._utils import write_output
 
 

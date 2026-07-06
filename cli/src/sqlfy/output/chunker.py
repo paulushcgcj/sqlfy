@@ -8,16 +8,16 @@ Converts SchemaGraph into semantic chunks for RAG/embedding-based retrieval.
 
 from __future__ import annotations
 
-from ..domain.models import SchemaGraph, VectorChunk, Column, Table, Edge
+from ..domain.models import Edge, SchemaGraph, VectorChunk
 from ..domain.utils import type_str as _type_str
 
 
 def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
     """Build LLM-optimized chunks from schema graph.
-    
+
     Args:
         graph: SchemaGraph from apply_migrations()
-    
+
     Returns:
         List of VectorChunk objects ready for embedding/retrieval
     """
@@ -30,7 +30,7 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
 
     def out_e(full: str) -> list[Edge]:
         return [e for e in edges if e.from_table == full]
-    
+
     def in_e(full: str) -> list[Edge]:
         return [e for e in edges if e.to_table == full]
 
@@ -113,7 +113,7 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
     table_names = list(tables.keys())
     total_cols  = sum(len(t.columns) for t in tables.values())
     schemas     = list({t.schema for t in tables.values() if t.schema})
-    
+
     sum_l = [
         'SCHEMA SUMMARY',
         f'DB Schemas: {", ".join(schemas)}',
@@ -129,12 +129,12 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
         '',
         'TABLE ROLES:',
     ]
-    
+
     # Determine table roles
     for t in tables.values():
         in_count = len(in_e(t.full))
         out_count = len(out_e(t.full))
-        
+
         if in_count > 0 and out_count == 0:
             role = "root/parent entity"
         elif out_count > 0 and in_count > 0:
@@ -143,12 +143,12 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
             role = "leaf/detail entity"
         else:
             role = "standalone"
-        
+
         sum_l.append(
             f'  {t.full}: {role} '
             f'(referenced by {in_count}, references {out_count})'
         )
-    
+
     chunks.insert(0, VectorChunk(
         id='schema:summary',
         type='schema_summary',
@@ -177,7 +177,7 @@ def build_chunks(graph: SchemaGraph) -> list[VectorChunk]:
             rel_l.append(f'  ◀──FK── {e.from_table} via {",".join(e.from_cols)}')
         if not out and not inn:
             rel_l.append('  (no FK relationships)')
-    
+
     chunks.append(VectorChunk(
         id='schema:relationships',
         type='relationship_map',

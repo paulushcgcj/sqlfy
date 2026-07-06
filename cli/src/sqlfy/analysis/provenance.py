@@ -4,28 +4,28 @@ import datetime
 import json
 import re
 import subprocess
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
 class FileProvenance:
     path: str
-    commit: Optional[str] = None
-    author_name: Optional[str] = None
-    author_email: Optional[str] = None
-    date: Optional[str] = None
-    branches: Optional[List[str]] = None
-    pr: Optional[str] = None
-    message: Optional[str] = None
+    commit: str | None = None
+    author_name: str | None = None
+    author_email: str | None = None
+    date: str | None = None
+    branches: list[str] | None = None
+    pr: str | None = None
+    message: str | None = None
 
 
-def _run_git(args: List[str], cwd: Path) -> subprocess.CompletedProcess:
+def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(["git"] + args, cwd=str(cwd), capture_output=True, text=True)
 
 
-def find_repo_root(start: Path) -> Optional[Path]:
+def find_repo_root(start: Path) -> Path | None:
     try:
         res = _run_git(["rev-parse", "--show-toplevel"], cwd=start.resolve())
     except FileNotFoundError:
@@ -35,7 +35,7 @@ def find_repo_root(start: Path) -> Optional[Path]:
     return Path(res.stdout.strip())
 
 
-def _git_last_commit_info(path: Path, repo_root: Path) -> Dict[str, Optional[str]]:
+def _git_last_commit_info(path: Path, repo_root: Path) -> dict[str, str | None]:
     rel = str(path.resolve().relative_to(repo_root.resolve()))
     res = _run_git(["log", "-n", "1", "--pretty=format:%H%n%an%n%ae%n%ai%n%B", "--", rel], cwd=repo_root.resolve())
     if res.returncode != 0 or not res.stdout.strip():
@@ -50,12 +50,12 @@ def _git_last_commit_info(path: Path, repo_root: Path) -> Dict[str, Optional[str
     return {"commit": commit, "author_name": author_name, "author_email": author_email, "date": date, "message": message}
 
 
-def _git_branches_containing(commit: Optional[str], repo_root: Path) -> List[str]:
+def _git_branches_containing(commit: str | None, repo_root: Path) -> list[str]:
     if not commit:
         return []
     res = _run_git(["branch", "--contains", commit], cwd=repo_root.resolve())
     if res.returncode == 0 and res.stdout.strip():
-        branches: List[str] = []
+        branches: list[str] = []
         for line in res.stdout.splitlines():
             name = line.strip().lstrip("* ").strip()
             if name:
@@ -77,7 +77,7 @@ def _is_tracked(path: Path, repo_root: Path) -> bool:
     return res.returncode == 0
 
 
-def _detect_pr_from_message(message: Optional[str]) -> Optional[str]:
+def _detect_pr_from_message(message: str | None) -> str | None:
     if not message:
         return None
     patterns = [
@@ -95,7 +95,7 @@ def _detect_pr_from_message(message: Optional[str]) -> Optional[str]:
     return None
 
 
-def collect_provenance(migrations_dir: str, recursive: bool = True, include_untracked: bool = False) -> Dict[str, Any]:
+def collect_provenance(migrations_dir: str, recursive: bool = True, include_untracked: bool = False) -> dict[str, Any]:
     pdir = Path(migrations_dir).resolve()
     if not pdir.exists():
         raise ValueError(f"Path does not exist: {migrations_dir}")
@@ -105,7 +105,7 @@ def collect_provenance(migrations_dir: str, recursive: bool = True, include_untr
         raise ValueError(f"Not a git repository (no git rev-parse) for: {migrations_dir}. Use include_untracked=True to collect without git.")
 
     sql_files = sorted(pdir.rglob("*.sql")) if recursive else sorted(pdir.glob("*.sql"))
-    files: List[Dict[str, Any]] = []
+    files: list[dict[str, Any]] = []
 
     for f in sql_files:
         # If we have a repo root, optionally filter untracked files when include_untracked=False
@@ -144,17 +144,17 @@ def collect_provenance(migrations_dir: str, recursive: bool = True, include_untr
     return {
         "migrations_dir": str(pdir.resolve()),
         "repo_root": str(repo_root.resolve()) if repo_root else None,
-        "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "generated_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "files": files,
     }
 
 
-def write_manifest(manifest: Dict[str, Any], out_path: str) -> None:
+def write_manifest(manifest: dict[str, Any], out_path: str) -> None:
     p = Path(out_path)
     p.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def verify_manifest(manifest_path: str, migrations_dir: str, recursive: bool = True, include_untracked: bool = False) -> Dict[str, Any]:
+def verify_manifest(manifest_path: str, migrations_dir: str, recursive: bool = True, include_untracked: bool = False) -> dict[str, Any]:
     p = Path(manifest_path)
     if not p.exists():
         raise ValueError(f"Manifest not found: {manifest_path}")
@@ -165,7 +165,7 @@ def verify_manifest(manifest_path: str, migrations_dir: str, recursive: bool = T
     old_by_path = {f["path"]: f for f in manifest.get("files", [])}
     cur_by_path = {f["path"]: f for f in current.get("files", [])}
 
-    diffs: List[Dict[str, Any]] = []
+    diffs: list[dict[str, Any]] = []
     for path, old in old_by_path.items():
         cur = cur_by_path.get(path)
         if not cur:
@@ -174,7 +174,7 @@ def verify_manifest(manifest_path: str, migrations_dir: str, recursive: bool = T
         if old.get("commit") != cur.get("commit"):
             diffs.append({"path": path, "status": "commit_changed", "old": old.get("commit"), "new": cur.get("commit")})
 
-    for path in cur_by_path.keys():
+    for path in cur_by_path:
         if path not in old_by_path:
             diffs.append({"path": path, "status": "new_file"})
 

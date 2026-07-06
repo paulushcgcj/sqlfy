@@ -29,7 +29,6 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-
 _TOML_KEYS = {
     "dialect", "cache_dir", "chunk_cache_dir", "log_level", "api_key", "max_chunks"
 }
@@ -72,7 +71,7 @@ class SqlfySettings:
     max_chunks: int = 6
 
     @classmethod
-    def from_env(cls) -> "SqlfySettings":
+    def from_env(cls) -> SqlfySettings:
         """Create settings from TOML files and environment variables.
 
         Environment variables take precedence over TOML config files.

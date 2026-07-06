@@ -41,13 +41,17 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from ..domain.schema_state import (
-    SchemaState, TableState, ColumnState,
-    ConstraintState, IndexState, SequenceState, RelationshipState, MigrationStep,
+    ColumnState,
+    ConstraintState,
+    IndexState,
+    MigrationStep,
+    RelationshipState,
+    SchemaState,
+    SequenceState,
+    TableState,
 )
-
 
 # ─────────────────────────────────────────────
 # CHANGE PRIMITIVES
@@ -57,8 +61,8 @@ from ..domain.schema_state import (
 class ColumnChange:
     name:       str
     change:     str        # added | removed | modified
-    before:     Optional[dict] = None   # None for added
-    after:      Optional[dict] = None   # None for removed
+    before:     dict | None = None   # None for added
+    after:      dict | None = None   # None for removed
     field_diffs: list[str] = field(default_factory=list)  # e.g. ["type: NUMBER→VARCHAR"]
 
     def is_breaking(self) -> bool:
@@ -76,7 +80,7 @@ class ColumnChange:
 
 @dataclass
 class ConstraintChange:
-    name:   Optional[str]
+    name:   str | None
     change: str            # added | removed
     type:   str
     columns: list[str]
@@ -98,8 +102,8 @@ class TableChange:
     constraint_changes: list[ConstraintChange] = field(default_factory=list)
     index_changes:     list[IndexChange]     = field(default_factory=list)
     comment_changed:   bool                  = False
-    comment_before:    Optional[str]         = None
-    comment_after:     Optional[str]         = None
+    comment_before:    str | None         = None
+    comment_after:     str | None         = None
 
     def is_breaking(self) -> bool:
         if self.change == 'removed':
@@ -120,7 +124,7 @@ class RelationshipChange:
     from_columns: list[str]
     to_table:     str
     to_columns:   list[str]
-    on_delete:    Optional[str]
+    on_delete:    str | None
 
 
 @dataclass
@@ -232,16 +236,16 @@ class DiffResult:
 
     def to_json(self, indent: int = 2) -> str:
         from ..models import (
-            DiffResult as _DiffResult,
-            DiffStats as _DiffStats,
-            DiffTableChange as _DiffTableChange,
+            Change as _Change,
+            Change1 as _Change1,
             DiffColumnChange as _DiffColumnChange,
             DiffConstraintChange as _DiffConstraintChange,
             DiffIndexChange as _DiffIndexChange,
-            DiffSequenceChange as _DiffSequenceChange,
             DiffRelationshipChange as _DiffRelationshipChange,
-            Change as _Change,
-            Change1 as _Change1,
+            DiffResult as _DiffResult,
+            DiffSequenceChange as _DiffSequenceChange,
+            DiffStats as _DiffStats,
+            DiffTableChange as _DiffTableChange,
         )
         stats = self.stats()
         model = _DiffResult(

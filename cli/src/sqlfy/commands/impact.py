@@ -24,13 +24,13 @@ def cmd_impact(
     out: str | None = None,
 ) -> None:
     """Analyze transitive impact of changes to a schema object via BFS/DFS traversal."""
-    from ..core import build_networkx_graph
     from ..analysis.impact import (
         analyze_impact,
         format_impact_json,
         format_impact_text,
         merge_impact_results,
     )
+    from ..core import build_networkx_graph
 
     # ── Resolve tables to analyze ───────────────────────────────────────
     explicit_tables: list[str] = []

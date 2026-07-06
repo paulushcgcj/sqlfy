@@ -8,16 +8,20 @@ from pathlib import Path
 
 import pytest
 
+from sqlfy.analysis.insights import (
+    InsightsEngine,
+    InsightsReport,
+    _detect_god_tables,
+    _detect_surprising_joins,
+)
 from sqlfy.core import apply_migrations
 from sqlfy.domain.schema_state import (
-    SchemaStateBuilder, SchemaState, TableState, ColumnState,
-    ConstraintState, IndexState, RelationshipState, SequenceState,
+    ColumnState,
     MigrationStep,
-)
-from sqlfy.analysis.insights import (
-    InsightsEngine, InsightsReport, Finding,
-    _detect_god_tables, _detect_surprising_joins,
-    GodTableFinding, SurprisingJoinFinding,
+    RelationshipState,
+    SchemaState,
+    SchemaStateBuilder,
+    TableState,
 )
 
 SAMPLES_DIR = Path(__file__).parent.parent.parent / 'samples'

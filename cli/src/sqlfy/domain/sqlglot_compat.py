@@ -29,7 +29,7 @@ Usage
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 try:
     import sqlglot
@@ -156,11 +156,11 @@ class ModifyColumnInfo:
     def __init__(
         self,
         column_name: str,
-        data_type: Optional[str] = None,
-        precision: Optional[int] = None,
-        scale: Optional[int] = None,
-        nullable: Optional[bool] = None,
-        default: Optional[str] = None,
+        data_type: str | None = None,
+        precision: int | None = None,
+        scale: int | None = None,
+        nullable: bool | None = None,
+        default: str | None = None,
     ):
         self.column_name = column_name
         self.data_type = data_type
@@ -212,7 +212,7 @@ def parse_modify_native(sql: str, dialect: str = "oracle") -> tuple[str, list[Mo
     return table_name.upper(), modifications
 
 
-def _extract_modify_info_from_action(action: Any) -> Optional[ModifyColumnInfo]:
+def _extract_modify_info_from_action(action: Any) -> ModifyColumnInfo | None:
     """
     Extract ModifyColumnInfo from a sqlglot action node.
 

@@ -3,16 +3,17 @@ test_sqlglot_compat
 ===================
 Tests for sqlglot feature detection and compatibility layer.
 """
+from __future__ import annotations
 
 import pytest
+
 from sqlfy.domain.sqlglot_compat import (
     SQLGLOT_HAS_MODIFY,
     SQLGLOT_HAS_RENAME_COLUMN,
-    parse_modify_native,
     ModifyColumnInfo,
     log_sqlglot_capabilities,
+    parse_modify_native,
 )
-
 
 # ─────────────────────────────────────────────
 # FEATURE DETECTION TESTS
@@ -42,10 +43,10 @@ def test_parse_modify_single_column():
     """Parse a simple ALTER TABLE MODIFY with one column."""
     sql = "ALTER TABLE users MODIFY (email VARCHAR2(255) NOT NULL)"
     table_name, modifications = parse_modify_native(sql)
-    
+
     assert table_name == "USERS"
     assert len(modifications) == 1
-    
+
     mod = modifications[0]
     assert mod.column_name == "EMAIL"
     # Note: Exact parsing depends on sqlglot version
@@ -58,7 +59,7 @@ def test_parse_modify_with_type_change():
     """Parse MODIFY that changes column type."""
     sql = "ALTER TABLE orders MODIFY status VARCHAR2(20)"
     table_name, modifications = parse_modify_native(sql)
-    
+
     assert table_name == "ORDERS"
     assert len(modifications) >= 1
     assert modifications[0].column_name == "STATUS"
@@ -69,7 +70,7 @@ def test_parse_modify_with_default():
     """Parse MODIFY that adds a default value."""
     sql = "ALTER TABLE orders MODIFY (status VARCHAR2(20) DEFAULT 'PENDING')"
     table_name, modifications = parse_modify_native(sql)
-    
+
     assert table_name == "ORDERS"
     assert len(modifications) >= 1
 
@@ -85,7 +86,7 @@ def test_parse_modify_multiple_columns():
     )
     """
     table_name, modifications = parse_modify_native(sql)
-    
+
     assert table_name == "USERS"
     # Should parse at least one column successfully
     assert len(modifications) >= 1
@@ -98,7 +99,7 @@ def test_parse_modify_without_native_support_raises_error():
     """When native MODIFY not supported, parse_modify_native should raise ValueError."""
     if SQLGLOT_HAS_MODIFY:
         pytest.skip("sqlglot has native MODIFY support")
-    
+
     sql = "ALTER TABLE users MODIFY (email VARCHAR2(255))"
     with pytest.raises(ValueError, match="does not support native MODIFY"):
         parse_modify_native(sql)
@@ -126,7 +127,7 @@ def test_modify_column_info_creation():
         nullable=False,
         default="'user@example.com'",
     )
-    
+
     assert info.column_name == "EMAIL"
     assert info.data_type == "VARCHAR2"
     assert info.precision == 255
@@ -138,7 +139,7 @@ def test_modify_column_info_creation():
 def test_modify_column_info_minimal():
     """ModifyColumnInfo can be created with just column name."""
     info = ModifyColumnInfo(column_name="EMAIL")
-    
+
     assert info.column_name == "EMAIL"
     assert info.data_type is None
     assert info.precision is None

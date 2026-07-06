@@ -33,10 +33,10 @@ Usage
 from __future__ import annotations
 
 import math
-import re
 import os
+import re
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from ..domain.models import VectorChunk
 
@@ -72,8 +72,7 @@ _STOP = frozenset({
     'between','and','or','but','not','no','so','yet','both',
     'either','neither','each','any','all','few','more','most',
     'other','some','such','than','too','very','just','own',
-    'same','than','too','very','s','t','can','will','just',
-    'don','should','now','i','me','my','we','our','you','your',
+    'same','s','t','don','now','i','me','my','we','our','you','your',
     'he','she','it','they','them','their','what','which','who',
     'whom','this','that','these','those','am','if','as','up',
     'how','get','got','table','column','tables','columns',
@@ -176,7 +175,7 @@ class KeywordRetriever:
 # ─────────────────────────────────────────────
 
 def _cosine(a: list[float], b: list[float]) -> float:
-    dot  = sum(x * y for x, y in zip(a, b))
+    dot  = sum(x * y for x, y in zip(a, b, strict=False))
     na   = math.sqrt(sum(x * x for x in a))
     nb   = math.sqrt(sum(x * x for x in b))
     return dot / (na * nb + 1e-9)
@@ -194,8 +193,8 @@ class EmbeddingRetriever:
 
     _MODEL = 'voyage-3'
 
-    def __init__(self, chunks: list[VectorChunk], api_key: Optional[str] = None, 
-                 cached_embeddings: Optional[Any] = None) -> None:
+    def __init__(self, chunks: list[VectorChunk], api_key: str | None = None,
+                 cached_embeddings: Any | None = None) -> None:
         self._chunks = chunks
         from ..config import settings as _settings
         self._key    = api_key or _settings.api_key or os.environ.get('ANTHROPIC_API_KEY', '')
@@ -205,7 +204,7 @@ class EmbeddingRetriever:
                 'Export it or pass api_key= to EmbeddingRetriever(). '
                 'Alternatively use KeywordRetriever (no API key needed).'
             )
-        
+
         # Use cached embeddings if available
         if cached_embeddings is not None:
             self._embeddings = [list(row) for row in cached_embeddings]
@@ -238,7 +237,8 @@ class EmbeddingRetriever:
         return all_vecs
 
     def _embed(self, texts: list[str]) -> list[list[float]]:
-        import urllib.request, json as _json
+        import json as _json
+        import urllib.request
         payload = _json.dumps({
             'model': self._MODEL,
             'input': texts,
@@ -262,7 +262,7 @@ class EmbeddingRetriever:
 # ─────────────────────────────────────────────
 
 def make_retriever(chunks: list[VectorChunk], use_embeddings: bool = False,
-                   api_key: Optional[str] = None, cached_embeddings: Optional[Any] = None) -> Retriever:
+                   api_key: str | None = None, cached_embeddings: Any | None = None) -> Retriever:
     """
     Return the best available retriever.
 
@@ -277,5 +277,5 @@ def make_retriever(chunks: list[VectorChunk], use_embeddings: bool = False,
             return EmbeddingRetriever(chunks, api_key=api_key, cached_embeddings=cached_embeddings)
         except Exception as e:
             import warnings
-            warnings.warn(f'EmbeddingRetriever failed ({e}), falling back to KeywordRetriever.')
+            warnings.warn(f'EmbeddingRetriever failed ({e}), falling back to KeywordRetriever.', stacklevel=2)
     return KeywordRetriever(chunks)

@@ -132,11 +132,7 @@ def extract_tables_from_sql(file_path: str, dialect: str = "oracle") -> set[str]
             if table_node:
                 tables.add(table_node.sql(dialect=dialect).upper())
 
-        elif isinstance(statement, exp.Alter):
-            if isinstance(statement.this, exp.Table):
-                tables.add(statement.this.sql(dialect=dialect).upper())
-
-        elif isinstance(statement, exp.Drop):
+        elif isinstance(statement, (exp.Alter, exp.Drop)):
             if isinstance(statement.this, exp.Table):
                 tables.add(statement.this.sql(dialect=dialect).upper())
 

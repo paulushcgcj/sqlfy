@@ -1,12 +1,13 @@
 """AI and query commands: ask, chat, query."""
+from __future__ import annotations
 
 import sys
 
-from ..domain.schema_state import SchemaStateBuilder
-from ..reconstructor import reconstruct, reconstruct_at
 from ..analysis.asker import Asker, ChatSession
 from ..analysis.query import QueryEngine
-from ._utils import load_files, write_output, parse_bool
+from ..domain.schema_state import SchemaStateBuilder
+from ..reconstructor import reconstruct, reconstruct_at
+from ._utils import load_files, parse_bool, write_output
 
 _QUERY_TYPES = [
     "tables", "columns", "fk-path", "refs",

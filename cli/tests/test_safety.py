@@ -1,13 +1,14 @@
 """Tests for analysis.safety — migration safety-level scoring (Feature #15)."""
-import json
-import pytest
-from sqlfy.analysis.safety import (
-    score_migration, score_migrations,
-    format_text, format_json,
-    MigrationSafety, StatementRisk,
-    _LEVEL_ORDER,
-)
+from __future__ import annotations
 
+import json
+
+from sqlfy.analysis.safety import (
+    format_json,
+    format_text,
+    score_migration,
+    score_migrations,
+)
 
 # ─────────────────────────────────────────────
 # DROP operations

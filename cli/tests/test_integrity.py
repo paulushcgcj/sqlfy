@@ -1,12 +1,7 @@
 """Tests for migration file integrity checking."""
-
-import json
-from pathlib import Path
-
-import pytest
+from __future__ import annotations
 
 from sqlfy.analysis.integrity import (
-    IntegrityReport,
     MigrationHash,
     check_integrity,
     compute_file_hash,
@@ -21,11 +16,11 @@ def test_compute_file_hash(tmp_path):
     f = tmp_path / "test.sql"
     f.write_text("SELECT * FROM users;\n")
     hash1 = compute_file_hash(f)
-    
+
     # Same content should produce same hash
     hash2 = compute_file_hash(f)
     assert hash1 == hash2
-    
+
     # Different content should produce different hash
     f.write_text("SELECT * FROM orders;\n")
     hash3 = compute_file_hash(f)
@@ -36,20 +31,20 @@ def test_compute_file_hash_normalizes_line_endings(tmp_path):
     """Test that CRLF and LF produce the same hash."""
     f1 = tmp_path / "unix.sql"
     f2 = tmp_path / "windows.sql"
-    
+
     f1.write_bytes(b"SELECT * FROM users;\n")
     f2.write_bytes(b"SELECT * FROM users;\r\n")
-    
+
     hash1 = compute_file_hash(f1)
     hash2 = compute_file_hash(f2)
-    
+
     assert hash1 == hash2
 
 
 def test_save_and_load_manifest(tmp_path):
     """Test manifest serialization and deserialization."""
     manifest_path = tmp_path / ".sqlfy-manifest.json"
-    
+
     manifest = {
         "V1__create_users.sql": MigrationHash(
             filename="V1__create_users.sql",
@@ -65,10 +60,10 @@ def test_save_and_load_manifest(tmp_path):
             last_modified="2026-05-26T10:05:00Z",
         ),
     }
-    
+
     save_manifest(manifest, manifest_path)
     assert manifest_path.exists()
-    
+
     loaded = load_manifest(manifest_path)
     assert len(loaded) == 2
     assert loaded["V1__create_users.sql"].hash == "abc123"
@@ -86,7 +81,7 @@ def test_load_manifest_corrupted_file(tmp_path):
     """Test loading manifest with corrupted JSON."""
     manifest_path = tmp_path / ".sqlfy-manifest.json"
     manifest_path.write_text("not valid json{")
-    
+
     loaded = load_manifest(manifest_path)
     assert loaded == {}
 
@@ -96,13 +91,13 @@ def test_check_integrity_clean(tmp_path):
     # Create migrations
     (tmp_path / "V1__create_users.sql").write_text("CREATE TABLE users (id NUMBER);")
     (tmp_path / "V2__add_orders.sql").write_text("CREATE TABLE orders (id NUMBER);")
-    
+
     # Initialize manifest
     update_manifest(tmp_path)
-    
+
     # Check integrity
     report = check_integrity(tmp_path)
-    
+
     assert report.status == "clean"
     assert report.total_migrations == 2
     assert len(report.modified) == 0
@@ -116,13 +111,13 @@ def test_check_integrity_modified(tmp_path):
     f = tmp_path / "V1__create_users.sql"
     f.write_text("CREATE TABLE users (id NUMBER);")
     update_manifest(tmp_path)
-    
+
     # Modify the file
     f.write_text("CREATE TABLE users (id NUMBER PRIMARY KEY);")
-    
+
     # Check integrity
     report = check_integrity(tmp_path)
-    
+
     assert report.status == "modified"
     assert report.total_migrations == 1
     assert len(report.modified) == 1
@@ -139,13 +134,13 @@ def test_check_integrity_missing(tmp_path):
     f = tmp_path / "V1__create_users.sql"
     f.write_text("CREATE TABLE users (id NUMBER);")
     update_manifest(tmp_path)
-    
+
     # Delete the file
     f.unlink()
-    
+
     # Check integrity
     report = check_integrity(tmp_path)
-    
+
     assert report.status == "missing"
     assert report.total_migrations == 0
     assert len(report.missing) == 1
@@ -158,13 +153,13 @@ def test_check_integrity_new(tmp_path):
     # Create first migration and manifest
     (tmp_path / "V1__create_users.sql").write_text("CREATE TABLE users (id NUMBER);")
     update_manifest(tmp_path)
-    
+
     # Add new migration
     (tmp_path / "V2__add_orders.sql").write_text("CREATE TABLE orders (id NUMBER);")
-    
+
     # Check integrity
     report = check_integrity(tmp_path)
-    
+
     assert report.status == "clean"  # New files don't cause "modified" status
     assert report.total_migrations == 2
     assert len(report.new) == 1
@@ -177,10 +172,10 @@ def test_check_integrity_no_manifest(tmp_path):
     # Create migrations
     (tmp_path / "V1__create_users.sql").write_text("CREATE TABLE users (id NUMBER);")
     (tmp_path / "V2__add_orders.sql").write_text("CREATE TABLE orders (id NUMBER);")
-    
+
     # Check integrity without manifest
     report = check_integrity(tmp_path)
-    
+
     assert report.status == "clean"
     assert report.total_migrations == 2
     assert len(report.new) == 2
@@ -191,10 +186,10 @@ def test_update_manifest_new_files(tmp_path):
     # Create migrations
     (tmp_path / "V1__create_users.sql").write_text("CREATE TABLE users (id NUMBER);")
     (tmp_path / "V2__add_orders.sql").write_text("CREATE TABLE orders (id NUMBER);")
-    
+
     # Update manifest
     update_manifest(tmp_path)
-    
+
     # Load and verify
     manifest = load_manifest(tmp_path / ".sqlfy-manifest.json")
     assert len(manifest) == 2
@@ -210,14 +205,14 @@ def test_update_manifest_modified_file(tmp_path):
     f = tmp_path / "V1__create_users.sql"
     f.write_text("CREATE TABLE users (id NUMBER);")
     update_manifest(tmp_path)
-    
+
     manifest1 = load_manifest(tmp_path / ".sqlfy-manifest.json")
     old_hash = manifest1["V1__create_users.sql"].hash
-    
+
     # Modify file
     f.write_text("CREATE TABLE users (id NUMBER PRIMARY KEY);")
     update_manifest(tmp_path)
-    
+
     # Verify hash changed and last_modified set
     manifest2 = load_manifest(tmp_path / ".sqlfy-manifest.json")
     assert manifest2["V1__create_users.sql"].hash != old_hash
@@ -230,11 +225,11 @@ def test_update_manifest_removed_file(tmp_path):
     (tmp_path / "V1__create_users.sql").write_text("CREATE TABLE users (id NUMBER);")
     (tmp_path / "V2__add_orders.sql").write_text("CREATE TABLE orders (id NUMBER);")
     update_manifest(tmp_path)
-    
+
     # Remove one migration
     (tmp_path / "V2__add_orders.sql").unlink()
     update_manifest(tmp_path)
-    
+
     # Verify removed from manifest
     manifest = load_manifest(tmp_path / ".sqlfy-manifest.json")
     assert len(manifest) == 1
@@ -245,7 +240,7 @@ def test_update_manifest_removed_file(tmp_path):
 def test_manifest_atomic_write(tmp_path):
     """Test that manifest writes are atomic (temp file + replace)."""
     manifest_path = tmp_path / ".sqlfy-manifest.json"
-    
+
     manifest = {
         "V1__create_users.sql": MigrationHash(
             filename="V1__create_users.sql",
@@ -254,9 +249,9 @@ def test_manifest_atomic_write(tmp_path):
             first_seen="2026-05-26T10:00:00Z",
         )
     }
-    
+
     save_manifest(manifest, manifest_path)
-    
+
     # Verify no .tmp files left behind
     assert manifest_path.exists()
     tmp_files = list(tmp_path.glob("*.tmp"))
@@ -271,9 +266,9 @@ def test_version_extraction_from_filename(tmp_path):
     (tmp_path / "V002__add_orders.sql").write_text("CREATE TABLE orders (id NUMBER);")
     # No description
     (tmp_path / "V3.sql").write_text("CREATE TABLE products (id NUMBER);")
-    
+
     report = check_integrity(tmp_path)
-    
+
     versions = {item["version"] for item in report.new}
     assert "1" in versions
     assert "002" in versions
@@ -286,9 +281,9 @@ def test_ignores_non_versioned_files(tmp_path):
     (tmp_path / "README.md").write_text("# Migrations")
     (tmp_path / "seed_data.sql").write_text("INSERT INTO users VALUES (1);")
     (tmp_path / "U1__undo.sql").write_text("DROP TABLE users;")
-    
+
     report = check_integrity(tmp_path)
-    
+
     assert report.total_migrations == 1
     assert len(report.new) == 1
     assert report.new[0]["filename"] == "V1__create_users.sql"

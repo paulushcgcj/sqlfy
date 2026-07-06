@@ -1,6 +1,7 @@
 """Developer tooling commands: lint, validate, deps, lineage, cache."""
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -511,15 +512,11 @@ def cmd_cache(
         total_size = 0
         if cache_dir.exists():
             for f in cache_dir.glob("*.json"):
-                try:
+                with contextlib.suppress(OSError):
                     total_size += f.stat().st_size
-                except OSError:
-                    pass
         if stat_index.exists():
-            try:
+            with contextlib.suppress(OSError):
                 total_size += stat_index.stat().st_size
-            except OSError:
-                pass
 
         print(f"Cache location: {_CACHE_ROOT}")
         print(f"Cached entries: {cache_count}")

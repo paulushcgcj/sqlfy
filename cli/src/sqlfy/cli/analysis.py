@@ -6,7 +6,6 @@ Typer app for analysis commands: insights, health, integrity, domains.
 
 from __future__ import annotations
 
-from typing import Optional
 import typer
 
 app = typer.Typer(help="Schema analysis and quality commands.", no_args_is_help=True)
@@ -16,11 +15,11 @@ _DIALECT_HELP = "SQL dialect: oracle, postgres, mysql, sqlite"
 
 @app.command("insights")
 def cmd_insights(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     detect_domains: bool = typer.Option(False, "--detect-domains",
         help="Run domain detection on the fly for god-table & surprising-join analysis"),
     resolution: float = typer.Option(1.0, "--resolution"),
@@ -33,11 +32,11 @@ def cmd_insights(
 
 @app.command("health")
 def cmd_health(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
 ) -> None:
     """Schema health score and issue breakdown."""
     from ..commands.analysis import cmd_health as _cmd
@@ -47,11 +46,11 @@ def cmd_health(
 
 @app.command("integrity")
 def cmd_integrity(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
 ) -> None:
     """Check referential integrity across the schema."""
     from ..commands.evolution import cmd_integrity as _cmd
@@ -60,11 +59,11 @@ def cmd_integrity(
 
 @app.command("domains")
 def cmd_domains(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
 ) -> None:
     """Detect bounded domains/modules via community detection."""
     from ..commands.analysis import cmd_domains as _cmd

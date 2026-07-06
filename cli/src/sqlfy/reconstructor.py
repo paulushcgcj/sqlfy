@@ -19,32 +19,37 @@ Key capabilities vs. the simple apply_migrations() function:
 
 from __future__ import annotations
 
-import re
 import logging
+import re
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Optional
 
 import sqlglot
 import sqlglot.expressions as exp
 
 from .domain.models import (
-    Column, Constraint, Index, Table, Sequence,
-    Edge, MigrationHistory, MigrationAction, SchemaGraph, VectorChunk,
+    Column,
+    Constraint,
+    Edge,
+    Index,
+    MigrationAction,
+    MigrationHistory,
+    SchemaGraph,
+    Sequence,
+    Table,
 )
-from .domain.utils import type_str
+from .domain.sqlglot_compat import (
+    SQLGLOT_HAS_MODIFY,
+    log_sqlglot_capabilities,
+    parse_modify_native,
+)
+from .migrations.parser import parse_flyway_ver
 from .parsing.ast_helpers import (
-    _table_full, _table_schema_name, _col_datatype, _on_delete_from_options,
+    _table_full,
+    _table_schema_name,
 )
 from .parsing.column_parser import _parse_column_def
 from .parsing.constraint_parser import _parse_table_constraint
-from .migrations.parser import parse_flyway_ver
-from .domain.sqlglot_compat import (
-    SQLGLOT_HAS_MODIFY,
-    SQLGLOT_HAS_RENAME_COLUMN,
-    parse_modify_native,
-    log_sqlglot_capabilities,
-)
 from .parsing.extractors import get_extractor
 from .semantic.operations import AnyOperation, OperationProvenance
 
@@ -96,7 +101,7 @@ class Reconstructor:
         self.actions:  list[MigrationAction]  = []
         self._applied: set[str] = set()   # versions already applied
         self.semantic_ops: list[AnyOperation] = []  # semantic operations (Phase 9)
-        
+
         # Log sqlglot capabilities on first instantiation
         if not hasattr(Reconstructor, '_logged_capabilities'):
             log_sqlglot_capabilities()
@@ -368,7 +373,7 @@ class Reconstructor:
                 act = MigrationAction(action='ADD_COLUMN', object_type='COLUMN',
                                       object_name=f'{full}.{col.name}', version=version)
                 acts.append(act); table.actions.append(act)
-            
+
             elif isinstance(action_node, exp.Schema):
                 # Schema-wrapped ColumnDef(s)
                 for node in action_node.expressions:
@@ -439,7 +444,7 @@ class Reconstructor:
                     if table: table.actions.append(act)
 
             # RENAME TABLE (fallback for dialects that parse it this way)
-            elif hasattr(exp, 'RenameTable') and isinstance(action_node, getattr(exp, 'RenameTable')):
+            elif hasattr(exp, 'RenameTable') and isinstance(action_node, exp.RenameTable):
                 new_node = action_node.this
                 if isinstance(new_node, exp.Table) and table:
                     new_schema, new_name = _table_schema_name(new_node)
@@ -609,7 +614,7 @@ class Reconstructor:
     def _alter_modify_native(self, raw_sql: str, version: str) -> list[MigrationAction]:
         """
         Parse ALTER TABLE MODIFY using native sqlglot AST (when supported).
-        
+
         This is faster and more robust than regex parsing, but only works
         with sqlglot versions that fully support Oracle MODIFY syntax.
         As of sqlglot 30.8.0, MODIFY is still parsed as Command, so this
@@ -620,22 +625,22 @@ class Reconstructor:
         except (ValueError, AttributeError) as e:
             log.warning(f"Native MODIFY parse failed: {e} — falling back to regex")
             return self._alter_modify_regex(raw_sql, version)
-        
+
         table = self.tables.get(table_name)
         if not table:
             log.warning(f"Table {table_name} not found for MODIFY statement")
             return []
-        
+
         acts: list[MigrationAction] = []
-        
+
         for mod_info in modifications:
             col_name = mod_info.column_name
-            
+
             # Find the column in the table
             for col in table.columns:
                 if col.name != col_name:
                     continue
-                
+
                 # Update column properties
                 if mod_info.data_type is not None:
                     col.type = mod_info.data_type
@@ -648,11 +653,11 @@ class Reconstructor:
                 if mod_info.default is not None:
                     col.default = mod_info.default
                 break
-            
+
             # Track modification
             if version not in table.modified_in:
                 table.modified_in.append(version)
-            
+
             act = MigrationAction(
                 action='MODIFY_COLUMN',
                 object_type='COLUMN',
@@ -661,7 +666,7 @@ class Reconstructor:
             )
             acts.append(act)
             table.actions.append(act)
-        
+
         return acts
 
     # ── Regex fallback MODIFY parser ────────────────────────────────────────

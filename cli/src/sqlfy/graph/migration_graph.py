@@ -17,18 +17,18 @@ Dependency detection:
 
 from __future__ import annotations
 
-import re
+import contextlib
 import json
-from pathlib import Path
-from typing import Optional, NamedTuple
+
+# Suppress sqlglot warnings
+import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
 import sqlglot
 import sqlglot.expressions as exp
 
-# Suppress sqlglot warnings
-import logging
 logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
 
 
@@ -42,7 +42,7 @@ class MigrationNode:
     version: str
     description: str
     filename: str
-    timestamp: Optional[datetime]
+    timestamp: datetime | None
     creates: list[str]  # Tables/views created by this migration
     alters: list[str]   # Tables altered by this migration
     references: list[str]  # Tables referenced (views, foreign keys)
@@ -61,10 +61,10 @@ class MigrationGraph:
 # MIGRATION PARSING
 # ─────────────────────────────────────────────
 
-def _extract_reference_table(ref) -> Optional[str]:
+def _extract_reference_table(ref) -> str | None:
     """
     Extract table name from a Reference node.
-    
+
     The structure can be:
       - Reference -> Schema -> Table -> Identifier
       - Reference -> Table -> Identifier
@@ -72,7 +72,7 @@ def _extract_reference_table(ref) -> Optional[str]:
     """
     if not ref:
         return None
-    
+
     # Try various levels of nesting
     current = ref
     for _ in range(5):  # Max depth to avoid infinite loops
@@ -84,19 +84,19 @@ def _extract_reference_table(ref) -> Optional[str]:
             current = current.this
         else:
             break
-    
+
     return None
 
 
-def parse_migration_filename(filename: str) -> tuple[str, str, Optional[datetime]]:
+def parse_migration_filename(filename: str) -> tuple[str, str, datetime | None]:
     """
     Parse Flyway-style migration filename.
-    
+
     Examples:
         V1__create_users.sql → ("V1", "create users", None)
         V2.1__add_email.sql → ("V2.1", "add email", None)
         V20260101120000__add_index.sql → ("V20260101120000", "add index", datetime(...))
-    
+
     Returns:
         (version, description, timestamp)
     """
@@ -104,25 +104,23 @@ def parse_migration_filename(filename: str) -> tuple[str, str, Optional[datetime
     match = re.match(r'^V([0-9._]+)__(.+)\.sql$', filename, re.IGNORECASE)
     if not match:
         return filename, filename, None
-    
+
     version = match.group(1)
     description = match.group(2).replace('_', ' ')
-    
+
     # Try to parse timestamp from version (format: yyyymmddhhmmss)
     timestamp = None
     if version.isdigit() and len(version) == 14:
-        try:
+        with contextlib.suppress(ValueError):
             timestamp = datetime.strptime(version, '%Y%m%d%H%M%S')
-        except ValueError:
-            pass
-    
+
     return f"V{version}", description, timestamp
 
 
 def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]:
     """
     Extract tables created, altered, and referenced from SQL.
-    
+
     Returns:
         (creates, alters, references)
         - creates: Tables/views created
@@ -132,29 +130,29 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
     creates = []
     alters = []
     references = []
-    
+
     try:
         statements = sqlglot.parse(sql, dialect='oracle')
-        
+
         for stmt in statements:
             if isinstance(stmt, exp.Create):
                 # CREATE TABLE or CREATE VIEW
                 # stmt.this is usually a Schema node for CREATE TABLE
                 table = stmt.this
                 table_name = None
-                
+
                 if hasattr(table, 'this') and hasattr(table.this, 'name'):
                     # Schema node: table.this.name contains the table name
                     table_name = table.this.name
                 elif hasattr(table, 'name'):
                     # Direct Table node
                     table_name = table.name
-                
+
                 if table_name:
                     table_name = table_name if isinstance(table_name, str) else str(table_name)
                     if table_name:
                         creates.append(table_name.upper())
-                
+
                 # Walk AST to find foreign keys (in CREATE TABLE)
                 for node in stmt.walk():
                     if isinstance(node, exp.ForeignKey):
@@ -163,7 +161,7 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
                             ref_table_name = _extract_reference_table(ref)
                             if ref_table_name:
                                 references.append(ref_table_name.upper())
-                
+
                 # For views, extract referenced tables
                 if stmt.kind == 'VIEW':
                     for node in stmt.walk():
@@ -172,24 +170,24 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
                                 ref_name = node.name if isinstance(node.name, str) else str(node.name)
                                 if ref_name:
                                     references.append(ref_name.upper())
-            
+
             elif isinstance(stmt, exp.Alter):
                 # ALTER TABLE
                 table = stmt.this
                 table_name = None
-                
+
                 if table is None:
                     pass
                 elif hasattr(table, 'this') and hasattr(table.this, 'name'):
                     table_name = table.this.name
                 elif hasattr(table, 'name'):
                     table_name = table.name
-                
+
                 if table_name:
                     table_name = table_name if isinstance(table_name, str) else str(table_name)
                     if table_name:
                         alters.append(table_name.upper())
-                
+
                 # Check for foreign keys in ALTER (walk full AST — ForeignKey may
                 # be nested inside AddConstraint or other wrapper nodes)
                 for node in stmt.walk():
@@ -199,28 +197,28 @@ def extract_table_operations(sql: str) -> tuple[list[str], list[str], list[str]]
                             ref_table_name = _extract_reference_table(ref)
                             if ref_table_name:
                                 references.append(ref_table_name.upper())
-            
+
             elif isinstance(stmt, exp.Drop):
                 # DROP TABLE (treated as alter for dependency purposes)
                 table = stmt.this
                 table_name = None
-                
+
                 if hasattr(table, 'this') and hasattr(table.this, 'name'):
                     table_name = table.this.name
                 elif hasattr(table, 'name'):
                     table_name = table.name
-                
+
                 if table_name:
                     table_name = table_name if isinstance(table_name, str) else str(table_name)
                     if table_name:
                         alters.append(table_name.upper())
-    
+
     except Exception:
         # Fallback to regex parsing if sqlglot fails
         creates.extend(_extract_creates_regex(sql))
         alters.extend(_extract_alters_regex(sql))
         references.extend(_extract_references_regex(sql))
-    
+
     return (
         list(dict.fromkeys([c for c in creates if c])),  # Remove duplicates and empty strings
         list(dict.fromkeys([a for a in alters if a])),
@@ -262,24 +260,24 @@ def _extract_references_regex(sql: str) -> list[str]:
 def build_migration_graph(files: list[dict]) -> MigrationGraph:
     """
     Build dependency graph from migration files.
-    
+
     Args:
         files: List of {filename, sql} dicts
-    
+
     Returns:
         MigrationGraph with nodes and edges
     """
     nodes = {}
     table_creators = {}  # table_name → version
-    
+
     # First pass: parse all migrations
     for file_data in files:
         filename = file_data['filename']
         sql = file_data['sql']
-        
+
         version, description, timestamp = parse_migration_filename(filename)
         creates, alters, references = extract_table_operations(sql)
-        
+
         node = MigrationNode(
             version=version,
             description=description,
@@ -292,36 +290,36 @@ def build_migration_graph(files: list[dict]) -> MigrationGraph:
             sql=sql
         )
         nodes[version] = node
-        
+
         # Track which migration created each table
         for table in creates:
             table_creators[table] = version
-    
+
     # Second pass: resolve dependencies
     edges = []
     for version, node in nodes.items():
         deps = set()
-        
+
         # Depend on migrations that created tables we alter
         for table in node.alters:
             if table in table_creators:
                 creator_version = table_creators[table]
                 if creator_version != version:
                     deps.add(creator_version)
-        
+
         # Depend on migrations that created tables we reference
         for table in node.references:
             if table in table_creators:
                 creator_version = table_creators[table]
                 if creator_version != version:
                     deps.add(creator_version)
-        
+
         node.dependencies = sorted(deps)
-        
+
         # Add edges
         for dep_version in node.dependencies:
             edges.append((dep_version, version))
-    
+
     return MigrationGraph(nodes=nodes, edges=edges)
 
 
@@ -335,47 +333,47 @@ def format_dot(graph: MigrationGraph) -> str:
     lines.append('  rankdir=LR;')
     lines.append('  node [shape=box, style=rounded];')
     lines.append('')
-    
+
     # Nodes
     for version, node in sorted(graph.nodes.items()):
         label = f"{version}\\n{node.description}"
         if node.timestamp:
             label += f"\\n{node.timestamp.strftime('%Y-%m-%d')}"
-        
+
         # Color based on operations
         color = 'lightblue'
         if node.creates:
             color = 'lightgreen'
         elif node.alters:
             color = 'lightyellow'
-        
+
         lines.append(f'  "{version}" [label="{label}", fillcolor={color}, style="filled,rounded"];')
-    
+
     lines.append('')
-    
+
     # Edges
     for from_ver, to_ver in graph.edges:
         lines.append(f'  "{from_ver}" -> "{to_ver}";')
-    
+
     lines.append('}')
     return '\n'.join(lines)
 
 
 def format_html(graph: MigrationGraph) -> str:
     """Generate interactive HTML visualization using vis.js."""
-    
+
     # Build nodes and edges for vis.js
     vis_nodes = []
     for version, node in graph.nodes.items():
         label = f"{version}\n{node.description}"
-        
+
         # Color based on operations
         color = '#9fc5e8'  # light blue
         if node.creates:
             color = '#b6d7a8'  # light green
         elif node.alters:
             color = '#ffe599'  # light yellow
-        
+
         vis_nodes.append({
             'id': version,
             'label': label,
@@ -387,7 +385,7 @@ def format_html(graph: MigrationGraph) -> str:
                      f"References: {', '.join(node.references) or 'none'}<br>"
                      f"Dependencies: {', '.join(node.dependencies) or 'none'}"
         })
-    
+
     vis_edges = []
     for from_ver, to_ver in graph.edges:
         vis_edges.append({
@@ -396,7 +394,7 @@ def format_html(graph: MigrationGraph) -> str:
             'arrows': 'to',
             'color': {'color': '#848484'}
         })
-    
+
     html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -439,7 +437,7 @@ def format_html(graph: MigrationGraph) -> str:
   <script type="text/javascript">
     var nodes = new vis.DataSet({json.dumps(vis_nodes)});
     var edges = new vis.DataSet({json.dumps(vis_edges)});
-    
+
     var container = document.getElementById('mynetwork');
     var data = {{
       nodes: nodes,
@@ -468,7 +466,7 @@ def format_html(graph: MigrationGraph) -> str:
         }}
       }}
     }};
-    
+
     var network = new vis.Network(container, data, options);
   </script>
 </body>
@@ -479,39 +477,39 @@ def format_html(graph: MigrationGraph) -> str:
 def format_timeline(graph: MigrationGraph) -> str:
     """Generate text-based timeline view."""
     lines = ['Migration Timeline', '=' * 80, '']
-    
+
     # Sort by version (assumes Flyway ordering)
     sorted_nodes = sorted(graph.nodes.items(), key=lambda x: x[0])
-    
+
     for i, (version, node) in enumerate(sorted_nodes):
         # Vertical connector
         if i > 0:
             lines.append('  │')
-        
+
         # Node
         lines.append(f'  ├─ {version}: {node.description}')
-        
+
         if node.timestamp:
             lines.append(f'  │  Date: {node.timestamp.strftime("%Y-%m-%d %H:%M")}')
-        
+
         if node.creates:
             lines.append(f'  │  Creates: {", ".join(node.creates)}')
-        
+
         if node.alters:
             lines.append(f'  │  Alters: {", ".join(node.alters)}')
-        
+
         if node.references:
             lines.append(f'  │  References: {", ".join(node.references)}')
-        
+
         if node.dependencies:
             lines.append(f'  │  Depends on: {", ".join(node.dependencies)}')
-        
+
         lines.append('  │')
-    
+
     lines.append('  └─ (end)')
     lines.append('')
     lines.append(f'Total: {len(graph.nodes)} migrations, {len(graph.edges)} dependencies')
-    
+
     return '\n'.join(lines)
 
 

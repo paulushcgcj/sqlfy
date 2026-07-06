@@ -3,14 +3,14 @@ test_stability.py
 =================
 Tests for schema stability metrics (Feature #29).
 """
+from __future__ import annotations
 
-import pytest
 from sqlfy.analysis.stability import (
-    calculate_stability,
-    format_text,
-    format_json,
     _calculate_volatility,
     _get_stability_grade,
+    calculate_stability,
+    format_json,
+    format_text,
 )
 from sqlfy.domain.schema_state import SchemaStateBuilder
 from sqlfy.reconstructor import reconstruct
@@ -21,9 +21,9 @@ def test_calculate_stability_empty_state():
     files = []
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     report = calculate_stability(state)
-    
+
     assert report.total_migrations == 0
     assert report.overall_stability_score == 100
     assert report.num_high_churn_tables == 0
@@ -37,12 +37,12 @@ def test_calculate_stability_single_migration():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     assert report.total_migrations == 1
     assert len(report.all_table_metrics) == 1
-    
+
     # Single creation should be stable
     metrics = report.all_table_metrics[0]
     assert metrics.table_name == 'APP.USERS'
@@ -59,16 +59,16 @@ def test_calculate_stability_multiple_migrations():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     assert report.total_migrations == 3
     assert len(report.all_table_metrics) == 2
-    
+
     # USERS should have higher churn (2 modifications)
     users_metrics = next(m for m in report.all_table_metrics if m.table_name == 'APP.USERS')
     orders_metrics = next(m for m in report.all_table_metrics if m.table_name == 'APP.ORDERS')
-    
+
     assert users_metrics.modification_count == 2  # Created + Modified
     assert orders_metrics.modification_count == 1  # Created only
     assert users_metrics.churn_rate > orders_metrics.churn_rate
@@ -83,12 +83,12 @@ def test_calculate_stability_high_churn_detection():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     # Default threshold is 20% for high churn
     report = calculate_stability(state)
-    
+
     assert report.num_high_churn_tables >= 1
-    
+
     # USERS should be in high churn (3 modifications / 3 migrations = 100%)
     assert any(m.table_name == 'APP.USERS' for m in report.high_churn_tables)
 
@@ -110,13 +110,13 @@ def test_calculate_stability_stable_tables():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     # Default threshold is 10% for stable
     report = calculate_stability(state)
-    
+
     # Most tables should be stable (only 1 modification each)
     assert report.num_stable_tables >= 9
-    
+
     # USERS should not be stable (2 modifications / 11 = 18.18%)
     assert not any(m.table_name == 'APP.USERS' for m in report.stable_tables)
 
@@ -130,10 +130,10 @@ def test_calculate_stability_custom_thresholds():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     # Very high threshold for high churn
     report = calculate_stability(state, high_churn_threshold=80.0, stable_threshold=30.0)
-    
+
     # USERS has 66.67% churn, should not be in high_churn with 80% threshold
     assert report.num_high_churn_tables == 0
 
@@ -146,9 +146,9 @@ def test_calculate_stability_churn_rate_calculation():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     # Each table: 1 modification / 2 migrations = 50%
     for metrics in report.all_table_metrics:
         assert metrics.churn_rate == 50.0
@@ -161,11 +161,11 @@ def test_calculate_stability_score_calculation():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     metrics = report.all_table_metrics[0]
-    
+
     # Churn rate = 100%, Stability score = max(0, 100 - 100*2) = 0
     assert metrics.stability_score == 0
 
@@ -181,9 +181,9 @@ def test_calculate_stability_sorting():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     # Verify sorting
     for i in range(len(report.all_table_metrics) - 1):
         assert report.all_table_metrics[i].churn_rate >= report.all_table_metrics[i + 1].churn_rate
@@ -251,10 +251,10 @@ def test_format_text():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
     text = format_text(report)
-    
+
     assert 'SCHEMA STABILITY METRICS' in text
     assert 'Total migrations:' in text
     assert 'Stability score:' in text
@@ -269,10 +269,10 @@ def test_format_text_with_high_churn():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
     text = format_text(report)
-    
+
     assert 'High Churn Tables' in text
     assert 'APP.USERS' in text
 
@@ -294,10 +294,10 @@ def test_format_text_with_stable_tables():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
     text = format_text(report)
-    
+
     assert 'Stable Tables' in text
 
 
@@ -309,10 +309,10 @@ def test_format_text_show_all():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
     text = format_text(report, show_all=True)
-    
+
     assert 'All Tables (sorted by churn rate):' in text
     assert 'APP.USERS' in text
     assert 'APP.ORDERS' in text
@@ -321,19 +321,19 @@ def test_format_text_show_all():
 def test_format_json():
     """Test JSON formatting of stability report."""
     import json
-    
+
     files = [
         {'filename': 'V1__create_users.sql', 'sql': 'CREATE TABLE APP.USERS (ID NUMBER PRIMARY KEY)'},
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
     json_str = format_json(report)
-    
+
     # Should be valid JSON
     data = json.loads(json_str)
-    
+
     assert 'total_migrations' in data
     assert 'overall_stability_score' in data
     assert 'grade' in data
@@ -344,23 +344,23 @@ def test_format_json():
 def test_format_json_structure():
     """Test JSON structure includes all expected fields."""
     import json
-    
+
     files = [
         {'filename': 'V1__create_users.sql', 'sql': 'CREATE TABLE APP.USERS (ID NUMBER PRIMARY KEY)'},
         {'filename': 'V2__modify_users.sql', 'sql': 'ALTER TABLE APP.USERS ADD COLUMN EMAIL VARCHAR2(255)'},
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
     json_str = format_json(report)
-    
+
     data = json.loads(json_str)
-    
+
     assert 'high_churn_tables' in data
     assert 'stable_tables' in data
     assert isinstance(data['all_tables'], list)
-    
+
     # Verify table entry structure
     if data['all_tables']:
         table = data['all_tables'][0]
@@ -381,12 +381,12 @@ def test_overall_stability_score():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     # Overall score should be between 0 and 100
     assert 0 <= report.overall_stability_score <= 100
-    
+
     # Overall score should be average of individual scores
     avg_score = sum(m.stability_score for m in report.all_table_metrics) / len(report.all_table_metrics)
     assert report.overall_stability_score == int(avg_score)
@@ -401,11 +401,11 @@ def test_modified_in_tracking():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
-    
+
     report = calculate_stability(state)
-    
+
     users_metrics = next(m for m in report.all_table_metrics if m.table_name == 'APP.USERS')
-    
+
     # Should track modified versions
     assert users_metrics.created_in == '1'
     assert len(users_metrics.modified_in) >= 1

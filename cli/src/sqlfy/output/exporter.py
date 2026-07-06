@@ -29,10 +29,11 @@ Usage
 
 from __future__ import annotations
 
-import json
 import html as html_mod
+import json
+
+from ..analysis.insights import InsightsReport
 from ..domain.schema_state import SchemaState, TableState
-from ..analysis.insights import InsightsReport, Finding
 from .grapher import Grapher
 
 

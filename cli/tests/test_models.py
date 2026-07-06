@@ -3,12 +3,23 @@ test_models.py
 ==============
 Tests for data models in sqlfy.models module.
 """
+from __future__ import annotations
 
 from sqlfy.domain.models import (
-    Column, Constraint, Index, MigrationAction,
-    Table, Sequence, Edge, MigrationHistory,
-    SchemaGraph, VectorChunk, GraphNode, GraphEdge,
-    EdgeRelation, Confidence,
+    Column,
+    Confidence,
+    Constraint,
+    Edge,
+    EdgeRelation,
+    GraphEdge,
+    GraphNode,
+    Index,
+    MigrationAction,
+    MigrationHistory,
+    SchemaGraph,
+    Sequence,
+    Table,
+    VectorChunk,
 )
 
 

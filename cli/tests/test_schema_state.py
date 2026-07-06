@@ -10,11 +10,11 @@ import pytest
 
 from sqlfy.core import apply_migrations
 from sqlfy.domain.schema_state import (
-    SchemaStateBuilder,
-    SchemaState,
-    TableState,
     ColumnState,
     RelationshipState,
+    SchemaState,
+    SchemaStateBuilder,
+    TableState,
 )
 
 SAMPLES_DIR = Path(__file__).parent.parent.parent / 'samples'

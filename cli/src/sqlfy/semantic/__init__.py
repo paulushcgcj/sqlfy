@@ -7,25 +7,26 @@ Modules:
   - operations   Pydantic models for all DDL operation types
   - normalizer   AST → operation converter (Normalizer class)
 """
+from __future__ import annotations
 
+from .normalizer import Normalizer
 from .operations import (
-    AnyOperation,
-    OperationProvenance,
-    CreateTableOperation,
-    DropTableOperation,
     AddColumnOperation,
-    DropColumnOperation,
-    ModifyColumnOperation,
-    RenameColumnOperation,
     AddConstraintOperation,
-    DropConstraintOperation,
-    CreateIndexOperation,
-    DropIndexOperation,
-    CreateSequenceOperation,
+    AnyOperation,
     CommentOperation,
+    CreateIndexOperation,
+    CreateSequenceOperation,
+    CreateTableOperation,
+    DropColumnOperation,
+    DropConstraintOperation,
+    DropIndexOperation,
+    DropTableOperation,
+    ModifyColumnOperation,
+    OperationProvenance,
+    RenameColumnOperation,
     UnknownOperation,
 )
-from .normalizer import Normalizer
 
 __all__ = [
     "AnyOperation",

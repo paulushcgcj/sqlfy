@@ -1,22 +1,22 @@
 """
 Tests for SQL linting functionality (Feature #38).
 """
+from __future__ import annotations
 
 import pytest
 
 from sqlfy.analysis.linter import (
-    lint_migration,
-    lint_directory,
-    calculate_score,
-    LintViolation,
-    LintResult,
-    format_text,
-    format_json,
-    format_directory_text,
-    format_directory_json,
     SQLFLUFF_AVAILABLE,
+    LintResult,
+    LintViolation,
+    calculate_score,
+    format_directory_json,
+    format_directory_text,
+    format_json,
+    format_text,
+    lint_directory,
+    lint_migration,
 )
-
 
 # Skip all tests if sqlfluff is not installed
 pytestmark = pytest.mark.skipif(
@@ -84,7 +84,7 @@ def test_lint_valid_sql():
     """Linting valid SQL produces high score."""
     sql = "SELECT id, name FROM users WHERE email = 'test@example.com';"
     result = lint_migration(sql, "test.sql", dialect='oracle')
-    
+
     assert result.filename == "test.sql"
     assert result.dialect == 'oracle'
     assert result.score >= 0  # May have some warnings depending on sqlfluff config
@@ -95,7 +95,7 @@ def test_lint_lowercase_keywords():
     """Linting SQL with lowercase keywords detects violations."""
     sql = "select id from users;"
     result = lint_migration(sql, "test.sql", dialect='oracle')
-    
+
     assert result.filename == "test.sql"
     # May or may not have violations depending on sqlfluff config
     # At minimum, should not error
@@ -106,7 +106,7 @@ def test_lint_select_star():
     """Linting SELECT * may produce warnings."""
     sql = "CREATE VIEW v AS SELECT * FROM users;"
     result = lint_migration(sql, "test.sql", dialect='oracle')
-    
+
     assert result.filename == "test.sql"
     assert result.error is None
     # SELECT * warnings depend on sqlfluff config
@@ -116,7 +116,7 @@ def test_lint_result_has_metadata():
     """Lint result includes dialect and rules_applied."""
     sql = "SELECT id FROM users;"
     result = lint_migration(sql, "test.sql", dialect='postgres')
-    
+
     assert result.dialect == 'postgres'
     assert result.rules_applied > 0  # Should have some rules
 
@@ -130,7 +130,7 @@ def test_format_text_no_violations():
         dialect='oracle',
         rules_applied=50,
     )
-    
+
     output = format_text(result)
     assert "test.sql" in output
     assert "100/100" in output
@@ -150,7 +150,7 @@ def test_format_text_with_violations():
         dialect='oracle',
         rules_applied=50,
     )
-    
+
     output = format_text(result)
     assert "test.sql" in output
     assert "90/100" in output
@@ -168,7 +168,7 @@ def test_format_text_with_error():
         dialect='oracle',
         error="Parse error",
     )
-    
+
     output = format_text(result)
     assert "test.sql" in output
     assert "Error" in output
@@ -178,7 +178,7 @@ def test_format_text_with_error():
 def test_format_json_valid():
     """JSON formatter produces valid JSON."""
     import json
-    
+
     violations = [
         LintViolation('L010', 'Warning message', 1, 1, 'warning', True),
     ]
@@ -189,10 +189,10 @@ def test_format_json_valid():
         dialect='oracle',
         rules_applied=50,
     )
-    
+
     output = format_json(result)
     data = json.loads(output)  # Should not raise
-    
+
     assert data['filename'] == "test.sql"
     assert data['score'] == 95
     assert len(data['violations']) == 1
@@ -209,7 +209,7 @@ def test_format_directory_text_summary():
             LintViolation('L010', 'warning', 2, 1, 'warning', True),
         ], 'oracle', 50),
     ]
-    
+
     output = format_directory_text(results)
     assert "Total files: 3" in output
     assert "v1.sql" in output
@@ -220,15 +220,15 @@ def test_format_directory_text_summary():
 def test_format_directory_json_valid():
     """Directory JSON formatter produces valid JSON array."""
     import json
-    
+
     results = [
         LintResult("v1.sql", 100, [], 'oracle', 50),
         LintResult("v2.sql", 85, [LintViolation('L010', 'msg', 1, 1, 'warning', True)], 'oracle', 50),
     ]
-    
+
     output = format_directory_json(results)
     data = json.loads(output)  # Should not raise
-    
+
     assert isinstance(data, list)
     assert len(data) == 2
     assert data[0]['filename'] == "v1.sql"
@@ -242,7 +242,7 @@ def test_lint_directory_non_recursive(tmp_path):
     subdir = tmp_path / "subdir"
     subdir.mkdir()
     (subdir / "v2.sql").write_text("SELECT id FROM orders;")
-    
+
     # Non-recursive: should only find v1.sql
     results = lint_directory(str(tmp_path), recursive=False, dialect='oracle')
     assert len(results) == 1
@@ -256,7 +256,7 @@ def test_lint_directory_recursive(tmp_path):
     subdir = tmp_path / "subdir"
     subdir.mkdir()
     (subdir / "v2.sql").write_text("SELECT id FROM orders;")
-    
+
     # Recursive: should find both files
     results = lint_directory(str(tmp_path), recursive=True, dialect='oracle')
     assert len(results) == 2
@@ -277,7 +277,7 @@ def test_lint_migration_error_handling():
     # Extremely malformed SQL that might cause parse errors
     sql = "SELECT FROM WHERE"
     result = lint_migration(sql, "bad.sql", dialect='oracle')
-    
+
     # Should return result even if parsing fails
     assert result.filename == "bad.sql"
     # May have error or violations depending on sqlfluff behavior
@@ -286,7 +286,7 @@ def test_lint_migration_error_handling():
 def test_lint_different_dialects():
     """Linting works with different SQL dialects."""
     sql = "SELECT id FROM users;"
-    
+
     for dialect in ['oracle', 'postgres', 'mysql', 'sqlite']:
         result = lint_migration(sql, "test.sql", dialect=dialect)
         assert result.dialect == dialect
@@ -303,7 +303,7 @@ def test_violations_have_required_fields():
         severity='warning',
         fixable=True,
     )
-    
+
     assert violation.rule_code == 'L010'
     assert violation.message == 'Test message'
     assert violation.line == 5
@@ -318,7 +318,7 @@ def test_lint_result_default_values():
         filename="test.sql",
         score=100,
     )
-    
+
     assert result.violations == []
     assert result.dialect == 'oracle'
     assert result.rules_applied == 0

@@ -9,8 +9,7 @@ All dataclasses used throughout the sqlfy package.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Literal
-
+from typing import Literal
 
 # ─────────────────────────────────────────────
 # SCHEMA DATA TYPES
@@ -20,22 +19,22 @@ from typing import Optional, Literal
 class Column:
     name: str
     type: str
-    precision: Optional[int]
-    scale: Optional[int]
+    precision: int | None
+    scale: int | None
     nullable: bool
-    default: Optional[str]
+    default: str | None
     primary_key: bool
     unique: bool
-    references: Optional[dict]   # { table, column }
+    references: dict | None   # { table, column }
 
 
 @dataclass
 class Constraint:
-    name: Optional[str]
+    name: str | None
     type: str                    # primary_key | unique | foreign_key | check
     columns: list[str]
-    references: Optional[dict] = None   # { table, columns, on_delete }
-    check_expr: Optional[str]  = None
+    references: dict | None = None   # { table, columns, on_delete }
+    check_expr: str | None  = None
 
 
 @dataclass
@@ -59,7 +58,7 @@ class MigrationAction:
 @dataclass
 class Table:
     id: str
-    schema: Optional[str]
+    schema: str | None
     name: str
     full: str
     columns: list[Column]        = field(default_factory=list)
@@ -74,7 +73,7 @@ class Table:
 @dataclass
 class Sequence:
     name: str
-    schema: Optional[str]
+    schema: str | None
     full: str
     start_with: int
     increment_by: int
@@ -88,8 +87,8 @@ class Edge:
     from_cols: list[str]
     to_table: str
     to_cols: list[str]
-    constraint_name: Optional[str]
-    on_delete: Optional[str]
+    constraint_name: str | None
+    on_delete: str | None
 
 
 @dataclass
@@ -139,9 +138,9 @@ class GraphNode:
     id: str
     label: str
     type: str  # table | column | view | sequence | constraint | migration
-    source_file: Optional[str] = None
-    source_location: Optional[str] = None
-    created_in: Optional[str] = None
+    source_file: str | None = None
+    source_location: str | None = None
+    created_in: str | None = None
     modified_in: list[str] = field(default_factory=list)
 
 

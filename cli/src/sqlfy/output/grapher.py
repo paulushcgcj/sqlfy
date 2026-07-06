@@ -27,7 +27,6 @@ from __future__ import annotations
 
 from ..domain.schema_state import SchemaState, TableState
 
-
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
@@ -80,15 +79,15 @@ class Grapher:
 
         lines = [
             f'// sqlfy schema graph — V{state.version}  fingerprint={state.fingerprint}',
-            f'digraph schema {{',
-            f'  graph [',
+            'digraph schema {',
+            '  graph [',
             f'    label="{_html_escape(title or f"Schema V{state.version}")}",',
-            f'    labelloc=t, fontname="Helvetica", fontsize=14,',
-            f'    rankdir=TB, splines=ortho, nodesep=0.6, ranksep=0.9,',
-            f'    bgcolor="#f8f8f8"',
-            f'  ]',
-            f'  node  [shape=none, margin=0, fontname="Helvetica", fontsize=11]',
-            f'  edge  [fontname="Helvetica", fontsize=9, color="#d97706", arrowhead=vee]',
+            '    labelloc=t, fontname="Helvetica", fontsize=14,',
+            '    rankdir=TB, splines=ortho, nodesep=0.6, ranksep=0.9,',
+            '    bgcolor="#f8f8f8"',
+            '  ]',
+            '  node  [shape=none, margin=0, fontname="Helvetica", fontsize=11]',
+            '  edge  [fontname="Helvetica", fontsize=9, color="#d97706", arrowhead=vee]',
             '',
         ]
 
@@ -104,11 +103,11 @@ class Grapher:
                 f'</TD></TR>'
             )
             rows.append(
-                f'    <TR>'
-                f'<TD BORDER="0" BGCOLOR="#f3f0ff"><FONT COLOR="#7c3aed" POINT-SIZE="9">COLUMN</FONT></TD>'
-                f'<TD BORDER="0" BGCOLOR="#f3f0ff"><FONT COLOR="#7c3aed" POINT-SIZE="9">TYPE</FONT></TD>'
-                f'<TD BORDER="0" BGCOLOR="#f3f0ff"><FONT COLOR="#7c3aed" POINT-SIZE="9">FLAGS</FONT></TD>'
-                f'</TR>'
+                '    <TR>'
+                '<TD BORDER="0" BGCOLOR="#f3f0ff"><FONT COLOR="#7c3aed" POINT-SIZE="9">COLUMN</FONT></TD>'
+                '<TD BORDER="0" BGCOLOR="#f3f0ff"><FONT COLOR="#7c3aed" POINT-SIZE="9">TYPE</FONT></TD>'
+                '<TD BORDER="0" BGCOLOR="#f3f0ff"><FONT COLOR="#7c3aed" POINT-SIZE="9">FLAGS</FONT></TD>'
+                '</TR>'
             )
             for col in t.columns:
                 badge     = _col_badge(col)
@@ -126,7 +125,7 @@ class Grapher:
                 f'    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="{bg}" COLOR="#d1d5db">',
             ]
             node.extend(rows)
-            node.append(f'    </TABLE>>]')
+            node.append('    </TABLE>>]')
             return node
 
         # Connected tables
@@ -197,9 +196,9 @@ class Grapher:
         lines: list[str] = []
 
         if title:
-            lines.append(f'---')
+            lines.append('---')
             lines.append(f'title: {title}')
-            lines.append(f'---')
+            lines.append('---')
 
         lines.append('erDiagram')
         lines.append(f'  %% sqlfy schema graph — V{state.version}  fp={state.fingerprint}')
@@ -223,12 +222,11 @@ class Grapher:
                 if col.is_unique: badges.append('UK')
                 badge_str  = ' '.join(badges)
                 comment_str = f'"{col.comment}"' if col.comment else ''
-                nn          = '' if col.nullable else '~NN~'  # Mermaid doesn't have NN — use comment
                 parts = [mermaid_type(col.data_type), col.name]
                 if badge_str:  parts.append(badge_str)
                 if comment_str: parts.append(comment_str)
                 block.append(f'    {" ".join(parts)}')
-            block.append(f'  }}')
+            block.append('  }')
             return block
 
         # Connected tables

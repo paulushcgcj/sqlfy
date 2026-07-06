@@ -9,10 +9,11 @@ Modules:
   - chunk_cache  Schema fingerprint-based chunk caching
   - chunker      Vector chunk builder from SchemaGraph
 """
+from __future__ import annotations
 
 from .asker import Asker, AskResult
-from .retriever import KeywordRetriever, make_retriever, RetrievedChunk
 from .chunk_cache import ChunkCache, compute_schema_fingerprint
+from .retriever import KeywordRetriever, RetrievedChunk, make_retriever
 
 __all__ = [
     "Asker",

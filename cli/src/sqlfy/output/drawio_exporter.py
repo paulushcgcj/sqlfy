@@ -17,17 +17,18 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+
 from sqlfy.domain.schema_state import SchemaState
 
 
 def to_drawio(state: SchemaState, title: str = "") -> str:
     """
     Convert SchemaState to Draw.io XML format.
-    
+
     Args:
         state: Schema state from reconstructor
         title: Optional diagram title
-    
+
     Returns:
         XML string that can be saved as .drawio file
     """
@@ -39,13 +40,13 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
         "version": "21.0.0",
         "type": "device",
     })
-    
+
     # Diagram element
     diagram = ET.SubElement(root, "diagram", attrib={
         "id": "schema-diagram",
         "name": title or "Database Schema",
     })
-    
+
     # Graph model
     model = ET.SubElement(diagram, "mxGraphModel", attrib={
         "dx": "800",
@@ -63,30 +64,30 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
         "pageHeight": "4681",
         "background": "#ffffff",
     })
-    
+
     # Root cells (required by mxGraph)
     root_cells = ET.SubElement(model, "root")
     ET.SubElement(root_cells, "mxCell", attrib={"id": "0"})
     ET.SubElement(root_cells, "mxCell", attrib={"id": "1", "parent": "0"})
-    
+
     # Cell ID counter
     cell_id_counter = 100
-    
+
     def next_id() -> str:
         nonlocal cell_id_counter
         cell_id_counter += 1
         return str(cell_id_counter)
-    
+
     # Layout tables in grid (3 columns)
     tables = list(state.tables.values())
     cols = 3
     x_spacing, y_spacing = 280, 300
     base_x, base_y = 40, 40
-    
+
     # Track table positions for FK lines
     table_cell_ids: dict[str, str] = {}
     table_positions: dict[str, tuple[int, int, int, int]] = {}
-    
+
     # Title
     if title:
         title_cell = ET.SubElement(root_cells, "mxCell", attrib={
@@ -103,22 +104,22 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
             "height": "40",
             "as": "geometry",
         })
-    
+
     # Create table cells
     for i, table in enumerate(tables):
         row, col = divmod(i, cols)
         x = base_x + col * x_spacing
         y = base_y + row * y_spacing
-        
+
         # Calculate table height
         row_height = 26
         header_height = 30
         table_height = header_height + len(table.columns) * row_height
-        
+
         table_id = next_id()
         table_cell_ids[table.full_name] = table_id
         table_positions[table.full_name] = (x, y, x + 240, y + table_height)
-        
+
         # Table container (swimlane with header)
         table_cell = ET.SubElement(root_cells, "mxCell", attrib={
             "id": table_id,
@@ -134,7 +135,7 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
             "height": str(table_height),
             "as": "geometry",
         })
-        
+
         # Column rows
         for column in table.columns:
             # Build column display string
@@ -145,12 +146,12 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
                 badges.append("🔗")
             if column.is_unique:
                 badges.append("✨")
-            
+
             badge_str = "".join(badges) + " " if badges else ""
             nullable_str = "" if column.nullable else " NOT NULL"
-            
+
             col_text = f"{badge_str}{column.name}: {column.data_type}{nullable_str}"
-            
+
             # Column cell
             col_cell = ET.SubElement(root_cells, "mxCell", attrib={
                 "id": next_id(),
@@ -165,18 +166,18 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
                 "height": str(row_height),
                 "as": "geometry",
             })
-    
+
     # Create FK relationship edges
     for rel in state.relationships:
         from_table = rel.from_table
         to_table = rel.to_table
-        
+
         if from_table not in table_cell_ids or to_table not in table_cell_ids:
             continue
-        
+
         from_id = table_cell_ids[from_table]
         to_id = table_cell_ids[to_table]
-        
+
         # Create edge with ERD style
         edge_cell = ET.SubElement(root_cells, "mxCell", attrib={
             "id": next_id(),
@@ -191,7 +192,7 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
             "relative": "1",
             "as": "geometry",
         })
-    
+
     # Pretty-print XML
     rough_string = ET.tostring(root, encoding="unicode")
     reparsed = minidom.parseString(rough_string)
@@ -201,7 +202,7 @@ def to_drawio(state: SchemaState, title: str = "") -> str:
 def to_drawio_compressed(state: SchemaState, title: str = "") -> str:
     """
     Convert SchemaState to compressed Draw.io XML (single line).
-    
+
     Some Draw.io integrations prefer compressed format.
     """
     root = ET.Element("mxfile")

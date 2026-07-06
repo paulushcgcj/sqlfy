@@ -18,52 +18,15 @@ import logging
 
 # ── Domain model re-exports ───────────────────────────────────────────────────
 from .domain.models import (
-    Column,
-    Constraint,
-    Index,
-    MigrationAction,
-    Table,
-    Sequence,
-    Edge,
-    MigrationHistory,
     SchemaGraph,
-    VectorChunk,
-    GraphNode,
-    GraphEdge,
-    EdgeRelation,
-    Confidence,
-)
-from .domain.utils import type_str
-from .domain.sqlglot_compat import SQLGLOT_HAS_MODIFY, parse_modify_native
-
-# ── Parsing layer re-exports ──────────────────────────────────────────────────
-from .parsing.ast_helpers import (
-    _table_full,
-    _table_schema_name,
-    _col_datatype,
-    _on_delete_from_options,
-)
-from .parsing.column_parser import _parse_column_def
-from .parsing.constraint_parser import _parse_table_constraint
-from .parsing.ddl_handlers import (
-    _handle_create_table,
-    _handle_drop_table,
-    _handle_alter_table,
-    _handle_alter_table_command,
-    _handle_create_index_command,
-    _handle_create_sequence,
-    _handle_comment,
 )
 
 # ── Graph layer re-exports ────────────────────────────────────────────────────
-from .graph.builder import build_networkx_graph
 
 # ── Migrations layer re-exports ───────────────────────────────────────────────
-from .migrations.parser import parse_flyway_ver
 
 # ── Output layer re-exports ───────────────────────────────────────────────────
-from .output.chunker import build_chunks
-from .output.layout import compute_layout
+# ── Parsing layer re-exports ──────────────────────────────────────────────────
 
 logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
 

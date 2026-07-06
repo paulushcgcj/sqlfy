@@ -23,7 +23,7 @@ Example::
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,7 +48,7 @@ class ResponseEnvelope(BaseModel, Generic[T]):
         description="Contract name, e.g. 'insights'.",
     )
     generated_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO-8601 UTC timestamp of response generation.",
     )
     data: T = Field(

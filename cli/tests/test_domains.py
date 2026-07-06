@@ -3,14 +3,14 @@ test_domains.py
 ===============
 Tests for semantic domain detection (Feature #27).
 """
+from __future__ import annotations
 
-import pytest
 from sqlfy.analysis.domains import (
     detect_domains,
-    infer_domain_label,
-    infer_domain_description,
-    format_text,
     format_json,
+    format_text,
+    infer_domain_description,
+    infer_domain_label,
 )
 from sqlfy.domain.schema_state import SchemaStateBuilder
 from sqlfy.reconstructor import reconstruct
@@ -51,7 +51,7 @@ def test_infer_domain_description():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     tables = ['APP.USERS']
     description = infer_domain_description(tables, state)
     assert 'Domain containing' in description
@@ -63,9 +63,9 @@ def test_detect_domains_empty_state():
     files = []
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     assert result.num_domains == 0
     assert result.total_tables == 0
     assert result.algorithm == 'none'
@@ -78,9 +78,9 @@ def test_detect_domains_single_table():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     assert result.num_domains >= 1
     assert result.total_tables == 1
     assert result.algorithm in ['leiden', 'louvain']
@@ -97,9 +97,9 @@ def test_detect_domains_multiple_tables_no_relationships():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     assert result.total_tables == 3
     # Isolated tables may form multiple domains or one domain depending on algorithm
     assert result.num_domains >= 1
@@ -119,12 +119,12 @@ def test_detect_domains_with_relationships():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     assert result.total_tables == 2
     assert result.num_domains >= 1
-    
+
     # Tables with FK should be in the same domain
     if result.num_domains == 1:
         domain = result.domains[0]
@@ -143,11 +143,11 @@ def test_detect_domains_custom_resolution():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     # Higher resolution = more communities
     result_high = detect_domains(state, resolution=2.0)
     result_low = detect_domains(state, resolution=0.5)
-    
+
     # Both should complete without error
     assert result_high.total_tables == 3
     assert result_low.total_tables == 3
@@ -167,10 +167,10 @@ def test_detect_domains_min_cohesion():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     # High cohesion threshold may filter out weak communities
     result = detect_domains(state, min_cohesion=0.5)
-    
+
     assert result.total_tables == 2
 
 
@@ -185,9 +185,9 @@ def test_detect_domains_disable_splitting():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state, enable_splitting=False)
-    
+
     assert result.total_tables == 3
 
 
@@ -208,9 +208,9 @@ def test_cross_domain_dependencies():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     # Should detect dependencies between domains (if they're in separate domains)
     # The exact result depends on the community detection algorithm
     assert result.total_tables == 3
@@ -223,10 +223,10 @@ def test_format_text():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
     text = format_text(result)
-    
+
     assert 'SEMANTIC DOMAIN DETECTION' in text
     assert 'Algorithm:' in text
     assert 'Total tables:' in text
@@ -237,29 +237,29 @@ def test_format_text_empty():
     files = []
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
     text = format_text(result)
-    
+
     assert 'No domains detected' in text
 
 
 def test_format_json():
     """Test JSON formatting of domain results."""
     import json
-    
+
     files = [
         {'filename': 'V1__create_users.sql', 'sql': 'CREATE TABLE APP.USERS (ID NUMBER PRIMARY KEY)'},
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
     json_str = format_json(result)
-    
+
     # Should be valid JSON
     data = json.loads(json_str)
-    
+
     assert 'algorithm' in data
     assert 'total_tables' in data
     assert 'num_domains' in data
@@ -270,7 +270,7 @@ def test_format_json():
 def test_format_json_with_cross_domain_deps():
     """Test JSON formatting with cross-domain dependencies."""
     import json
-    
+
     files = [
         {'filename': 'V1__create_tables.sql', 'sql': '''
             CREATE TABLE APP.USERS (ID NUMBER PRIMARY KEY);
@@ -283,12 +283,12 @@ def test_format_json_with_cross_domain_deps():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
     json_str = format_json(result)
-    
+
     data = json.loads(json_str)
-    
+
     assert 'cross_domain_dependencies' in data
     assert isinstance(data['cross_domain_dependencies'], list)
 
@@ -307,9 +307,9 @@ def test_domain_cohesion_scores():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     for domain in result.domains:
         assert hasattr(domain, 'cohesion')
         assert 0.0 <= domain.cohesion <= 1.0
@@ -327,9 +327,9 @@ def test_domain_sorting():
     ]
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph)
-    
+
     result = detect_domains(state)
-    
+
     # Verify sorting (largest first)
     if len(result.domains) > 1:
         for i in range(len(result.domains) - 1):

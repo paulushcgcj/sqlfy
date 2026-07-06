@@ -11,7 +11,6 @@ of the parsing domain and carry no domain model imports.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 import sqlglot.expressions as exp
 
@@ -30,15 +29,15 @@ def _table_full(node: exp.Table) -> str:
     return name
 
 
-def _table_schema_name(node: exp.Table) -> tuple[Optional[str], str]:
+def _table_schema_name(node: exp.Table) -> tuple[str | None, str]:
     """Return (schema, name) from a sqlglot Table node, both uppercased."""
     db = node.args.get("db")
     return (db.name.upper() if db else None), node.name.upper()
 
 
 def _col_datatype(
-    kind: Optional[exp.DataType],
-) -> tuple[str, Optional[int], Optional[int]]:
+    kind: exp.DataType | None,
+) -> tuple[str, int | None, int | None]:
     """Extract (type_name, precision, scale) from a sqlglot DataType node.
 
     Returns:
@@ -63,7 +62,7 @@ def _col_datatype(
     return type_name, precision, scale
 
 
-def _on_delete_from_options(options: list) -> Optional[str]:
+def _on_delete_from_options(options: list) -> str | None:
     """Extract ON DELETE action string from a list of option expressions."""
     joined = " ".join(str(o) for o in options).upper()
     m = re.search(

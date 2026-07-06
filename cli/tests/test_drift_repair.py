@@ -11,16 +11,16 @@ Test coverage:
 - Report formatting (text, JSON)
 - Migration file generation
 """
+from __future__ import annotations
 
 import pytest
+
 from sqlfy.analysis.drift_repair import (
+    DriftFinding,
     analyze_drift,
     generate_repair_migration,
-    DriftFinding,
-    DriftReport,
 )
 from sqlfy.reconstructor import reconstruct
-
 
 # ─────────────────────────────────────────────
 # FIXTURES
@@ -39,7 +39,7 @@ def base_schema_files():
                     NAME VARCHAR2(100),
                     CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 CREATE TABLE APP.ORDERS (
                     ORDER_ID NUMBER PRIMARY KEY,
                     USER_ID NUMBER NOT NULL,
@@ -47,7 +47,7 @@ def base_schema_files():
                     STATUS VARCHAR2(20) DEFAULT 'PENDING',
                     CONSTRAINT FK_ORDERS_USER FOREIGN KEY (USER_ID) REFERENCES APP.USERS(USER_ID)
                 );
-                
+
                 CREATE INDEX IDX_ORDERS_USER ON APP.ORDERS(USER_ID);
             '''
         }
@@ -103,7 +103,7 @@ def target_column_changes_files():
                     PHONE VARCHAR2(20),                  -- Extra column
                     CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 CREATE TABLE APP.ORDERS (
                     ORDER_ID NUMBER PRIMARY KEY,
                     USER_ID NUMBER NOT NULL,
@@ -111,7 +111,7 @@ def target_column_changes_files():
                     STATUS VARCHAR2(20) DEFAULT 'PENDING',
                     CONSTRAINT FK_ORDERS_USER FOREIGN KEY (USER_ID) REFERENCES APP.USERS(USER_ID)
                 );
-                
+
                 CREATE INDEX IDX_ORDERS_USER ON APP.ORDERS(USER_ID);
             '''
         }
@@ -131,14 +131,14 @@ def target_constraint_changes_files():
                     NAME VARCHAR2(100),
                     CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 CREATE TABLE APP.ORDERS (
                     ORDER_ID NUMBER PRIMARY KEY,
                     USER_ID NUMBER NOT NULL,
                     TOTAL NUMBER(10,2),
                     STATUS VARCHAR2(20) DEFAULT 'PENDING'
                 );
-                
+
                 CREATE INDEX IDX_ORDERS_USER ON APP.ORDERS(USER_ID);
                 CREATE UNIQUE INDEX IDX_ORDERS_UNIQUE ON APP.ORDERS(ORDER_ID, USER_ID);
             '''
@@ -154,12 +154,12 @@ def test_missing_table(base_schema_files, target_missing_table_files):
     """Detect table missing in target schema."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_missing_table_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     assert not report.is_clean
     assert report.total_drift_count > 0
-    
+
     # Should detect APP.ORDERS missing
     missing_table_findings = [f for f in report.findings if f.category == 'missing_table']
     assert len(missing_table_findings) == 1
@@ -172,11 +172,11 @@ def test_extra_table(base_schema_files, target_extra_table_files):
     """Detect extra table in target schema."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_extra_table_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     assert not report.is_clean
-    
+
     # Should detect APP.PRODUCTS as extra
     extra_table_findings = [f for f in report.findings if f.category == 'extra_table']
     assert len(extra_table_findings) == 1
@@ -189,9 +189,9 @@ def test_no_drift_identical_schemas(base_schema_files):
     """No drift when schemas are identical."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(base_schema_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     assert report.is_clean
     assert report.total_drift_count == 0
     assert len(report.findings) == 0
@@ -205,15 +205,15 @@ def test_column_type_mismatch(base_schema_files, target_column_changes_files):
     """Detect column type differences."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_column_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     assert not report.is_clean
-    
+
     # Should detect EMAIL type mismatch
     type_mismatches = [f for f in report.findings if f.category == 'type_mismatch']
     assert len(type_mismatches) >= 1
-    
+
     email_mismatch = [f for f in type_mismatches if 'EMAIL' in f.object_name]
     assert len(email_mismatch) == 1
     # Note: reconstructor may normalize VARCHAR2 to VARCHAR
@@ -226,13 +226,13 @@ def test_extra_column(base_schema_files, target_column_changes_files):
     """Detect extra column in target schema."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_column_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     # Should detect PHONE as extra column
     extra_columns = [f for f in report.findings if f.category == 'extra_column']
     assert len(extra_columns) >= 1
-    
+
     phone_extra = [f for f in extra_columns if 'PHONE' in f.object_name]
     assert len(phone_extra) == 1
     assert phone_extra[0].severity == 'warning'
@@ -254,7 +254,7 @@ def test_missing_column():
             '''
         }
     ]
-    
+
     target_files = [
         {
             'filename': 'V1__target.sql',
@@ -267,16 +267,16 @@ def test_missing_column():
             '''
         }
     ]
-    
+
     base_graph = reconstruct(base_files)
     target_graph = reconstruct(target_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     # Should detect PHONE as missing
     missing_columns = [f for f in report.findings if f.category == 'missing_column']
     assert len(missing_columns) >= 1
-    
+
     phone_missing = [f for f in missing_columns if 'PHONE' in f.object_name]
     assert len(phone_missing) == 1
     assert phone_missing[0].severity == 'error'
@@ -291,13 +291,13 @@ def test_missing_foreign_key(base_schema_files, target_constraint_changes_files)
     """Detect missing foreign key constraint."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_constraint_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     # Should detect FK_ORDERS_USER as missing
     missing_constraints = [f for f in report.findings if f.category == 'missing_constraint']
     assert len(missing_constraints) >= 1
-    
+
     fk_missing = [f for f in missing_constraints if 'FK_ORDERS_USER' in f.object_name.upper()]
     assert len(fk_missing) == 1
     assert fk_missing[0].severity == 'warning'
@@ -308,13 +308,13 @@ def test_extra_index(base_schema_files, target_constraint_changes_files):
     """Detect extra index in target schema."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_constraint_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     # Should detect IDX_ORDERS_UNIQUE as extra
     extra_indexes = [f for f in report.findings if f.category == 'extra_index']
     assert len(extra_indexes) >= 1
-    
+
     unique_idx = [f for f in extra_indexes if 'IDX_ORDERS_UNIQUE' in f.object_name.upper()]
     assert len(unique_idx) == 1
     assert unique_idx[0].severity == 'info'
@@ -329,10 +329,10 @@ def test_report_to_text(base_schema_files, target_missing_table_files):
     """Test text report formatting."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_missing_table_files)
-    
+
     report = analyze_drift(base_graph, target_graph, base_label="Production", target_label="Development")
     text_output = report.to_text()
-    
+
     assert 'Schema Drift Report' in text_output
     assert 'Base:   Production' in text_output
     assert 'Target: Development' in text_output
@@ -345,20 +345,20 @@ def test_report_to_json(base_schema_files, target_missing_table_files):
     """Test JSON report formatting."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_missing_table_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     json_output = report.to_json()
-    
+
     import json
     data = json.loads(json_output)
-    
+
     assert data['status'] == 'drift_detected'
     assert data['total_findings'] > 0
     assert 'by_category' in data
     assert 'by_severity' in data
     assert 'findings' in data
     assert isinstance(data['findings'], list)
-    
+
     # Check finding structure
     first_finding = data['findings'][0]
     assert 'category' in first_finding
@@ -371,10 +371,10 @@ def test_clean_report_text(base_schema_files):
     """Test text output when no drift detected."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(base_schema_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     text_output = report.to_text()
-    
+
     assert 'No drift detected' in text_output
     assert 'identical' in text_output.lower()
 
@@ -383,13 +383,13 @@ def test_clean_report_json(base_schema_files):
     """Test JSON output when no drift detected."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(base_schema_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     json_output = report.to_json()
-    
+
     import json
     data = json.loads(json_output)
-    
+
     assert data['status'] == 'clean'
     assert data['total_findings'] == 0
     assert len(data['findings']) == 0
@@ -403,10 +403,10 @@ def test_generate_migration_file(base_schema_files, target_missing_table_files):
     """Test migration file generation from drift report."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_missing_table_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     migration_sql = generate_repair_migration(report, version='10', description='fix_drift')
-    
+
     assert 'V10__fix_drift.sql' in migration_sql
     assert 'CREATE TABLE' in migration_sql
     assert 'APP.ORDERS' in migration_sql
@@ -417,10 +417,10 @@ def test_generate_migration_clean_schema(base_schema_files):
     """Test migration generation when no drift."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(base_schema_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     migration_sql = generate_repair_migration(report, version='10')
-    
+
     assert 'No drift detected' in migration_sql
     assert 'no changes needed' in migration_sql.lower()
 
@@ -429,13 +429,13 @@ def test_generate_migration_multiple_findings(base_schema_files, target_column_c
     """Test migration generation with multiple drift categories."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_column_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     migration_sql = generate_repair_migration(report, version='15', description='catch_up')
-    
+
     assert 'V15__catch_up.sql' in migration_sql
     assert report.total_drift_count > 0
-    
+
     # Should contain SQL for all findings
     for finding in report.findings:
         if finding.repair_sql:
@@ -451,10 +451,10 @@ def test_report_by_category(base_schema_files, target_column_changes_files):
     """Test by_category property."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_column_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     by_cat = report.by_category
-    
+
     assert isinstance(by_cat, dict)
     assert sum(by_cat.values()) == report.total_drift_count
 
@@ -463,10 +463,10 @@ def test_report_by_severity(base_schema_files, target_column_changes_files):
     """Test by_severity property."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_column_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
     by_sev = report.by_severity
-    
+
     assert isinstance(by_sev, dict)
     assert sum(by_sev.values()) == report.total_drift_count
 
@@ -475,12 +475,12 @@ def test_report_errors_warnings(base_schema_files, target_column_changes_files):
     """Test errors() and warnings() filters."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_column_changes_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     errors = report.errors()
     warnings = report.warnings()
-    
+
     assert all(f.severity == 'error' for f in errors)
     assert all(f.severity == 'warning' for f in warnings)
     assert len(errors) + len(warnings) <= report.total_drift_count
@@ -501,9 +501,9 @@ def test_drift_finding_to_dict():
         actual='VARCHAR2(500)',
         repair_sql='ALTER TABLE APP.USERS MODIFY (EMAIL VARCHAR2(255));'
     )
-    
+
     d = finding.to_dict()
-    
+
     assert d['category'] == 'type_mismatch'
     assert d['severity'] == 'error'
     assert d['object_name'] == 'APP.USERS.EMAIL'
@@ -519,12 +519,12 @@ def test_drift_finding_to_dict():
 def test_empty_schemas():
     """Test comparing two empty schemas."""
     empty_files = []
-    
+
     base_graph = reconstruct(empty_files)
     target_graph = reconstruct(empty_files)
-    
+
     report = analyze_drift(base_graph, target_graph)
-    
+
     assert report.is_clean
     assert report.total_drift_count == 0
 
@@ -533,17 +533,17 @@ def test_custom_labels(base_schema_files, target_missing_table_files):
     """Test custom schema labels."""
     base_graph = reconstruct(base_schema_files)
     target_graph = reconstruct(target_missing_table_files)
-    
+
     report = analyze_drift(
         base_graph,
         target_graph,
         base_label="Production DB",
         target_label="Dev Branch"
     )
-    
+
     assert report.base_label == "Production DB"
     assert report.target_label == "Dev Branch"
-    
+
     text_output = report.to_text()
     assert "Production DB" in text_output
     assert "Dev Branch" in text_output

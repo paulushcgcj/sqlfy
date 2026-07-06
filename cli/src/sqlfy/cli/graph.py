@@ -6,7 +6,6 @@ Typer app for graph commands: show, build, migrations.
 
 from __future__ import annotations
 
-from typing import Optional
 import typer
 
 app = typer.Typer(help="Graph construction and visualization commands.", no_args_is_help=True)
@@ -16,11 +15,11 @@ _DIALECT_HELP = "SQL dialect: oracle, postgres, mysql, sqlite"
 
 @app.command("show")
 def cmd_graph(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect", help=_DIALECT_HELP),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out", metavar="FILE"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out", metavar="FILE"),
     fmt: str = typer.Option("human", "--format"),
 ) -> None:
     """Display the schema graph."""
@@ -31,10 +30,10 @@ def cmd_graph(
 
 @app.command("build")
 def cmd_build_graph(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect", help=_DIALECT_HELP),
-    out: Optional[str] = typer.Option(None, "--out", metavar="FILE"),
+    out: str | None = typer.Option(None, "--out", metavar="FILE"),
     fmt: str = typer.Option("gexf", "--format"),
     resolution: float = typer.Option(1.0, "--resolution"),
     min_cohesion: float = typer.Option(0.1, "--min-cohesion"),
@@ -48,10 +47,10 @@ def cmd_build_graph(
 
 @app.command("migrations")
 def cmd_graph_migrations(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect", help=_DIALECT_HELP),
-    out: Optional[str] = typer.Option(None, "--out", metavar="FILE"),
+    out: str | None = typer.Option(None, "--out", metavar="FILE"),
     fmt: str = typer.Option("timeline", "--format"),
 ) -> None:
     """Build migration dependency/timeline graph."""

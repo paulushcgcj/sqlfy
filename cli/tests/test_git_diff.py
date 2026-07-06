@@ -17,7 +17,6 @@ from sqlfy.commands._git_diff import (
     run_git_diff,
 )
 
-
 # ── resolve_git_root ────────────────────────────────────────────────────
 
 class TestResolveGitRoot:
