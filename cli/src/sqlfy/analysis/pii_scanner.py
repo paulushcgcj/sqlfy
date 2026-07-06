@@ -59,6 +59,8 @@ def scan_pii(
     }
     if extra_patterns:
         for category, patterns in extra_patterns.items():
+            if category not in merged_patterns:
+                merged_patterns[category] = []
             merged_patterns[category].extend(patterns)
 
     findings: list[PiiColumnFinding] = []
