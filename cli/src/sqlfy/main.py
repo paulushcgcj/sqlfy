@@ -39,6 +39,7 @@ from .commands import (
     cmd_simulate,
     cmd_stability,
     cmd_validate,
+    cmd_watch,
     legacy_main,
 )
 
@@ -46,7 +47,7 @@ KNOWN_SUBCOMMANDS = {
     "dump", "manifest", "chunks", "diff", "diff-versions", "graph", "graph-migrations", "build-graph",
     "rollback-analysis", "insights", "health", "simulate", "integrity",
     "cache", "ask", "chat", "export", "query", "impact", "lint",
-    "provenance", "cost",
+    "provenance", "cost", "watch",
     "naming",
     "domains", "stability", "validate", "deps", "lineage", "drift",
     "classify", "safety", "pii-scan",
@@ -425,6 +426,17 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--extra-patterns", metavar="FILE",
                    help="JSON file with additional patterns: {\"category\": [\"regex\", ...]}")
     p.set_defaults(func=cmd_pii_scan)
+
+    # watch
+    p = sub.add_parser("watch", help="Auto-rebuild analysis when migration files change")
+    shared(p)
+    p.add_argument("--debounce", type=float, default=2.0, metavar="SECONDS",
+                   help="Debounce time in seconds (default: 2.0)")
+    p.add_argument("--run", default="lint,safety,insights", metavar="COMMANDS",
+                   help="Comma-separated list of commands to run (default: lint,safety,insights)")
+    p.add_argument("--force", action="store_true",
+                   help="Force rebuild even if shrink-safety gate is triggered")
+    p.set_defaults(func=cmd_watch)
 
     return parser
 
