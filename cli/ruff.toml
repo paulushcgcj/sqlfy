@@ -29,9 +29,8 @@ lint.isort.known-first-party = ["sqlfy"]
 # Allow computing  (flake8-use-pathlib)
 lint.per-file-ignores."__init__.py" = ["F401"]
 
-# Formatting
-format.docstring-code-format = true
-format.docstring-code-line-length = 88
-
 [format]
+docstring-code-format = true
+docstring-code-line-length = 88
 line-ending = "lf"
+
