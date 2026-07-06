@@ -506,3 +506,127 @@ def cmd_cache(
         print(f"Cache location: {_CACHE_ROOT}")
         print(f"Cached entries: {cache_count}")
         print(f"Total size: {total_size / (1024 * 1024):.2f} MB")
+
+
+def cmd_pii_scan(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    format: str = "text",
+    out: str | None = None,
+    min_confidence: float = 0.6,
+    extra_patterns: str | None = None,
+    at: str | None = None,
+) -> int:
+    """Scan schema columns for PII (Personally Identifiable Information) patterns."""
+    from ..analysis.pii_scanner import scan_pii, PII_PATTERNS
+    from ..reconstructor import reconstruct, reconstruct_at
+    
+    files = load_files(migrations_dir, json_input)
+    
+    # Build schema state
+    if at:
+        graph = reconstruct_at(files, at, dialect=dialect)
+    else:
+        graph = reconstruct(files, dialect=dialect)
+    
+    state = graph.state
+    
+    # Load extra patterns if provided
+    extra_patterns_dict = None
+    if extra_patterns:
+        try:
+            with open(extra_patterns, 'r', encoding='utf-8') as f:
+                extra_data = json.load(f)
+                extra_patterns_dict = {str(k): [str(p) for p in v] for k, v in extra_data.items()}
+        except Exception as e:
+            print(f"Error loading extra patterns: {e}", file=sys.stderr)
+            return 1
+    
+    # Run PII scan
+    result = scan_pii(state, extra_patterns_dict)
+    
+    # Filter by confidence
+    filtered_findings = [f for f in result.findings if f.confidence >= min_confidence]
+    
+    fmt = (format or "text").lower()
+    
+    if fmt == "json":
+        # Convert to camelCase for JSON output
+        output_data = {
+            "tablesScanned": result.tables_scanned,
+            "columnsScanned": result.columns_scanned,
+            "piiTableCount": result.pii_table_count,
+            "piiColumnCount": len(filtered_findings),
+            "findings": [
+                {
+                    "tableName": f.table_name,
+                    "columnName": f.column_name,
+                    "columnType": f.column_type,
+                    "piiCategories": f.pii_categories,
+                    "confidence": f.confidence,
+                    "evidence": f.evidence,
+                }
+                for f in filtered_findings
+            ]
+        }
+        output = json.dumps(output_data, indent=2)
+        write_output(output, out)
+        
+        if not filtered_findings:
+            print("No PII columns found.", file=sys.stderr)
+        else:
+            print(f"Found {len(filtered_findings)} PII columns across {result.pii_table_count} tables.", file=sys.stderr)
+    else:
+        # Text output
+        lines = []
+        a = lines.append
+        
+        a(f"PII Scan — {result.tables_scanned} tables, {result.columns_scanned} columns scanned")
+        
+        if not filtered_findings:
+            a("No PII columns found.")
+            output = "\n".join(lines)
+            write_output(output, out)
+            return 0
+        
+        a(f"Found {len(filtered_findings)} PII columns across {result.pii_table_count} tables.")
+        a("")
+        
+        # Group by confidence levels
+        high_confidence = [f for f in filtered_findings if f.confidence >= 0.8]
+        medium_confidence = [f for f in filtered_findings if 0.6 <= f.confidence < 0.8]
+        
+        if high_confidence:
+            a("HIGH CONFIDENCE (≥0.8)")
+            for finding in sorted(high_confidence, key=lambda x: (x.table_name, x.column_name)):
+                categories_str = ", ".join(finding.pii_categories)
+                a(f"  {finding.table_name}.{finding.column_name:<25} {categories_str:<20} confidence={finding.confidence:.2f}")
+            a("")
+        
+        if medium_confidence:
+            a("MEDIUM CONFIDENCE (0.6–0.8)")
+            for finding in sorted(medium_confidence, key=lambda x: (x.table_name, x.column_name)):
+                categories_str = ", ".join(finding.pii_categories)
+                a(f"  {finding.table_name}.{finding.column_name:<25} {categories_str:<20} confidence={finding.confidence:.2f}")
+            a("")
+        
+        # Tables with most PII columns
+        table_pii_counts = {}
+        for finding in filtered_findings:
+            table_pii_counts[finding.table_name] = table_pii_counts.get(finding.table_name, 0) + 1
+        
+        sorted_tables = sorted(table_pii_counts.items(), key=lambda x: x[1], reverse=True)
+        if sorted_tables:
+            a("Tables with most PII columns:")
+            for table_name, count in sorted_tables[:5]:  # Top 5
+                a(f"  {table_name} ({count} columns)")
+        
+        output = "\n".join(lines)
+        write_output(output, out)
+        
+        if filtered_findings:
+            print(f"  {len(filtered_findings)} PII column(s) found", file=sys.stderr)
+    
+    return 0

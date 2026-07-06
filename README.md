@@ -152,7 +152,7 @@ pip install dist/sqlfy-*.whl       # install from wheel
 
 ## CLI Reference
 
-SQLfy has 31 CLI subcommands covering schema reconstruction, graph visualization, impact analysis, linting, drift detection, domain analysis, RAG Q&A, and more.
+SQLfy has 32 CLI subcommands covering schema reconstruction, graph visualization, impact analysis, linting, drift detection, domain analysis, RAG Q&A, PII scanning, and more.
 
 See the [full command reference on the wiki](https://github.com/paulushcgcj/sqlfy.wiki/wiki/commands/) for documentation on every command, including usage, flags, and examples.
 
@@ -191,6 +191,7 @@ See the [full command reference on the wiki](https://github.com/paulushcgcj/sqlf
 | `naming` | Enforce migration filename naming conventions (Flyway pattern, description format) |
 | `cost` | Estimate migration execution cost (score, category, estimated_seconds) |
 | `safety` | Score migrations by safety level (SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS) |
+| `pii-scan` | Scan schema columns for PII patterns (GDPR/CCPA compliance) |
 
 **Common flags available on most commands:**
 - `--dialect oracle|postgres|mysql|sqlite` — SQL dialect (default: `oracle`)
@@ -422,6 +423,7 @@ Paste the **Schema Summary** chunk as system context and individual **table chun
 - [x] Schema simulator (`sqlfy simulate` — test what-if migrations)
 - [x] Migration integrity checks (`sqlfy integrity` — SHA256 hashing)
 - [x] File-based caching (`sqlfy cache`)
+- [x] PII column scanning (`sqlfy pii-scan` — GDPR/CCPA compliance)
 - [x] Natural language queries (`sqlfy ask` — single-shot RAG)
 - [x] Interactive chat (`sqlfy chat` — multi-turn conversations)
 - [x] HTML documentation export (`sqlfy export`)
