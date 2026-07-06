@@ -112,7 +112,7 @@ class TestPiiScanner:
         
         # Should find PII in CUSTOMER table
         customer_pii = [f for f in result.findings if f.table_name == "CUSTOMER"]
-        assert len(customer_pii) >= 3  # EMAIL, PHONE_NUMBER, FIRST_NAME, LAST_NAME, DATE_OF_BIRTH, SSN
+        assert len(customer_pii) >= 6  # EMAIL, PHONE_NUMBER, FIRST_NAME, LAST_NAME, DATE_OF_BIRTH, SSN
         
         # Should find EMAIL with high confidence
         email_finding = next((f for f in customer_pii if f.column_name == "EMAIL"), None)
@@ -151,7 +151,7 @@ class TestPiiScanner:
         result = scan_pii(state)
         
         address_pii = [f for f in result.findings if f.table_name == "ADDRESS"]
-        assert len(address_pii) >= 3  # ADDR_LINE1, ADDR_LINE2, CITY, POSTAL_CODE, STATE
+        assert len(address_pii) >= 5  # ADDR_LINE1, ADDR_LINE2, CITY, POSTAL_CODE, STATE
         
         # Check that address columns are detected with address category
         addr_line1 = next((f for f in address_pii if f.column_name == "ADDR_LINE1"), None)
@@ -201,7 +201,7 @@ class TestPiiScanner:
         result = scan_pii(state)
         
         assert result.tables_scanned == 3  # CUSTOMER, ORDER, ADDRESS
-        assert result.columns_scanned == 3 + 4 + 6  # Columns in each table
+        assert result.columns_scanned == 8 + 4 + 6  # Columns in each table (8, 4, 6)
         assert result.pii_column_count == len(result.findings)
         assert result.pii_table_count == len({f.table_name for f in result.findings})
         
