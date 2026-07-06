@@ -9,7 +9,7 @@ from __future__ import annotations
 import platform
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class BuildInfo:
     """Registry keys of all generated contracts, e.g. ``["insights@v1", ...]``."""
 
     @classmethod
-    def capture(cls, contract_keys: list[str]) -> "BuildInfo":
+    def capture(cls, contract_keys: list[str]) -> BuildInfo:
         """Capture build metadata from the current runtime environment."""
         try:
             from importlib.metadata import version as _version
@@ -45,7 +45,7 @@ class BuildInfo:
             sqlfy_ver = "unknown"
 
         return cls(
-            build_timestamp=datetime.now(timezone.utc).isoformat(),
+            build_timestamp=datetime.now(UTC).isoformat(),
             sqlfy_version=sqlfy_ver,
             python_version=sys.version,
             platform=platform.platform(),

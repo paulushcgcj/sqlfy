@@ -15,16 +15,17 @@ Sub-apps (Typer groups):
   - devtools      Lint, validate, naming, deps, lineage, classify, safety
   - provenance    Git provenance and impact analysis
 """
+from __future__ import annotations
 
 import typer
 
-from .schema import app as schema_app
-from .graph import app as graph_app
 from .analysis import app as analysis_app
-from .evolution import app as evolution_app
-from .intelligence import app as intelligence_app
 from .devtools import app as devtools_app
+from .evolution import app as evolution_app
+from .graph import app as graph_app
+from .intelligence import app as intelligence_app
 from .provenance import app as provenance_app
+from .schema import app as schema_app
 
 app = typer.Typer(
     name="sqlfy",

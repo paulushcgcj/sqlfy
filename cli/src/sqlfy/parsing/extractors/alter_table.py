@@ -4,17 +4,30 @@ sqlfy.parsing.extractors.alter_table
 Extractor for ALTER TABLE statements.
 """
 from __future__ import annotations
+
 import sqlglot.expressions as exp
-from ...semantic.operations import (
-    AnyOperation, OperationProvenance, ColumnDefinition, ConstraintDefinition,
-    ColumnChanges,
-    AddColumnOperation, DropColumnOperation, ModifyColumnOperation,
-    RenameColumnOperation, AddConstraintOperation, DropConstraintOperation,
+
+from ...domain.sqlglot_compat import (
+    SQLGLOT_HAS_MODIFY,
+    SQLGLOT_HAS_RENAME_COLUMN,
+    parse_modify_native,
 )
 from ...parsing.ast_helpers import _table_full
 from ...parsing.column_parser import _parse_column_def
 from ...parsing.constraint_parser import _parse_table_constraint
-from ...domain.sqlglot_compat import SQLGLOT_HAS_MODIFY, SQLGLOT_HAS_RENAME_COLUMN, parse_modify_native
+from ...semantic.operations import (
+    AddColumnOperation,
+    AddConstraintOperation,
+    AnyOperation,
+    ColumnChanges,
+    ColumnDefinition,
+    ConstraintDefinition,
+    DropColumnOperation,
+    DropConstraintOperation,
+    ModifyColumnOperation,
+    OperationProvenance,
+    RenameColumnOperation,
+)
 from .base import BaseExtractor
 
 

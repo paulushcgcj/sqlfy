@@ -5,12 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from sqlfy.core import apply_migrations
 from sqlfy.reconstructor import (
-    Reconstructor,
     MigrationResult,
+    Reconstructor,
     reconstruct,
     reconstruct_at,
 )
@@ -222,7 +220,7 @@ class TestMigrationResultIdempotency:
     def test_no_duplicate_actions_after_double_apply(self):
         r = Reconstructor()
         sql = (SAMPLES_DIR / 'V1__create_core_tables.sql').read_text(encoding='utf-8')
-        result1 = r.apply_file('V1__create_core_tables.sql', sql)
+        r.apply_file('V1__create_core_tables.sql', sql)
         result2 = r.apply_file('V1__create_core_tables.sql', sql)
         assert len(result2.actions) == 0
 

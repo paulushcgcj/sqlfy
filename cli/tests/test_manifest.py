@@ -1,6 +1,8 @@
 """Tests for manifest/metadata generation."""
+from __future__ import annotations
 
 import json
+
 from sqlfy.domain.schema_state import MigrationStep, SchemaState
 
 

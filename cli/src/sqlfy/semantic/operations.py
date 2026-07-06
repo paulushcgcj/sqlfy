@@ -14,10 +14,9 @@ is needed.
 from __future__ import annotations
 
 import hashlib
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ─────────────────────────────────────────────────────────────
 # Provenance
@@ -35,7 +34,7 @@ class OperationProvenance(BaseModel):
     raw_sql: str | None = Field(None, serialization_alias="rawSql", description="Original SQL fragment.")
 
     @classmethod
-    def of(cls, source_file: str, version: str, statement_index: int, raw_sql: str | None) -> "OperationProvenance":
+    def of(cls, source_file: str, version: str, statement_index: int, raw_sql: str | None) -> OperationProvenance:
         h = hashlib.sha256((raw_sql or "").encode()).hexdigest()
         return cls(
             source_file=source_file,
@@ -216,23 +215,7 @@ class UnknownOperation(BaseOperation):
 # ─────────────────────────────────────────────────────────────
 
 AnyOperation = Annotated[
-    Union[
-        CreateTableOperation,
-        DropTableOperation,
-        RenameTableOperation,
-        AddColumnOperation,
-        DropColumnOperation,
-        ModifyColumnOperation,
-        RenameColumnOperation,
-        AddConstraintOperation,
-        DropConstraintOperation,
-        CreateIndexOperation,
-        DropIndexOperation,
-        CreateSequenceOperation,
-        DropSequenceOperation,
-        CommentOperation,
-        UnknownOperation,
-    ],
+    CreateTableOperation | DropTableOperation | RenameTableOperation | AddColumnOperation | DropColumnOperation | ModifyColumnOperation | RenameColumnOperation | AddConstraintOperation | DropConstraintOperation | CreateIndexOperation | DropIndexOperation | CreateSequenceOperation | DropSequenceOperation | CommentOperation | UnknownOperation,
     Field(discriminator="operation"),
 ]
 

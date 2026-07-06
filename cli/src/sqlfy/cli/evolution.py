@@ -5,7 +5,7 @@ Typer app for schema evolution commands: diff, diff-versions,
 rollback-analysis, simulate, drift.
 """
 from __future__ import annotations
-from typing import Optional
+
 import typer
 
 app = typer.Typer(help="Schema evolution and change-analysis commands.", no_args_is_help=True)
@@ -16,7 +16,7 @@ def cmd_diff(
     state_a: str = typer.Argument(..., help="First schema state JSON or migrations dir"),
     state_b: str = typer.Argument(..., help="Second schema state JSON or migrations dir"),
     fmt: str = typer.Option("text", "--format", help="Output format: json | text"),
-    out: Optional[str] = typer.Option(None, "--out", metavar="FILE"),
+    out: str | None = typer.Option(None, "--out", metavar="FILE"),
 ) -> None:
     """Compare two schema state dictionaries or migration directories."""
     from ..commands.evolution import cmd_diff as _cmd
@@ -25,13 +25,13 @@ def cmd_diff(
 
 @app.command("diff-versions")
 def cmd_diff_versions(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    from_version: Optional[str] = typer.Option(None, "--from"),
-    to_version: Optional[str] = typer.Option(None, "--to"),
+    from_version: str | None = typer.Option(None, "--from"),
+    to_version: str | None = typer.Option(None, "--to"),
     fmt: str = typer.Option("json", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    out: str | None = typer.Option(None, "--out"),
 ) -> None:
     """Compare two version snapshots of the same migration set."""
     from ..commands.evolution import cmd_diff_versions as _cmd
@@ -41,11 +41,11 @@ def cmd_diff_versions(
 
 @app.command("rollback-analysis")
 def cmd_rollback_analysis(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     fmt: str = typer.Option("text", "--format"),
     generate: bool = typer.Option(False, "--generate"),
 ) -> None:
@@ -57,13 +57,13 @@ def cmd_rollback_analysis(
 
 @app.command("simulate")
 def cmd_simulate(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input", metavar="FILE"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input", metavar="FILE"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
-    sql: Optional[str] = typer.Option(None, "--sql"),
-    file: Optional[str] = typer.Option(None, "--file"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
+    sql: str | None = typer.Option(None, "--sql"),
+    file: str | None = typer.Option(None, "--file"),
     fmt: str = typer.Option("text", "--format"),
     diff: bool = typer.Option(False, "--diff"),
 ) -> None:
@@ -79,9 +79,9 @@ def cmd_drift(
     target_migrations: str = typer.Argument(...),
     dialect: str = typer.Option("oracle", "--dialect"),
     fmt: str = typer.Option("text", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    out: str | None = typer.Option(None, "--out"),
     generate_migration: bool = typer.Option(False, "--generate-migration"),
-    next_version: Optional[str] = typer.Option(None, "--next-version"),
+    next_version: str | None = typer.Option(None, "--next-version"),
     description: str = typer.Option("catch_up_drift", "--description"),
 ) -> None:
     """Detect schema drift between two migration folders."""

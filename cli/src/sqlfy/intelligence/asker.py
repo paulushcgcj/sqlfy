@@ -32,16 +32,15 @@ from __future__ import annotations
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator, Optional
 
-from ..output.chunker import build_chunks
 from ..domain.models import SchemaGraph
-from .retriever import make_retriever, RetrievedChunk
+from ..output.chunker import build_chunks
 from .chunk_cache import ChunkCache, compute_schema_fingerprint
-
+from .retriever import RetrievedChunk, make_retriever
 
 # ─────────────────────────────────────────────
 # RESULT TYPE
@@ -133,47 +132,47 @@ class Asker:
     def __init__(
         self,
         graph:          SchemaGraph,
-        api_key:        Optional[str] = None,
+        api_key:        str | None = None,
         use_embeddings: bool = False,
         k:              int  = 6,
-        model:          Optional[str] = None,
+        model:          str | None = None,
         use_cache:      bool = True,
-        files:          Optional[list[dict]] = None,
+        files:          list[dict] | None = None,
     ) -> None:
         from ..config import settings as _settings
         self._api_key  = api_key or _settings.api_key or os.environ.get('ANTHROPIC_API_KEY', '')
         self._k        = k
         self._model    = model or self._MODEL
-        
+
         # Try to load from cache if enabled
         chunks_from_cache = None
         embeddings_from_cache = None
         cache_hit = False
-        
+
         if use_cache and files:
             fingerprint = compute_schema_fingerprint(files)
             chunk_cache = ChunkCache()
             cached = chunk_cache.get(fingerprint)
-            
+
             if cached:
                 chunks_from_cache, embeddings_from_cache = cached
                 cache_hit = True
                 if chunks_from_cache:
                     print(f"✓ Loaded {len(chunks_from_cache)} chunks from cache", file=sys.stderr)
-        
+
         # Build chunks if not cached
         if chunks_from_cache:
             self._chunks = chunks_from_cache
         else:
             self._chunks = build_chunks(graph)
-            
+
             # Cache chunks if enabled
             if use_cache and files:
                 fingerprint = compute_schema_fingerprint(files)
                 chunk_cache = ChunkCache()
                 # We'll cache embeddings later if using EmbeddingRetriever
                 chunk_cache.put(fingerprint, self._chunks, metadata={"dialect": getattr(graph, 'dialect', 'oracle')})
-        
+
         # Build retriever (may use cached embeddings if available)
         self._retriever = make_retriever(
             self._chunks,
@@ -190,7 +189,7 @@ class Asker:
 
     # ── Public API ──────────────────────────────────────────────────────
 
-    def ask(self, question: str, k: Optional[int] = None) -> AskResult:
+    def ask(self, question: str, k: int | None = None) -> AskResult:
         """Ask a question and return the full answer synchronously."""
         hits     = self._retriever.retrieve(question, k=k or self._k)
         prompt   = _build_prompt(question, hits)
@@ -207,7 +206,7 @@ class Asker:
             output_tokens=usage.get('output_tokens', 0),
         )
 
-    def ask_stream(self, question: str, k: Optional[int] = None) -> Iterator[str]:
+    def ask_stream(self, question: str, k: int | None = None) -> Iterator[str]:
         """Ask a question and yield answer tokens as they arrive (streaming)."""
         hits   = self._retriever.retrieve(question, k=k or self._k)
         prompt = _build_prompt(question, hits)
@@ -216,7 +215,7 @@ class Asker:
     def ask_print(
         self,
         question: str,
-        k:        Optional[int] = None,
+        k:        int | None = None,
         show_sources: bool = True,
         stream:   bool = True,
     ) -> AskResult:

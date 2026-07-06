@@ -1,12 +1,14 @@
 """Schema evolution commands: diff, rollback-analysis, simulate, drift, integrity."""
+from __future__ import annotations
 
-import sys
+import contextlib
 import json
+import sys
 from pathlib import Path
 
+from ..analysis.differ import SchemaDiffer, diff_files
 from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import reconstruct, reconstruct_at
-from ..analysis.differ import SchemaDiffer, diff_files
 from ._utils import load_files, write_output
 
 
@@ -83,7 +85,11 @@ def cmd_rollback_analysis(
 ) -> None:
     """Analyze migration rollback feasibility."""
     files = load_files(migrations_dir, json_input, use_cache=False)
-    from ..analysis.rollback import analyze_migrations, format_rollback_text, format_rollback_json
+    from ..analysis.rollback import (
+        analyze_migrations,
+        format_rollback_json,
+        format_rollback_text,
+    )
 
     results = analyze_migrations(files)
     fmt = (format or "text").lower()
@@ -143,7 +149,10 @@ def cmd_integrity(
     strict: bool = False,
 ) -> None:
     """Check migration file integrity using SHA256 hashes."""
-    from ..analysis.integrity import check_integrity, update_manifest as _update_manifest
+    from ..analysis.integrity import (
+        check_integrity,
+        update_manifest as _update_manifest,
+    )
 
     migrations_dir_path = Path(migrations_dir)
     fmt = (format or "text").lower()
@@ -232,10 +241,8 @@ def cmd_drift(
             for file_dict in target_files:
                 parsed = parse_migration_filename(file_dict["filename"])
                 if parsed and parsed["version"]:
-                    try:
+                    with contextlib.suppress(ValueError, AttributeError):
                         versions.append(int(parsed["version"].split(".")[0]))
-                    except (ValueError, AttributeError):
-                        pass
             version = str(max(versions) + 1) if versions else "1"
 
         migration_content = generate_repair_migration(report, version, description)

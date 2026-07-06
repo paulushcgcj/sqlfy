@@ -3,11 +3,11 @@ tests.test_insights_migrations
 ================================
 Tests for migration-specific anti-pattern detection (Feature #20).
 """
+from __future__ import annotations
 
-import pytest
 from sqlfy.analysis.insights import InsightsEngine
-from sqlfy.reconstructor import reconstruct
 from sqlfy.domain.schema_state import SchemaStateBuilder
+from sqlfy.reconstructor import reconstruct
 
 
 def test_add_not_null_no_default_detected():
@@ -22,11 +22,11 @@ def test_add_not_null_no_default_detected():
             'sql': 'ALTER TABLE users ADD (status VARCHAR2(20) NOT NULL);'
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should detect ADD_NOT_NULL_NO_DEFAULT
     findings = [f for f in report.findings if f.code == 'ADD_NOT_NULL_NO_DEFAULT']
     assert len(findings) >= 1
@@ -46,11 +46,11 @@ def test_add_not_null_with_default_not_flagged():
             'sql': 'ALTER TABLE users ADD (status VARCHAR2(20) DEFAULT \'active\' NOT NULL);'
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should NOT detect ADD_NOT_NULL_NO_DEFAULT
     findings = [f for f in report.findings if f.code == 'ADD_NOT_NULL_NO_DEFAULT']
     assert len(findings) == 0
@@ -67,11 +67,11 @@ def test_select_star_view_detected():
             '''
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should detect SELECT_STAR_VIEW
     findings = [f for f in report.findings if f.code == 'SELECT_STAR_VIEW']
     assert len(findings) >= 1
@@ -90,11 +90,11 @@ def test_select_star_view_not_detected_without_star():
             '''
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should NOT detect SELECT_STAR_VIEW
     findings = [f for f in report.findings if f.code == 'SELECT_STAR_VIEW']
     assert len(findings) == 0
@@ -129,11 +129,11 @@ def test_trigger_with_business_logic_detected():
             '''
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should detect TRIGGER_WITH_BUSINESS_LOGIC
     findings = [f for f in report.findings if f.code == 'TRIGGER_WITH_BUSINESS_LOGIC']
     assert len(findings) >= 1
@@ -157,11 +157,11 @@ def test_simple_trigger_not_flagged():
             '''
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should NOT detect TRIGGER_WITH_BUSINESS_LOGIC (too short, no IF/CASE)
     findings = [f for f in report.findings if f.code == 'TRIGGER_WITH_BUSINESS_LOGIC']
     assert len(findings) == 0
@@ -179,11 +179,11 @@ def test_large_delete_no_where_detected():
             'sql': 'DELETE FROM temp_data;'
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should detect LARGE_DELETE_NO_WHERE
     findings = [f for f in report.findings if f.code == 'LARGE_DELETE_NO_WHERE']
     assert len(findings) >= 1
@@ -203,11 +203,11 @@ def test_delete_with_where_not_flagged():
             'sql': "DELETE FROM users WHERE status = 'inactive';"
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should NOT detect LARGE_DELETE_NO_WHERE
     findings = [f for f in report.findings if f.code == 'LARGE_DELETE_NO_WHERE']
     assert len(findings) == 0
@@ -225,17 +225,17 @@ def test_migration_findings_category():
             '''
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # All migration-specific findings should have category='migrations'
     migration_findings = [f for f in report.findings if f.code in (
         'ADD_NOT_NULL_NO_DEFAULT', 'SELECT_STAR_VIEW',
         'TRIGGER_WITH_BUSINESS_LOGIC', 'LARGE_DELETE_NO_WHERE'
     )]
-    
+
     for finding in migration_findings:
         assert finding.category == 'migrations'
 
@@ -253,11 +253,11 @@ def test_multiple_migration_antipatterns_in_one_file():
             '''
         }
     ]
-    
+
     graph = reconstruct(files, dialect='oracle')
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     report = InsightsEngine.analyse(state)
-    
+
     # Should detect all three patterns
     codes = {f.code for f in report.findings}
     assert 'ADD_NOT_NULL_NO_DEFAULT' in codes

@@ -1,8 +1,7 @@
 """Additional tests for provenance flags and non-git behavior."""
+from __future__ import annotations
 
-import json
 import pytest
-from pathlib import Path
 
 from sqlfy.analysis.provenance import collect_provenance
 

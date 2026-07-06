@@ -1,18 +1,45 @@
 #!/usr/bin/env python3
 """sqlfy CLI entry point — subcommand and legacy modes."""
+from __future__ import annotations
 
-import sys
 import argparse
+import sys
 
 from .commands import (
-    cmd_dump, cmd_manifest, cmd_chunks, cmd_export, legacy_main,
-    cmd_graph, cmd_graph_migrations, cmd_build_graph,
-    cmd_diff, cmd_diff_versions, cmd_rollback_analysis, cmd_simulate, cmd_integrity, cmd_drift,
-    cmd_insights, cmd_health, cmd_domains, cmd_stability,
-    cmd_ask, cmd_chat, cmd_query, _QUERY_TYPES,
+    _QUERY_TYPES,
+    cmd_ask,
+    cmd_build_graph,
+    cmd_cache,
+    cmd_chat,
+    cmd_chunks,
+    cmd_classify,
+    cmd_cost,
+    cmd_deps,
+    cmd_diff,
+    cmd_diff_versions,
+    cmd_domains,
+    cmd_drift,
+    cmd_dump,
+    cmd_export,
+    cmd_graph,
+    cmd_graph_migrations,
+    cmd_health,
     cmd_impact,
-    cmd_lint, cmd_validate, cmd_deps, cmd_lineage, cmd_cache, cmd_classify, cmd_safety,
-    cmd_cost, cmd_provenance, cmd_naming,
+    cmd_insights,
+    cmd_integrity,
+    cmd_lineage,
+    cmd_lint,
+    cmd_manifest,
+    cmd_naming,
+    cmd_pii_scan,
+    cmd_provenance,
+    cmd_query,
+    cmd_rollback_analysis,
+    cmd_safety,
+    cmd_simulate,
+    cmd_stability,
+    cmd_validate,
+    legacy_main,
 )
 
 KNOWN_SUBCOMMANDS = {
@@ -22,7 +49,7 @@ KNOWN_SUBCOMMANDS = {
     "provenance", "cost",
     "naming",
     "domains", "stability", "validate", "deps", "lineage", "drift",
-    "classify", "safety",
+    "classify", "safety", "pii-scan",
 }
 
 
@@ -388,6 +415,16 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         help="Show per-statement breakdown for each migration",
     )
     p.set_defaults(func=cmd_safety)
+
+    # pii-scan
+    p = sub.add_parser("pii-scan", help="Scan schema columns for PII patterns")
+    shared(p)
+    p.add_argument("--format", choices=["json", "text"], default="text")
+    p.add_argument("--min-confidence", type=float, default=0.6, metavar="FLOAT",
+                   help="Filter findings below this confidence (default: 0.6)")
+    p.add_argument("--extra-patterns", metavar="FILE",
+                   help="JSON file with additional patterns: {\"category\": [\"regex\", ...]}")
+    p.set_defaults(func=cmd_pii_scan)
 
     return parser
 

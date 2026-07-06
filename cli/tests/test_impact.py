@@ -3,16 +3,17 @@ test_impact.py
 ==============
 Tests for impact analysis module (Feature #3).
 """
+from __future__ import annotations
 
 import networkx as nx
 
 from sqlfy.analysis.impact import (
-    analyze_impact,
     ImpactResult,
-    format_impact_text,
-    format_impact_json,
-    format_impact_from_diff_text,
+    analyze_impact,
     format_impact_from_diff_json,
+    format_impact_from_diff_text,
+    format_impact_json,
+    format_impact_text,
     merge_impact_results,
 )
 
@@ -25,7 +26,7 @@ def test_impact_result_total_count():
         transitive=['D', 'E', 'F'],
         depth_map={'B': 1, 'C': 1, 'D': 2, 'E': 2, 'F': 3},
     )
-    
+
     assert result.total_count == 5
 
 
@@ -40,9 +41,9 @@ def test_impact_result_to_dict():
         critical_paths=[['A', 'B', 'C']],
         max_depth=2,
     )
-    
+
     data = result.to_dict()
-    
+
     assert data['object_id'] == 'A'
     assert data['direct'] == ['B']
     assert data['transitive'] == ['C']
@@ -54,9 +55,9 @@ def test_analyze_impact_nonexistent_node():
     """Test impact analysis for non-existent node returns empty result."""
     G = nx.DiGraph()
     G.add_node('A')
-    
+
     result = analyze_impact(G, 'NONEXISTENT')
-    
+
     assert result.object_id == 'NONEXISTENT'
     assert result.total_count == 0
     assert result.direct == []
@@ -72,9 +73,9 @@ def test_analyze_impact_linear_chain():
     G.add_node('C', type='view')
     G.add_node('D', type='procedure')
     G.add_edges_from([('A', 'B'), ('B', 'C'), ('C', 'D')])
-    
+
     result = analyze_impact(G, 'A', max_depth=5)
-    
+
     assert result.object_id == 'A'
     assert result.direct == ['B']
     assert set(result.transitive) == {'C', 'D'}
@@ -90,9 +91,9 @@ def test_analyze_impact_branching():
     for node in ['A', 'B', 'C', 'D']:
         G.add_node(node, type='table')
     G.add_edges_from([('A', 'B'), ('A', 'C'), ('B', 'D'), ('C', 'D')])
-    
+
     result = analyze_impact(G, 'A', max_depth=5)
-    
+
     assert result.object_id == 'A'
     assert set(result.direct) == {'B', 'C'}
     assert result.transitive == ['D']
@@ -108,9 +109,9 @@ def test_analyze_impact_circular_dependency():
     for node in ['A', 'B', 'C']:
         G.add_node(node, type='table')
     G.add_edges_from([('A', 'B'), ('B', 'C'), ('C', 'A')])
-    
+
     result = analyze_impact(G, 'A', max_depth=5)
-    
+
     # Should visit each node once and stop
     assert result.object_id == 'A'
     assert result.total_count == 2  # B and C
@@ -125,9 +126,9 @@ def test_analyze_impact_max_depth_limit():
     for node in ['A', 'B', 'C', 'D', 'E']:
         G.add_node(node, type='table')
     G.add_edges_from([('A', 'B'), ('B', 'C'), ('C', 'D'), ('D', 'E')])
-    
+
     result = analyze_impact(G, 'A', max_depth=2)
-    
+
     # Should only reach B and C (depth 1 and 2)
     assert result.total_count == 2
     assert 'B' in result.direct
@@ -144,9 +145,9 @@ def test_analyze_impact_by_type_grouping():
     G.add_node('C', type='view')
     G.add_node('D', type='procedure')
     G.add_edges_from([('A', 'B'), ('A', 'C'), ('A', 'D')])
-    
+
     result = analyze_impact(G, 'A')
-    
+
     assert 'table' in result.by_type
     assert 'view' in result.by_type
     assert 'procedure' in result.by_type
@@ -163,9 +164,9 @@ def test_analyze_impact_critical_paths():
     for node in ['A', 'B', 'C', 'D', 'E']:
         G.add_node(node, type='table')
     G.add_edges_from([('A', 'B'), ('B', 'D'), ('A', 'C'), ('C', 'E')])
-    
+
     result = analyze_impact(G, 'A')
-    
+
     # Should have 2 critical paths
     assert len(result.critical_paths) == 2
     paths_set = {tuple(path) for path in result.critical_paths}
@@ -180,9 +181,9 @@ def test_analyze_impact_undirected_graph():
     G.add_node('B', type='table')
     G.add_node('C', type='table')
     G.add_edges_from([('A', 'B'), ('B', 'C')])
-    
+
     result = analyze_impact(G, 'A')
-    
+
     # In undirected graph, neighbors are all connected nodes
     assert result.total_count == 2
     assert 'B' in result.direct
@@ -196,10 +197,10 @@ def test_analyze_impact_follow_direction_in():
     for node in ['A', 'B', 'C']:
         G.add_node(node, type='table')
     G.add_edges_from([('A', 'B'), ('B', 'C')])
-    
+
     # Analyze C with direction='in' (what depends ON C? nothing)
     result = analyze_impact(G, 'C', follow_direction='in')
-    
+
     # Should find B and A (predecessors)
     assert result.total_count == 2
     assert 'B' in result.direct
@@ -211,9 +212,9 @@ def test_analyze_impact_isolated_node():
     G = nx.DiGraph()
     G.add_node('A', type='table')
     G.add_node('B', type='table')  # No edge to A
-    
+
     result = analyze_impact(G, 'A')
-    
+
     assert result.total_count == 0
     assert result.direct == []
     assert result.transitive == []
@@ -223,10 +224,10 @@ def test_format_impact_text_no_affected():
     """Test text formatting when no objects are affected."""
     G = nx.DiGraph()
     G.add_node('A', type='table')
-    
+
     result = analyze_impact(G, 'A')
     text = format_impact_text(result, G)
-    
+
     assert 'No affected objects found' in text
     assert 'Impact Analysis: A' in text
 
@@ -238,10 +239,10 @@ def test_format_impact_text_with_affected():
     G.add_node('B', type='view')
     G.add_node('C', type='procedure')
     G.add_edges_from([('A', 'B'), ('B', 'C')])
-    
+
     result = analyze_impact(G, 'A')
     text = format_impact_text(result, G)
-    
+
     assert 'Impact Analysis: A' in text
     assert 'Total affected: 2' in text
     assert 'Direct dependencies (1):' in text
@@ -261,9 +262,9 @@ def test_format_impact_json():
         critical_paths=[['A', 'B', 'C']],
         max_depth=2,
     )
-    
+
     json_str = format_impact_json(result)
-    
+
     assert '"objectId": "A"' in json_str
     assert '"direct": [\n    "B"\n  ]' in json_str or '"direct":["B"]' in json_str
     assert '"totalCount": 2' in json_str
@@ -284,20 +285,20 @@ def test_analyze_impact_complex_graph():
         ('C', 'D'),
         ('D', 'F'),
     ])
-    
+
     result = analyze_impact(G, 'A')
-    
+
     # Direct: B, C
     assert set(result.direct) == {'B', 'C'}
-    
+
     # Transitive: D (via B or C), E (via B), F (via D)
     assert set(result.transitive) == {'D', 'E', 'F'}
-    
+
     # D should be at depth 2 (shortest path from A)
     assert result.depth_map['D'] == 2
     assert result.depth_map['E'] == 2
     assert result.depth_map['F'] == 3
-    
+
     # Should have 2 critical paths: A→B→E and A→B→D→F (or A→C→D→F)
     assert len(result.critical_paths) >= 2
 
@@ -313,7 +314,7 @@ def test_analyze_impact_real_schema_pattern():
     G.add_node('PRODUCTS', type='table')
     G.add_node('AUDIT_LOG', type='table')
     G.add_node('V_ORDER_SUMMARY', type='view')
-    
+
     G.add_edges_from([
         ('USERS', 'ORDERS'),
         ('ORDERS', 'ORDER_ITEMS'),
@@ -321,16 +322,16 @@ def test_analyze_impact_real_schema_pattern():
         ('ORDER_ITEMS', 'PRODUCTS'),
         ('USERS', 'AUDIT_LOG'),
     ])
-    
+
     # What's affected if USERS changes?
     result = analyze_impact(G, 'USERS')
-    
+
     assert 'ORDERS' in result.direct
     assert 'AUDIT_LOG' in result.direct
     assert 'ORDER_ITEMS' in result.transitive
     assert 'V_ORDER_SUMMARY' in result.transitive
     assert 'PRODUCTS' in result.transitive
-    
+
     # Check type grouping
     assert 'table' in result.by_type
     assert 'view' in result.by_type

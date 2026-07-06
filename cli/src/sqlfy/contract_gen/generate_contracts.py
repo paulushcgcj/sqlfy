@@ -38,9 +38,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 # Default output directory — ``cli/build/contracts/``.
 # __file__ = cli/src/sqlfy/contract_gen/generate_contracts.py
@@ -72,8 +71,8 @@ def generate_all(output_dir: Path | None = None) -> Path:
     RuntimeError
         If schema generation fails for any contract.
     """
-    from sqlfy.contracts.registry import all_contracts
     from sqlfy.contracts.common.metadata import BuildInfo
+    from sqlfy.contracts.registry import all_contracts
 
     if output_dir is None:
         output_dir = _DEFAULT_OUT
@@ -136,7 +135,7 @@ def generate_all(output_dir: Path | None = None) -> Path:
 
     # ── index.json ────────────────────────────────────────────────────────
     index = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "contracts": index_entries,
     }
     index_path = output_dir / "index.json"
@@ -153,7 +152,7 @@ def generate_all(output_dir: Path | None = None) -> Path:
         json.dumps(build_info.to_dict(), indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    print(f"  OK      manifest.json", file=sys.stderr)
+    print("  OK      manifest.json", file=sys.stderr)
     print(
         f"[contracts] Done — {len(generated_keys)} schema(s) written to {output_dir}",
         file=sys.stderr,
@@ -173,7 +172,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help=(
             "Output directory for generated artifacts.  "
-            f"Default: cli/build/contracts/"
+            "Default: cli/build/contracts/"
         ),
     )
     return parser.parse_args(argv)

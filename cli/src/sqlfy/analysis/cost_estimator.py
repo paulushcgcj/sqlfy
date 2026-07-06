@@ -12,17 +12,16 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 import sqlglot
 import sqlglot.expressions as exp
-
 
 # ── Weight profiles ──────────────────────────────────────────────────────────
 # Each profile maps op_type substrings (case-insensitive) to a multiplier.
 # Patterns are checked via "fragment in op_type.lower()"; first match wins.
 # The special key "*" is the catch-all fallback multiplier (default 1.0).
-WEIGHT_PROFILES: Dict[str, Dict[str, float]] = {
+WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     # Default: conservative — all operations scored at face value.
     "default": {},
     # PL/SQL: tuned for Oracle-heavy repos where packages, procedures, triggers,
@@ -51,7 +50,7 @@ WEIGHT_PROFILES: Dict[str, Dict[str, float]] = {
 }
 
 
-def _apply_profile(ops: List["OperationEstimate"], profile_name: str) -> None:
+def _apply_profile(ops: list[OperationEstimate], profile_name: str) -> None:
     """Apply weight-profile multipliers to a list of OperationEstimate objects in-place."""
     profile = WEIGHT_PROFILES.get(profile_name, {})
     if not profile:
@@ -74,7 +73,7 @@ class OperationEstimate:
     op_type: str
     weight: int
     reason: str
-    tables: List[str] = field(default_factory=list)
+    tables: list[str] = field(default_factory=list)
     est_seconds: float = 0.0
 
 
@@ -83,7 +82,7 @@ class MigrationCost:
     filename: str
     score: int
     category: str
-    operations: List[OperationEstimate] = field(default_factory=list)
+    operations: list[OperationEstimate] = field(default_factory=list)
     estimated_seconds: float = 0.0
 
 
@@ -100,8 +99,8 @@ def _column_is_not_null_no_default(col_def: exp.ColumnDef) -> bool:
     return has_not_null and not has_default
 
 
-def _estimate_statement(stmt: exp.Expression, raw_sql: str) -> List[OperationEstimate]:
-    ops: List[OperationEstimate] = []
+def _estimate_statement(stmt: exp.Expression, raw_sql: str) -> list[OperationEstimate]:
+    ops: list[OperationEstimate] = []
     raw_up = raw_sql.upper()
 
     # CREATE
@@ -204,9 +203,9 @@ def _estimate_statement(stmt: exp.Expression, raw_sql: str) -> List[OperationEst
     return ops
 
 
-def _extract_table_names(stmt: exp.Expression, raw_sql: str) -> List[str]:
+def _extract_table_names(stmt: exp.Expression, raw_sql: str) -> list[str]:
     """Return a list of table names referenced in the statement (best-effort)."""
-    names: List[str] = []
+    names: list[str] = []
     try:
         for t in stmt.find_all(exp.Table):
             try:
@@ -231,7 +230,7 @@ def _extract_table_names(stmt: exp.Expression, raw_sql: str) -> List[str]:
 
     # Deduplicate while preserving order
     seen = set()
-    out: List[str] = []
+    out: list[str] = []
     for n in names:
         if n not in seen:
             seen.add(n)
@@ -239,7 +238,7 @@ def _extract_table_names(stmt: exp.Expression, raw_sql: str) -> List[str]:
     return out
 
 
-def _get_table_stats(name: str | None, table_stats: Dict[str, Dict[str, Any]] | None, default_rows: int, default_size: int) -> tuple[int, int]:
+def _get_table_stats(name: str | None, table_stats: dict[str, dict[str, Any]] | None, default_rows: int, default_size: int) -> tuple[int, int]:
     """Lookup table stats by exact or short name; return (rows, avg_row_size).
 
     Table stats keys are normalized to lower-case when provided.
@@ -271,7 +270,7 @@ def estimate_migration(
     filename: str,
     content: str,
     dialect: str = "oracle",
-    table_stats: Dict[str, Dict[str, Any]] | None = None,
+    table_stats: dict[str, dict[str, Any]] | None = None,
     throughput_bytes_per_sec: int = 100 * 1024 * 1024,
     default_rows: int = 100_000,
     default_row_size: int = 200,
@@ -290,7 +289,7 @@ def estimate_migration(
         weight_profile: scoring profile — 'default', 'plsql', or 'data-migration'
     """
     stmts = sqlglot.parse(content, dialect=dialect, error_level=sqlglot.ErrorLevel.WARN)
-    ops: List[OperationEstimate] = []
+    ops: list[OperationEstimate] = []
     total_seconds = 0.0
 
     for stmt in stmts:
@@ -384,12 +383,12 @@ def estimate_migration(
 
 
 def estimate_migrations(
-    files: List[Dict[str, Any]],
+    files: list[dict[str, Any]],
     dialect: str = "oracle",
-    table_stats: Dict[str, Dict[str, Any]] | None = None,
+    table_stats: dict[str, dict[str, Any]] | None = None,
     throughput_bytes_per_sec: int = 100 * 1024 * 1024,
     weight_profile: str = "default",
-) -> List[MigrationCost]:
+) -> list[MigrationCost]:
     return [
         estimate_migration(
             f["filename"],
@@ -403,12 +402,12 @@ def estimate_migrations(
     ]
 
 
-def format_text(results: List[MigrationCost], verbose: bool = False, weight_profile: str = "default") -> str:
+def format_text(results: list[MigrationCost], verbose: bool = False, weight_profile: str = "default") -> str:
     if not results:
         return "No migrations to estimate."
 
     profile_note = f"  (weight profile: {weight_profile})" if weight_profile != "default" else ""
-    lines: List[str] = [f"Migration Cost Estimates{profile_note}", "=" * 24, ""]
+    lines: list[str] = [f"Migration Cost Estimates{profile_note}", "=" * 24, ""]
     max_name = max(len(r.filename) for r in results)
     for r in results:
         pad = max_name - len(r.filename)
@@ -419,7 +418,7 @@ def format_text(results: List[MigrationCost], verbose: bool = False, weight_prof
     return "\n".join(lines)
 
 
-def format_json(results: List[MigrationCost]) -> str:
+def format_json(results: list[MigrationCost]) -> str:
     data = {
         "migrations": [
             {

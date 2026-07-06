@@ -1,6 +1,5 @@
 """Tests for migration execution cost estimation (Feature #19)."""
-
-from pathlib import Path
+from __future__ import annotations
 
 from sqlfy.analysis.cost_estimator import estimate_migration, estimate_migrations
 

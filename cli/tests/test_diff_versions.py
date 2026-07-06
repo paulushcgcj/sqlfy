@@ -1,13 +1,10 @@
 """Tests for cmd_diff_versions (diff-versions subcommand) added to evolution.py."""
+from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
-import pytest
-
 from sqlfy.commands.evolution import cmd_diff_versions
-
 
 # ── minimal migration fixtures ────────────────────────────────────────────────
 

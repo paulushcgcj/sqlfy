@@ -3,13 +3,15 @@
 Detects tampering or edits to migration files by maintaining a manifest
 of file hashes and comparing current state against recorded state.
 """
+from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -108,14 +110,10 @@ def save_manifest(manifest: dict[str, MigrationHash], manifest_path: Path) -> No
         os.close(fd)
         os.replace(tmp, manifest_path)
     except Exception:
-        try:
+        with contextlib.suppress(BaseException):
             os.close(fd)
-        except:
-            pass
-        try:
+        with contextlib.suppress(BaseException):
             os.unlink(tmp)
-        except:
-            pass
         raise
 
 
@@ -205,7 +203,7 @@ def update_manifest(migrations_dir: Path) -> None:
         f for f in migrations_dir.iterdir() if f.suffix.lower() == ".sql" and f.name.startswith("V")
     )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     for f in sql_files:
         current_hash = compute_file_hash(f)

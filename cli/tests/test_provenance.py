@@ -1,14 +1,17 @@
 """Tests for provenance collection and verification (Feature #18)."""
+from __future__ import annotations
 
-import json
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from sqlfy.analysis.provenance import collect_provenance, write_manifest, verify_manifest
-
+from sqlfy.analysis.provenance import (
+    collect_provenance,
+    verify_manifest,
+    write_manifest,
+)
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not available")
 

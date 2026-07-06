@@ -8,10 +8,11 @@ Packages:
   - parser     Flyway filename/version parsing
   - cache      Parsed schema caching
 """
+from __future__ import annotations
 
-from .parser import parse_flyway_ver
+from .cache import clear_cache, load_cached, save_cached
 from .loader import load_files
-from .cache import load_cached, save_cached, clear_cache
+from .parser import parse_flyway_ver
 
 __all__ = [
     "parse_flyway_ver",

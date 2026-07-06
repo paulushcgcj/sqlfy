@@ -16,11 +16,10 @@ advanced NetworkX-based analysis.
 
 from __future__ import annotations
 
+import contextlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-import json
-import sys
 
 try:
     import networkx as nx
@@ -64,10 +63,10 @@ class DependencyAnalysis:
 def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
     """
     Analyze migration dependencies.
-    
+
     Args:
         migrations_dir: Path to migrations directory
-    
+
     Returns:
         DependencyAnalysis with validation results
     """
@@ -77,19 +76,19 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
             "Install with: pip install networkx"
         )
     assert nx is not None
-    
+
     # Import here to avoid circular dependency
     from ..migration_graph import build_migration_graph
-    
+
     # Load migration files directly
     files_data = []
     for file_path in sorted(migrations_dir.glob('*.sql')):
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             files_data.append({
                 'filename': file_path.name,
                 'sql': f.read()
             })
-    
+
     if not files_data:
         return DependencyAnalysis(
             migrations=[],
@@ -102,30 +101,30 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
             issues=[],
             unreferenced_objects=[]
         )
-    
+
     # Build migration graph
     graph = build_migration_graph(files_data)
-    
+
     # Build NetworkX directed graph for analysis
     G = nx.DiGraph()
-    
+
     # Add all migration nodes
-    for version in graph.nodes.keys():
+    for version in graph.nodes:
         G.add_node(version)
-    
+
     # Add dependency edges (from_version depends on to_version, so edge goes from to → from)
     for from_version, to_version in graph.edges:
         G.add_edge(from_version, to_version)
-    
+
     # Build dependency maps
     dependency_map = {version: sorted(node.dependencies) for version, node in graph.nodes.items()}
-    reverse_dependency_map = {version: [] for version in graph.nodes.keys()}
+    reverse_dependency_map = {version: [] for version in graph.nodes}
     for version, deps in dependency_map.items():
         for dep_version in deps:
             reverse_dependency_map[dep_version].append(version)
     for version in reverse_dependency_map:
         reverse_dependency_map[version] = sorted(reverse_dependency_map[version])
-    
+
     # Detect circular dependencies
     circular_dependencies = []
     try:
@@ -133,7 +132,7 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
         circular_dependencies = cycles
     except Exception:
         pass
-    
+
     # Find parallel-safe sets (topological layers)
     parallel_safe_sets = []
     if not circular_dependencies:
@@ -143,19 +142,17 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
         except nx.NetworkXError:
             # Graph has cycles, cannot do topological sort
             pass
-    
+
     # Find critical path (longest path in DAG)
     critical_path = []
     if not circular_dependencies:
-        try:
+        with contextlib.suppress(Exception):
             critical_path = nx.dag_longest_path(G)
-        except Exception:
-            pass
-    
+
     # Validate dependencies and collect issues
     issues = []
     unreferenced_objects = []
-    
+
     # Check for circular dependencies
     if circular_dependencies:
         for cycle in circular_dependencies:
@@ -166,13 +163,13 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
                 message=f'Circular dependency detected: {cycle_str}',
                 migrations=cycle
             ))
-    
+
     # Check for unreferenced objects (migrations reference objects never created)
     all_created_objects = set()
     for node in graph.nodes.values():
         for table in node.creates:
             all_created_objects.add(table)
-    
+
     for version, node in graph.nodes.items():
         for table in node.references:
             if table not in all_created_objects:
@@ -183,7 +180,7 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
                     message=f'Migration {version} references table {table} that is never created',
                     migrations=[version]
                 ))
-        
+
         for table in node.alters:
             if table not in all_created_objects:
                 unreferenced_objects.append((version, table))
@@ -193,7 +190,7 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
                     message=f'Migration {version} alters table {table} that is never created',
                     migrations=[version]
                 ))
-    
+
     # Check for migrations with no dependencies (isolated migrations)
     for version, node in graph.nodes.items():
         if not node.dependencies and not node.creates:
@@ -203,7 +200,7 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
                 message=f'Migration {version} has no dependencies and creates no objects',
                 migrations=[version]
             ))
-    
+
     return DependencyAnalysis(
         migrations=sorted(graph.nodes.keys()),
         total_dependencies=len(graph.edges),
@@ -224,11 +221,11 @@ def analyze_dependencies(migrations_dir: Path) -> DependencyAnalysis:
 def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
     """
     Format dependency analysis as human-readable text.
-    
+
     Args:
         analysis: DependencyAnalysis results
         show_details: Whether to show detailed dependency information
-    
+
     Returns:
         Formatted text output
     """
@@ -236,7 +233,7 @@ def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
     lines.append("Migration Dependency Analysis")
     lines.append("=" * 50)
     lines.append("")
-    
+
     # Summary statistics
     lines.append(f"Total Migrations: {len(analysis.migrations)}")
     lines.append(f"Total Dependencies: {analysis.total_dependencies}")
@@ -244,12 +241,12 @@ def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
     lines.append(f"Parallel-Safe Sets: {len(analysis.parallel_safe_sets)}")
     lines.append(f"Critical Path Length: {len(analysis.critical_path)}")
     lines.append("")
-    
+
     # Issues summary
     error_count = sum(1 for issue in analysis.issues if issue.severity == 'error')
     warning_count = sum(1 for issue in analysis.issues if issue.severity == 'warning')
     info_count = sum(1 for issue in analysis.issues if issue.severity == 'info')
-    
+
     lines.append(f"Issues Found: {len(analysis.issues)} total")
     if error_count > 0:
         lines.append(f"  ❌ {error_count} error(s)")
@@ -260,7 +257,7 @@ def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
     if len(analysis.issues) == 0:
         lines.append("  ✅ No issues found")
     lines.append("")
-    
+
     # Critical path
     if analysis.critical_path:
         lines.append("Critical Path (Longest Dependency Chain)")
@@ -268,7 +265,7 @@ def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
         lines.append(" → ".join(analysis.critical_path))
         lines.append(f"({len(analysis.critical_path)} migrations must run sequentially)")
         lines.append("")
-    
+
     # Parallel-safe sets
     if analysis.parallel_safe_sets:
         lines.append("Parallel-Safe Migration Sets")
@@ -279,7 +276,7 @@ def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
             else:
                 lines.append(f"Layer {i}: {pset[0]}")
         lines.append("")
-    
+
     # Detailed dependency information
     if show_details:
         lines.append("Migration Dependencies")
@@ -287,56 +284,56 @@ def format_text(analysis: DependencyAnalysis, show_details: bool = True) -> str:
         for version in analysis.migrations:
             deps = analysis.dependency_map.get(version, [])
             rev_deps = analysis.reverse_dependency_map.get(version, [])
-            
+
             lines.append(f"\n{version}")
             if deps:
                 lines.append(f"  Depends on: {', '.join(deps)}")
             else:
-                lines.append(f"  Depends on: (none)")
-            
+                lines.append("  Depends on: (none)")
+
             if rev_deps:
                 lines.append(f"  Required by: {', '.join(rev_deps)}")
             else:
-                lines.append(f"  Required by: (none)")
+                lines.append("  Required by: (none)")
         lines.append("")
-    
+
     # Issues detail
     if analysis.issues:
         lines.append("Issues Detail")
         lines.append("-" * 50)
-        
+
         # Group by severity
         errors = [i for i in analysis.issues if i.severity == 'error']
         warnings = [i for i in analysis.issues if i.severity == 'warning']
         infos = [i for i in analysis.issues if i.severity == 'info']
-        
+
         if errors:
             lines.append("\nERRORS:")
             for issue in errors:
                 lines.append(f"  [{issue.code}] {issue.message}")
-        
+
         if warnings:
             lines.append("\nWARNINGS:")
             for issue in warnings:
                 lines.append(f"  [{issue.code}] {issue.message}")
-        
+
         if infos:
             lines.append("\nINFO:")
             for issue in infos:
                 lines.append(f"  [{issue.code}] {issue.message}")
-        
+
         lines.append("")
-    
+
     return "\n".join(lines)
 
 
 def format_json(analysis: DependencyAnalysis) -> str:
     """
     Format dependency analysis as JSON.
-    
+
     Args:
         analysis: DependencyAnalysis results
-    
+
     Returns:
         JSON string
     """
@@ -375,10 +372,10 @@ def format_json(analysis: DependencyAnalysis) -> str:
 def format_dot(analysis: DependencyAnalysis) -> str:
     """
     Format dependency analysis as Graphviz DOT format.
-    
+
     Args:
         analysis: DependencyAnalysis results
-    
+
     Returns:
         DOT format string
     """
@@ -386,13 +383,13 @@ def format_dot(analysis: DependencyAnalysis) -> str:
     lines.append('  rankdir=LR;')
     lines.append('  node [shape=box, style="rounded,filled"];')
     lines.append('')
-    
+
     # Determine node colors based on issues
     problematic_migrations = set()
     for issue in analysis.issues:
         if issue.severity == 'error':
             problematic_migrations.update(issue.migrations)
-    
+
     # Add nodes
     for version in analysis.migrations:
         if version in problematic_migrations:
@@ -401,16 +398,16 @@ def format_dot(analysis: DependencyAnalysis) -> str:
             color = 'gold'  # On critical path
         else:
             color = 'lightblue'
-        
+
         lines.append(f'  "{version}" [fillcolor={color}];')
-    
+
     lines.append('')
-    
+
     # Add edges from dependency_map
     for version, deps in analysis.dependency_map.items():
         for dep_version in deps:
             lines.append(f'  "{dep_version}" -> "{version}";')
-    
+
     # Highlight critical path
     if analysis.critical_path and len(analysis.critical_path) > 1:
         lines.append('')
@@ -419,7 +416,7 @@ def format_dot(analysis: DependencyAnalysis) -> str:
             from_ver = analysis.critical_path[i]
             to_ver = analysis.critical_path[i + 1]
             lines.append(f'  "{from_ver}" -> "{to_ver}" [color=red, penwidth=2];')
-    
+
     # Add legend
     lines.append('')
     lines.append('  // Legend')
@@ -430,7 +427,7 @@ def format_dot(analysis: DependencyAnalysis) -> str:
     lines.append('    legend_critical [label="Critical Path", fillcolor=gold, shape=box, style="rounded,filled"];')
     lines.append('    legend_normal [label="Normal", fillcolor=lightblue, shape=box, style="rounded,filled"];')
     lines.append('  }')
-    
+
     lines.append('}')
     return '\n'.join(lines)
 
@@ -442,17 +439,17 @@ def format_dot(analysis: DependencyAnalysis) -> str:
 def validate_dependencies(analysis: DependencyAnalysis, strict: bool = False) -> tuple[bool, str]:
     """
     Validate migration dependencies.
-    
+
     Args:
         analysis: DependencyAnalysis results
         strict: If True, warnings are treated as errors
-    
+
     Returns:
         (is_valid, summary_message)
     """
     error_count = sum(1 for issue in analysis.issues if issue.severity == 'error')
     warning_count = sum(1 for issue in analysis.issues if issue.severity == 'warning')
-    
+
     if strict:
         is_valid = error_count == 0 and warning_count == 0
         if is_valid:

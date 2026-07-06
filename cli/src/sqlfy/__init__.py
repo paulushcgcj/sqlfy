@@ -1,20 +1,35 @@
 # sqlfy cli package
-from .core import apply_migrations, type_str
+from __future__ import annotations
+
+from .analysis.differ import DiffResult, SchemaDiffer, diff_files
+from .analysis.insights import Finding, InsightsEngine, InsightsReport
+from .core import apply_migrations
 from .domain.models import (
-    SchemaGraph, VectorChunk, Table, Column, Edge, Sequence, MigrationAction,
+    Column,
+    Edge,
+    MigrationAction,
+    SchemaGraph,
+    Sequence,
+    Table,
+    VectorChunk,
 )
-from .reconstructor import Reconstructor, reconstruct, reconstruct_at, MigrationResult
 from .domain.schema_state import (
-    SchemaState, SchemaStateBuilder,
-    TableState, ColumnState, ConstraintState, IndexState,
-    SequenceState, RelationshipState, MigrationStep,
+    ColumnState,
+    ConstraintState,
+    IndexState,
+    MigrationStep,
+    RelationshipState,
+    SchemaState,
+    SchemaStateBuilder,
+    SequenceState,
+    TableState,
 )
+from .domain.utils import type_str
 from .output.chunker import build_chunks
-from .output.layout import compute_layout
-from .output.grapher import Grapher
 from .output.exporter import Exporter
-from .analysis.differ import SchemaDiffer, DiffResult, diff_files
-from .analysis.insights import InsightsEngine, InsightsReport, Finding
+from .output.grapher import Grapher
+from .output.layout import compute_layout
+from .reconstructor import MigrationResult, Reconstructor, reconstruct, reconstruct_at
 
 __all__ = [
     'apply_migrations', 'build_chunks', 'compute_layout', 'type_str',

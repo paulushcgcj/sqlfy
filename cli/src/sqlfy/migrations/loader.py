@@ -9,8 +9,8 @@ JSON input file. Integrates with the file cache for fast repeated runs.
 
 from __future__ import annotations
 
-import sys
 import json
+import sys
 from pathlib import Path
 
 

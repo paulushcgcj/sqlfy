@@ -6,15 +6,13 @@ Convert a sqlglot Constraint AST node into a domain Constraint dataclass.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import sqlglot.expressions as exp
 
 from ..domain.models import Constraint
-from .ast_helpers import _table_full, _on_delete_from_options
+from .ast_helpers import _on_delete_from_options, _table_full
 
 
-def _parse_table_constraint(node: exp.Constraint) -> Optional[Constraint]:
+def _parse_table_constraint(node: exp.Constraint) -> Constraint | None:
     """Parse a sqlglot table-level Constraint node into a domain Constraint.
 
     Handles: PRIMARY KEY, UNIQUE, FOREIGN KEY, CHECK constraints.
@@ -42,7 +40,7 @@ def _parse_table_constraint(node: exp.Constraint) -> Optional[Constraint]:
             ref = expr.args.get("reference")
             to_table: str = ""
             to_cols: list[str] = []
-            on_delete: Optional[str] = None
+            on_delete: str | None = None
             if ref:
                 ref_schema = ref.args.get("this")  # Schema wrapping Table
                 if ref_schema:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .ordering import parse_migration_filename, ValidationIssue, ValidationReport
+from .ordering import ValidationIssue, ValidationReport, parse_migration_filename
 
 
 def validate_naming(

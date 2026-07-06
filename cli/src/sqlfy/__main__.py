@@ -1,4 +1,5 @@
 """Module entrypoint for ``python -m sqlfy`` and ``python sqlfy``."""
+from __future__ import annotations
 
 try:
     # Package execution path (python -m sqlfy)

@@ -4,14 +4,19 @@ sqlfy.parsing.extractors.create_table
 Extractor for CREATE TABLE statements.
 """
 from __future__ import annotations
+
 import sqlglot.expressions as exp
-from ...semantic.operations import (
-    AnyOperation, OperationProvenance, ColumnDefinition, ConstraintDefinition,
-    CreateTableOperation,
-)
+
 from ...parsing.ast_helpers import _table_full, _table_schema_name
 from ...parsing.column_parser import _parse_column_def
 from ...parsing.constraint_parser import _parse_table_constraint
+from ...semantic.operations import (
+    AnyOperation,
+    ColumnDefinition,
+    ConstraintDefinition,
+    CreateTableOperation,
+    OperationProvenance,
+)
 from .base import BaseExtractor
 
 

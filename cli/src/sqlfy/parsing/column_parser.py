@@ -6,12 +6,10 @@ Convert a sqlglot ColumnDef AST node into a domain Column dataclass.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import sqlglot.expressions as exp
 
 from ..domain.models import Column
-from .ast_helpers import _table_full, _col_datatype
+from .ast_helpers import _col_datatype, _table_full
 
 
 def _parse_column_def(col_node: exp.ColumnDef) -> Column:
@@ -27,10 +25,10 @@ def _parse_column_def(col_node: exp.ColumnDef) -> Column:
     type_, precision, scale = _col_datatype(col_node.kind)
 
     nullable: bool = True
-    default_val: Optional[str] = None
+    default_val: str | None = None
     primary_key: bool = False
     unique: bool = False
-    references: Optional[dict] = None
+    references: dict | None = None
 
     for c in col_node.constraints:
         kind = c.kind

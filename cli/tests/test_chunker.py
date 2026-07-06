@@ -3,9 +3,18 @@ test_chunker.py
 ===============
 Tests for LLM chunk builder in sqlfy.chunker module.
 """
+from __future__ import annotations
 
-from sqlfy.output.chunker import build_chunks, _type_str
-from sqlfy.domain.models import Column, Table, Sequence, Edge, MigrationHistory, SchemaGraph, Constraint
+from sqlfy.domain.models import (
+    Column,
+    Constraint,
+    Edge,
+    MigrationHistory,
+    SchemaGraph,
+    Sequence,
+    Table,
+)
+from sqlfy.output.chunker import _type_str, build_chunks
 
 
 def test_type_str_simple():
@@ -30,7 +39,7 @@ def test_build_chunks_empty_schema():
     """Test build_chunks with empty schema."""
     graph = SchemaGraph(tables={}, seqs={}, edges=[], mig_hist=[])
     chunks = build_chunks(graph)
-    
+
     # Should still have schema summary and relationship map
     assert len(chunks) >= 2
     assert chunks[0].id == 'schema:summary'
@@ -43,7 +52,7 @@ def test_build_chunks_single_table():
     col1 = Column('id', 'NUMBER', 10, None, False, None, True, False, None)
     col2 = Column('name', 'VARCHAR2', 100, None, False, None, False, False, None)
     table = Table('users', None, 'users', 'users', columns=[col1, col2], created_in='V1')
-    
+
     graph = SchemaGraph(
         tables={'users': table},
         seqs={},
@@ -51,7 +60,7 @@ def test_build_chunks_single_table():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     # Summary + users table + relationship map
     assert len(chunks) == 3
     assert chunks[0].id == 'schema:summary'
@@ -66,7 +75,7 @@ def test_build_chunks_table_content():
     pk = Constraint('users_pk', 'primary_key', ['id'])
     uq = Constraint('users_email_uq', 'unique', ['email'])
     table = Table('users', 'app', 'users', 'app.users', columns=[col1, col2], constraints=[pk, uq], created_in='V1')
-    
+
     graph = SchemaGraph(
         tables={'app.users': table},
         seqs={},
@@ -74,7 +83,7 @@ def test_build_chunks_table_content():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     users_chunk = next(c for c in chunks if c.id == 'table:app.users')
     assert 'TABLE: app.users' in users_chunk.content
     assert 'id: NUMBER(10)' in users_chunk.content
@@ -88,7 +97,7 @@ def test_build_chunks_with_foreign_key():
     users_table = Table('users', None, 'users', 'users', created_in='V1')
     orders_table = Table('orders', None, 'orders', 'orders', created_in='V2')
     edge = Edge('fk1', 'orders', ['user_id'], 'users', ['id'], 'orders_user_fk', 'CASCADE')
-    
+
     graph = SchemaGraph(
         tables={'users': users_table, 'orders': orders_table},
         seqs={},
@@ -96,7 +105,7 @@ def test_build_chunks_with_foreign_key():
         mig_hist=[MigrationHistory('V1', 'init'), MigrationHistory('V2', 'add_orders')],
     )
     chunks = build_chunks(graph)
-    
+
     orders_chunk = next(c for c in chunks if c.id == 'table:orders')
     assert 'REFERENCES (outgoing FK)' in orders_chunk.content
     assert 'users' in orders_chunk.content
@@ -113,7 +122,7 @@ def test_build_chunks_schema_summary_meta():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     summary = chunks[0]
     assert summary.meta['table_count'] == 1
     assert summary.meta['seq_count'] == 0
@@ -130,7 +139,7 @@ def test_build_chunks_with_sequence():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     summary = chunks[0]
     assert 'order_seq' in summary.content
     assert summary.meta['seq_count'] == 1
@@ -141,7 +150,7 @@ def test_build_chunks_relationship_map():
     users_table = Table('users', None, 'users', 'users', created_in='V1')
     orders_table = Table('orders', None, 'orders', 'orders', created_in='V1')
     edge = Edge('fk1', 'orders', ['user_id'], 'users', ['id'], 'orders_user_fk', None)
-    
+
     graph = SchemaGraph(
         tables={'users': users_table, 'orders': orders_table},
         seqs={},
@@ -149,7 +158,7 @@ def test_build_chunks_relationship_map():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     rel_chunk = chunks[-1]
     assert rel_chunk.id == 'schema:relationships'
     assert rel_chunk.type == 'relationship_map'
@@ -167,7 +176,7 @@ def test_build_chunks_table_hint():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     users_chunk = next(c for c in chunks if c.id == 'table:users')
     assert 'Use for' in users_chunk.hint
     assert 'users table' in users_chunk.hint
@@ -184,6 +193,6 @@ def test_build_chunks_unique_ids():
         mig_hist=[MigrationHistory('V1', 'init')],
     )
     chunks = build_chunks(graph)
-    
+
     ids = [c.id for c in chunks]
     assert len(ids) == len(set(ids)), "Chunk IDs must be unique"

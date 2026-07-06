@@ -1,10 +1,11 @@
 """Analysis commands: insights, health, domains, stability."""
+from __future__ import annotations
 
 import sys
 
+from ..analysis.insights import InsightsEngine
 from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import reconstruct, reconstruct_at
-from ..analysis.insights import InsightsEngine
 from ._utils import load_files, write_output
 
 
@@ -33,8 +34,8 @@ def cmd_insights(
     # Optionally detect communities for god-table & surprising-join analysis
     communities: dict[int, list[str]] | None = None
     if detect_domains:
-        from ..graph.builder import build_networkx_graph
         from ..clustering import detect_communities
+        from ..graph.builder import build_networkx_graph
         nx_graph = build_networkx_graph(graph, directed=False)
         comm_result = detect_communities(
             nx_graph,
@@ -100,7 +101,7 @@ def cmd_domains(
     no_split: bool = False,
 ) -> None:
     """Detect semantic business domains via community detection and naming patterns."""
-    from ..analysis.domains import detect_domains, format_text, format_json
+    from ..analysis.domains import detect_domains, format_json, format_text
 
     files = load_files(migrations_dir, json_input)
     graph = (
@@ -132,7 +133,7 @@ def cmd_stability(
     show_all: bool = False,
 ) -> None:
     """Calculate churn rates and stability scores per table."""
-    from ..analysis.stability import calculate_stability, format_text, format_json
+    from ..analysis.stability import calculate_stability, format_json, format_text
 
     files = load_files(migrations_dir, json_input)
     graph = (

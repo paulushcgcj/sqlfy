@@ -12,10 +12,10 @@ Usage
 -----
     from cli.core import build_networkx_graph
     from cli.graph_export import export_graph_json, export_graph_html, export_graph_report
-    
+
     graph = build_networkx_graph(schema_graph)
     communities = _compute_communities(graph)  # Feature #4, placeholder for now
-    
+
     export_graph_json(graph, communities, Path('graph.json'))
     export_graph_html(graph, communities, Path('graph.html'))
     export_graph_report(graph, Path('GRAPH_REPORT.md'))
@@ -29,9 +29,7 @@ from typing import Any
 
 import networkx as nx
 
-from ..domain.models import SchemaGraph
 from ..clustering import detect_communities, label_communities
-
 
 # ──────────────────────────────────────────────
 # COMMUNITY DETECTION (Feature #4)
@@ -45,13 +43,13 @@ def _compute_communities(
 ) -> dict[int, list[str]]:
     """
     Compute community assignments for nodes using Leiden/Louvain.
-    
+
     Args:
         graph: NetworkX graph to analyze
         resolution: Resolution parameter (>1 = more communities, <1 = fewer)
         min_cohesion: Minimum cohesion score to keep a community
         enable_splitting: Whether to split oversized communities
-    
+
     Returns:
         Dictionary mapping community ID to list of node IDs
     """
@@ -67,11 +65,11 @@ def _compute_communities(
 def _get_community_labels(communities: dict[int, list[str]], graph: nx.Graph[Any] | nx.DiGraph[Any]) -> dict[int, str]:
     """
     Generate human-readable labels for communities.
-    
+
     Args:
         communities: Community assignments
         graph: NetworkX graph
-    
+
     Returns:
         Dictionary mapping community ID to label
     """
@@ -92,10 +90,10 @@ def export_graph_json(
 ) -> None:
     """
     Export graph in NetworkX node-link JSON format.
-    
+
     Compatible with NetworkX json_graph.node_link_data() format.
     Enriches nodes with community assignments and degree centrality.
-    
+
     Args:
         graph: NetworkX graph to export
         communities: Optional community assignments (default: auto-compute with Leiden/Louvain)
@@ -106,22 +104,22 @@ def export_graph_json(
     """
     if communities is None:
         communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
-    
+
     # Map node → community ID
     node_community: dict[str, int] = {}
     for cid, nodes in communities.items():
         for node in nodes:
             node_community[node] = cid
-    
+
     # Convert to node-link format
     data = nx.node_link_data(graph)
-    
+
     # Enrich nodes with community and degree
     for node in data['nodes']:
         node_id = node['id']
         node['community'] = node_community.get(node_id, 0)
         node['degree'] = graph.degree(node_id)
-    
+
     # Write output
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -151,14 +149,14 @@ def export_graph_html(
 ) -> None:
     """
     Export interactive HTML visualization using vis.js.
-    
+
     Features:
       - Force-directed layout with physics simulation
       - Search bar with live filtering
       - Community legend with toggle checkboxes
       - Node inspector showing degree, type, neighbors
       - Edge tooltips with relation type and confidence
-    
+
     Args:
         graph: NetworkX graph to export
         communities: Optional community assignments (default: auto-compute with Leiden/Louvain)
@@ -169,22 +167,22 @@ def export_graph_html(
     """
     if communities is None:
         communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
-    
+
     community_labels = _get_community_labels(communities, graph)
-    
+
     # Map node → community ID
     node_community: dict[str, int] = {}
     for cid, nodes in communities.items():
         for node in nodes:
             node_community[node] = cid
-    
+
     # Prepare vis.js nodes
     nodes_data = []
     for node_id, attrs in graph.nodes(data=True):
         cid = node_community.get(node_id, 0)
         color = _get_community_color(cid)
         degree = graph.degree(node_id)
-        
+
         nodes_data.append({
             'id': node_id,
             'label': attrs.get('label', node_id),
@@ -196,13 +194,13 @@ def export_graph_html(
             'degree': degree,
             'title': f"{attrs.get('type', 'unknown')}: {node_id}<br/>Degree: {degree}<br/>{community_labels.get(cid, '')}"
         })
-    
+
     # Prepare vis.js edges
     edges_data = []
     for u, v, attrs in graph.edges(data=True):
         relation = attrs.get('relation', '')
         confidence = attrs.get('confidence', 'EXTRACTED')
-        
+
         edges_data.append({
             'from': u,
             'to': v,
@@ -212,7 +210,7 @@ def export_graph_html(
             'width': 2 if confidence == 'EXTRACTED' else 1,
             'color': {'color': '#94a3b8', 'opacity': 0.6 if confidence == 'INFERRED' else 1.0}
         })
-    
+
     # Prepare community legend
     legend_data = [
         {
@@ -223,28 +221,28 @@ def export_graph_html(
         }
         for cid, nodes_list in sorted(communities.items(), key=lambda x: len(x[1]), reverse=True)
     ]
-    
+
     # Render HTML
     html_content = _render_html_template(nodes_data, edges_data, legend_data, graph)
-    
+
     # Write output
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html_content)
 
 
-def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any]], 
+def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any]],
                           legend: list[dict[str, Any]], graph: nx.Graph[Any] | nx.DiGraph[Any]) -> str:
     """Render HTML template with vis.js visualization."""
-    
+
     nodes_json = json.dumps(nodes, ensure_ascii=False)
     edges_json = json.dumps(edges, ensure_ascii=False)
     legend_json = json.dumps(legend, ensure_ascii=False)
-    
+
     graph_type = 'directed' if isinstance(graph, nx.DiGraph) else 'undirected'
     node_count = graph.number_of_nodes()
     edge_count = graph.number_of_edges()
-    
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -253,27 +251,27 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
   <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
   <style>
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-    body {{ 
-      display: flex; 
-      height: 100vh; 
-      background: #0f172a; 
-      color: #f1f5f9; 
+    body {{
+      display: flex;
+      height: 100vh;
+      background: #0f172a;
+      color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }}
     #graph {{ flex: 1; }}
-    #sidebar {{ 
-      width: 320px; 
-      background: #1e2235; 
-      border-left: 1px solid rgba(255,255,255,0.1); 
-      display: flex; 
+    #sidebar {{
+      width: 320px;
+      background: #1e2235;
+      border-left: 1px solid rgba(255,255,255,0.1);
+      display: flex;
       flex-direction: column;
       overflow-y: auto;
     }}
-    #search {{ 
-      width: 100%; 
-      padding: 14px; 
-      background: #0f172a; 
-      border: 1px solid rgba(255,255,255,0.15); 
+    #search {{
+      width: 100%;
+      padding: 14px;
+      background: #0f172a;
+      border: 1px solid rgba(255,255,255,0.15);
       border-radius: 6px;
       color: #f1f5f9;
       font-size: 14px;
@@ -282,19 +280,19 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
     }}
     #search:focus {{ outline: 2px solid #7c3aed; outline-offset: 2px; }}
     .section {{ padding: 0 16px 16px; }}
-    .section-title {{ 
-      font-size: 11px; 
-      text-transform: uppercase; 
-      letter-spacing: 0.5px; 
-      color: #94a3b8; 
+    .section-title {{
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
       margin-bottom: 12px;
       font-weight: 600;
     }}
-    .legend-item {{ 
-      padding: 10px 12px; 
-      cursor: pointer; 
-      display: flex; 
-      align-items: center; 
+    .legend-item {{
+      padding: 10px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
       gap: 12px;
       border-radius: 6px;
       margin-bottom: 4px;
@@ -302,21 +300,21 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
     }}
     .legend-item:hover {{ background: rgba(255,255,255,0.05); }}
     .legend-item.hidden {{ opacity: 0.4; }}
-    .legend-dot {{ 
-      width: 14px; 
-      height: 14px; 
-      border-radius: 50%; 
+    .legend-dot {{
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
       flex-shrink: 0;
     }}
     .legend-label {{ flex: 1; font-size: 13px; }}
-    .legend-count {{ 
-      font-size: 12px; 
-      color: #94a3b8; 
+    .legend-count {{
+      font-size: 12px;
+      color: #94a3b8;
       font-weight: 500;
     }}
-    .stats {{ 
-      padding: 16px; 
-      background: rgba(124,58,237,0.1); 
+    .stats {{
+      padding: 16px;
+      background: rgba(124,58,237,0.1);
       border-radius: 8px;
       margin-bottom: 16px;
     }}
@@ -329,7 +327,7 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
   <div id="graph"></div>
   <div id="sidebar">
     <input id="search" type="text" placeholder="Search nodes..." />
-    
+
     <div class="section">
       <div class="stats">
         <div class="stats-row">
@@ -346,21 +344,21 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
         </div>
       </div>
     </div>
-    
+
     <div class="section">
       <div class="section-title">Communities</div>
       <div id="legend"></div>
     </div>
   </div>
-  
+
   <script>
     const nodesData = {nodes_json};
     const edgesData = {edges_json};
     const legendData = {legend_json};
-    
+
     const nodes = new vis.DataSet(nodesData);
     const edges = new vis.DataSet(edgesData);
-    
+
     const container = document.getElementById('graph');
     const options = {{
       physics: {{
@@ -399,17 +397,17 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
         tooltipDelay: 100,
       }}
     }};
-    
+
     const network = new vis.Network(container, {{ nodes, edges }}, options);
-    
+
     // Hidden communities tracking
     const hiddenCommunities = new Set();
-    
+
     // Search functionality
     const searchInput = document.getElementById('search');
     searchInput.addEventListener('input', (e) => {{
       const query = e.target.value.toLowerCase().trim();
-      
+
       if (!query) {{
         // Reset: show all nodes except those in hidden communities
         nodesData.forEach(n => {{
@@ -419,17 +417,17 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
         }});
         return;
       }}
-      
+
       // Hide nodes that don't match query
       nodesData.forEach(n => {{
-        const matches = n.label.toLowerCase().includes(query) || 
+        const matches = n.label.toLowerCase().includes(query) ||
                        n.id.toLowerCase().includes(query) ||
                        n.type.toLowerCase().includes(query);
         const inHiddenCommunity = hiddenCommunities.has(n.community);
         nodes.update({{ id: n.id, hidden: !matches || inHiddenCommunity }});
       }});
     }});
-    
+
     // Legend rendering and toggling
     const legendEl = document.getElementById('legend');
     legendData.forEach(c => {{
@@ -440,7 +438,7 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
         <div class="legend-label">${{c.label}}</div>
         <div class="legend-count">${{c.count}}</div>
       `;
-      
+
       item.addEventListener('click', () => {{
         if (hiddenCommunities.has(c.cid)) {{
           hiddenCommunities.delete(c.cid);
@@ -449,24 +447,24 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
           hiddenCommunities.add(c.cid);
           item.classList.add('hidden');
         }}
-        
+
         // Update node visibility
         nodesData.forEach(n => {{
           if (n.community === c.cid) {{
             nodes.update({{ id: n.id, hidden: hiddenCommunities.has(c.cid) }});
           }}
         }});
-        
+
         // Re-apply search if active
         const query = searchInput.value.toLowerCase().trim();
         if (query) {{
           searchInput.dispatchEvent(new Event('input'));
         }}
       }});
-      
+
       legendEl.appendChild(item);
     }});
-    
+
     // Node click handler - show neighbors
     network.on('click', (params) => {{
       if (params.nodes.length > 0) {{
@@ -494,13 +492,13 @@ def export_graph_report(
 ) -> None:
     """
     Export human-readable GRAPH_REPORT.md with insights.
-    
+
     Includes:
       - Graph metadata (nodes, edges, density)
       - God nodes (high-degree hubs)
       - Community summaries
       - Suggested exploration questions
-    
+
     Args:
         graph: NetworkX graph to analyze
         communities: Optional community assignments (default: auto-compute with Leiden/Louvain)
@@ -511,19 +509,19 @@ def export_graph_report(
     """
     if communities is None:
         communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
-    
+
     community_labels = _get_community_labels(communities, graph)
-    
+
     # Compute god nodes (top 10 by degree)
     degree_centrality = nx.degree_centrality(graph)
     god_nodes = sorted(degree_centrality.items(), key=lambda x: x[1], reverse=True)[:10]
-    
+
     # Compute graph metrics
     node_count = graph.number_of_nodes()
     edge_count = graph.number_of_edges()
     density = nx.density(graph)
     is_connected = nx.is_connected(graph.to_undirected()) if isinstance(graph, nx.DiGraph) else nx.is_connected(graph)
-    
+
     # Build report
     lines = [
         "# Schema Graph Report",
@@ -545,11 +543,11 @@ def export_graph_report(
         "| Rank | Node | Degree Centrality | Type |",
         "|------|------|-------------------|------|",
     ]
-    
+
     for i, (node_id, centrality) in enumerate(god_nodes, 1):
         node_type = graph.nodes[node_id].get('type', 'unknown')
         lines.append(f"| {i} | `{node_id}` | {centrality:.4f} | {node_type} |")
-    
+
     lines.extend([
         "",
         "## Communities",
@@ -557,22 +555,22 @@ def export_graph_report(
         f"Detected {len(communities)} semantic domain(s):",
         "",
     ])
-    
+
     for cid, nodes in sorted(communities.items(), key=lambda x: len(x[1]), reverse=True):
         label = community_labels.get(cid, f"Community {cid}")
         lines.append(f"### {label}")
-        lines.append(f"")
+        lines.append("")
         lines.append(f"- **Size:** {len(nodes)} nodes")
-        
+
         # Node type breakdown
         type_counts: dict[str, int] = {}
         for node in nodes:
             node_type = graph.nodes[node].get('type', 'unknown')
             type_counts[node_type] = type_counts.get(node_type, 0) + 1
-        
-        lines.append(f"- **Composition:** " + ", ".join(f"{count} {t}" for t, count in sorted(type_counts.items())))
+
+        lines.append("- **Composition:** " + ", ".join(f"{count} {t}" for t, count in sorted(type_counts.items())))
         lines.append("")
-    
+
     lines.extend([
         "## Suggested Exploration Questions",
         "",
@@ -603,9 +601,9 @@ def export_graph_report(
         "*This report was generated automatically from your migration files.*",
         "*Re-run `sqlfy graph` to update after schema changes.*",
     ])
-    
+
     report_content = "\n".join(lines)
-    
+
     # Write output
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

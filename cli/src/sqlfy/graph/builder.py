@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import networkx as nx
 
-from ..domain.models import SchemaGraph, EdgeRelation
+from ..domain.models import EdgeRelation, SchemaGraph
 
 
 def build_networkx_graph(

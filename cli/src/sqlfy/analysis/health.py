@@ -12,16 +12,15 @@ Example:
     graph = reconstruct(files)
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     insights_report = InsightsEngine.analyse(state)
-    
+
     health_report = HealthAnalyzer.analyze(state, insights_report, './migrations')
     print(health_report.to_text())
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..analysis.insights import InsightsReport
 from ..domain.schema_state import SchemaState
@@ -30,7 +29,7 @@ from ..domain.schema_state import SchemaState
 @dataclass
 class MigrationStatus:
     """Status of a single migration file."""
-    
+
     filename: str
     status: str  # 'safe', 'unsafe', 'irreversible'
     errors: int
@@ -43,7 +42,7 @@ class MigrationStatus:
 @dataclass
 class HealthScore:
     """Health score calculation with breakdown."""
-    
+
     score: int  # 0-100
     grade: str  # 'excellent', 'good', 'warning', 'critical'
     breakdown: dict[str, int]
@@ -53,7 +52,7 @@ class HealthScore:
 @dataclass
 class FolderHealthReport:
     """Migration folder health summary."""
-    
+
     folder: str
     timestamp: str
     total_migrations: int
@@ -61,19 +60,19 @@ class FolderHealthReport:
     unsafe_migrations: int
     irreversible_migrations: int
     safe_percentage: int
-    
+
     errors: int
     warnings: int
     infos: int
     findings_by_code: dict[str, int]
-    
+
     migration_statuses: list[MigrationStatus]
     health_score: HealthScore
-    
+
     def to_text(self) -> str:
         """Generate formatted text report."""
         lines = []
-        
+
         # Header
         lines.append("╔══════════════════════════════════════════════════════════╗")
         lines.append("║         Migration Folder Health Report                   ║")
@@ -82,7 +81,7 @@ class FolderHealthReport:
         lines.append(f"📁 Migration Folder: {self.folder}")
         lines.append(f"📅 Report Date: {self.timestamp}")
         lines.append("")
-        
+
         # Summary Statistics
         lines.append("━" * 60)
         lines.append("📊 SUMMARY STATISTICS")
@@ -95,7 +94,7 @@ class FolderHealthReport:
         irreversible_pct = int(self.irreversible_migrations / self.total_migrations * 100) if self.total_migrations > 0 else 0
         lines.append(f"  Irreversible Migrations:       {self.irreversible_migrations} ({irreversible_pct}%)")
         lines.append("")
-        
+
         # Findings Breakdown
         lines.append("━" * 60)
         lines.append("🔍 FINDINGS BREAKDOWN")
@@ -105,19 +104,19 @@ class FolderHealthReport:
         lines.append(f"  Warnings:                      {self.warnings}")
         lines.append(f"  Infos:                         {self.infos}")
         lines.append("")
-        
+
         if self.findings_by_code:
             lines.append("  Top Issues:")
             for code, count in sorted(self.findings_by_code.items(), key=lambda x: x[1], reverse=True)[:5]:
                 lines.append(f"    • {code:30s} ({count} occurrence{'s' if count > 1 else ''})")
             lines.append("")
-        
+
         # Migration File Status
         lines.append("━" * 60)
         lines.append("📋 MIGRATION FILE STATUS")
         lines.append("━" * 60)
         lines.append("")
-        
+
         for mig in self.migration_statuses:
             icon = "✅" if mig.status == "safe" else "⚠️" if mig.status == "unsafe" else "🔴"
             status_text = f"({mig.status.capitalize()})"
@@ -128,10 +127,10 @@ class FolderHealthReport:
                 if mig.warnings > 0:
                     issue_text.append(f"{mig.warnings} warning{'s' if mig.warnings > 1 else ''}")
                 status_text += f" ({', '.join(issue_text)})"
-            
+
             lines.append(f"  {icon} {mig.filename:40s} {status_text}")
         lines.append("")
-        
+
         # Health Score
         lines.append("━" * 60)
         lines.append(f"🏥 HEALTH SCORE: {self.health_score.score}/100 ({self.health_score.grade.capitalize()})")
@@ -144,20 +143,20 @@ class FolderHealthReport:
             lines.append(f"    {label:20s} {sign}{value}")
         lines.append("")
         lines.append(f"  Recommendation: {self.health_score.recommendation}")
-        
+
         return "\n".join(lines)
-    
+
     def to_json(self) -> str:
         """Generate JSON report."""
         from ..models import (
-            HealthResult as _HealthResult,
-            HealthSummary as _HealthSummary,
             HealthFindings as _HealthFindings,
+            HealthGrade as _HealthGrade,
             HealthMigrationStatus as _HealthMigrationStatus,
+            HealthResult as _HealthResult,
             HealthScore as _HealthScore,
             HealthScoreBreakdown as _HealthScoreBreakdown,
+            HealthSummary as _HealthSummary,
             Status as _Status,
-            HealthGrade as _HealthGrade,
         )
         model = _HealthResult(
             folder=self.folder,
@@ -203,18 +202,18 @@ class FolderHealthReport:
 
 class HealthAnalyzer:
     """Analyze migration folder health."""
-    
+
     @staticmethod
-    def analyze(state: SchemaState, insights_report: InsightsReport, 
+    def analyze(state: SchemaState, insights_report: InsightsReport,
                 folder_path: str) -> FolderHealthReport:
         """
         Generate health report from schema state and insights.
-        
+
         Args:
             state: Schema state from migrations
             insights_report: Insights analysis report
             folder_path: Path to migrations folder
-        
+
         Returns:
             Folder health report with score and recommendations
         """
@@ -275,28 +274,28 @@ class HealthAnalyzer:
                 has_drop_table=has_drop_table,
                 has_drop_column=has_drop_column,
             ))
-        
+
         # Count safe/unsafe/irreversible
         safe_count = sum(1 for m in migration_statuses if m.status == 'safe')
         unsafe_count = sum(1 for m in migration_statuses if m.status == 'unsafe')
         irreversible_count = sum(1 for m in migration_statuses if m.status == 'irreversible')
-        
+
         safe_percentage = int(safe_count / total_migrations * 100) if total_migrations > 0 else 0
-        
+
         # Count findings by code
         findings_by_code: dict[str, int] = {}
         for finding in insights_report.findings:
             code = finding.code
             findings_by_code[code] = findings_by_code.get(code, 0) + 1
-        
+
         # Calculate health score
         base_score = 100
         error_penalty = len(insights_report.errors()) * 20
         warning_penalty = len(insights_report.warnings()) * 5
         irreversible_penalty = irreversible_count * 10
-        
+
         score = max(0, base_score - error_penalty - warning_penalty - irreversible_penalty)
-        
+
         # Determine grade
         if score >= 90:
             grade = 'excellent'
@@ -306,11 +305,11 @@ class HealthAnalyzer:
             grade = 'warning'
         else:
             grade = 'critical'
-        
+
         # Generate recommendation
         error_count = len(insights_report.errors())
         warning_count = len(insights_report.warnings())
-        
+
         if error_count > 0:
             recommendation = f"Fix {error_count} error{'s' if error_count > 1 else ''} before production deployment."
         elif warning_count > 0:
@@ -319,7 +318,7 @@ class HealthAnalyzer:
             recommendation = f"{irreversible_count} irreversible migration{'s' if irreversible_count > 1 else ''} detected - ensure backups are in place."
         else:
             recommendation = "All migrations are safe. No issues detected."
-        
+
         health_score = HealthScore(
             score=score,
             grade=grade,
@@ -331,10 +330,10 @@ class HealthAnalyzer:
             },
             recommendation=recommendation,
         )
-        
+
         return FolderHealthReport(
             folder=folder_path,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             total_migrations=total_migrations,
             safe_migrations=safe_count,
             unsafe_migrations=unsafe_count,

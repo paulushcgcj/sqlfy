@@ -18,37 +18,42 @@ Usage::
 
 from __future__ import annotations
 
-import re
 import logging
-from typing import Iterator
+import re
 
 import sqlglot
 import sqlglot.expressions as exp
 
-from ..parsing.ast_helpers import _table_full, _table_schema_name, _col_datatype, _on_delete_from_options
+from ..domain.sqlglot_compat import (
+    SQLGLOT_HAS_MODIFY,
+    SQLGLOT_HAS_RENAME_COLUMN,
+    parse_modify_native,
+)
+from ..parsing.ast_helpers import (
+    _table_full,
+    _table_schema_name,
+)
 from ..parsing.column_parser import _parse_column_def
 from ..parsing.constraint_parser import _parse_table_constraint
 from .operations import (
-    AnyOperation,
-    OperationProvenance,
-    ColumnDefinition,
-    ConstraintDefinition,
-    CreateTableOperation,
-    DropTableOperation,
     AddColumnOperation,
-    DropColumnOperation,
-    ModifyColumnOperation,
-    RenameColumnOperation,
     AddConstraintOperation,
-    DropConstraintOperation,
-    CreateIndexOperation,
-    DropIndexOperation,
-    CreateSequenceOperation,
+    AnyOperation,
     ColumnChanges,
+    ColumnDefinition,
     CommentOperation,
-    UnknownOperation,
+    ConstraintDefinition,
+    CreateIndexOperation,
+    CreateSequenceOperation,
+    CreateTableOperation,
+    DropColumnOperation,
+    DropConstraintOperation,
+    DropIndexOperation,
+    DropTableOperation,
+    ModifyColumnOperation,
+    OperationProvenance,
+    RenameColumnOperation,
 )
-from ..domain.sqlglot_compat import SQLGLOT_HAS_MODIFY, SQLGLOT_HAS_RENAME_COLUMN, parse_modify_native
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +72,7 @@ def _to_col_def(col: object) -> ColumnDefinition:
     )
 
 
-def _to_constraint_def(c: "object") -> ConstraintDefinition:
+def _to_constraint_def(c: object) -> ConstraintDefinition:
     """Convert internal Constraint dataclass → ConstraintDefinition."""
     return ConstraintDefinition(
         name=getattr(c, "name", None),

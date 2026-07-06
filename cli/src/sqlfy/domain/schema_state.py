@@ -39,15 +39,14 @@ Usage
 
 from __future__ import annotations
 
-import json
-import hashlib
 import datetime
-from dataclasses import dataclass, field, asdict
-from typing import Any, Optional
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from .models import SchemaGraph
 from .utils import type_str
-
 
 # ─────────────────────────────────────────────
 # VALUE OBJECTS
@@ -58,25 +57,25 @@ class ColumnState:
     name:        str
     data_type:   str           # rendered type string e.g. "NUMBER(10,2)"
     raw_type:    str           # base type name e.g. "NUMBER"
-    precision:   Optional[int]
-    scale:       Optional[int]
+    precision:   int | None
+    scale:       int | None
     nullable:    bool
-    default:     Optional[str]
+    default:     str | None
     is_pk:       bool
     is_fk:       bool
     is_unique:   bool
-    comment:     Optional[str]
+    comment:     str | None
 
 
 @dataclass
 class ConstraintState:
-    name:        Optional[str]
+    name:        str | None
     type:        str           # primary_key | unique | foreign_key | check
     columns:     list[str]
-    ref_table:   Optional[str] = None
-    ref_columns: Optional[list[str]] = None
-    on_delete:   Optional[str] = None
-    check_expr:  Optional[str] = None
+    ref_table:   str | None = None
+    ref_columns: list[str] | None = None
+    on_delete:   str | None = None
+    check_expr:  str | None = None
 
 
 @dataclass
@@ -89,13 +88,13 @@ class IndexState:
 
 @dataclass
 class TableState:
-    schema:       Optional[str]
+    schema:       str | None
     name:         str
     full_name:    str
     columns:      list[ColumnState]
     constraints:  list[ConstraintState]
     indexes:      list[IndexState]
-    comment:      Optional[str]
+    comment:      str | None
     created_in:   str
     modified_in:  list[str]
     column_count: int
@@ -118,15 +117,15 @@ class RelationshipState:
     from_columns:    list[str]
     to_table:        str
     to_columns:      list[str]
-    constraint_name: Optional[str]
-    on_delete:       Optional[str]
+    constraint_name: str | None
+    on_delete:       str | None
     # Derived cardinality hints (heuristic, not parsed from DDL)
     cardinality:     str   # "many_to_one" | "one_to_one" | "unknown"
 
 
 @dataclass
 class SequenceState:
-    schema:       Optional[str]
+    schema:       str | None
     name:         str
     full_name:    str
     start_with:   int
@@ -184,15 +183,15 @@ class SchemaState:
     def to_dict(self) -> dict:  # type: ignore[override]
         """Convert to a plain dict (JSON-safe)."""
         return _deep_asdict(self)
-    
+
     def to_manifest(self) -> str:
         """Generate manifest/metadata JSON with high-level summary.
-        
+
         Returns camelCase JSON string using the SchemaManifest Pydantic model.
         """
         from ..models import (
-            SchemaManifest as _SchemaManifest,
             MigrationHistory as _MigrationHistory,
+            SchemaManifest as _SchemaManifest,
         )
         model = _SchemaManifest(
             schema_version=self.version,
@@ -219,14 +218,14 @@ class SchemaState:
     def to_json(self, indent: int = 2) -> str:
         """Serialise to camelCase JSON string using Pydantic SchemaState model."""
         from ..models import (
-            SchemaState as _SchemaState,
-            TableState as _TableState,
             ColumnState as _ColumnState,
             ConstraintState as _ConstraintState,
             IndexState as _IndexState,
-            SequenceState as _SequenceState,
-            RelationshipState as _RelationshipState,
             MigrationHistory as _MigrationHistory,
+            RelationshipState as _RelationshipState,
+            SchemaState as _SchemaState,
+            SequenceState as _SequenceState,
+            TableState as _TableState,
         )
 
         def _col(c: ColumnState) -> _ColumnState:
@@ -332,7 +331,7 @@ class SchemaState:
 
     # ── Convenience accessors ──────────────────────────────────────────────
 
-    def get_table(self, name: str) -> Optional[TableState]:
+    def get_table(self, name: str) -> TableState | None:
         """Case-insensitive table lookup by name or full name."""
         name_up = name.upper()
         return (
@@ -373,7 +372,7 @@ class SchemaStateBuilder:
     def from_graph(
         graph: SchemaGraph,
         dialect: str = 'oracle',
-        source_files: Optional[list[dict]] = None,
+        source_files: list[dict] | None = None,
     ) -> SchemaState:
         tables        = SchemaStateBuilder._build_tables(graph)
         sequences     = SchemaStateBuilder._build_sequences(graph)
@@ -393,7 +392,7 @@ class SchemaStateBuilder:
             'migration_count':    len(mig_history),
         }
 
-        generated_at = datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+        generated_at = datetime.datetime.now(datetime.UTC).isoformat().replace('+00:00', 'Z')
 
         # Fingerprint — stable hash of the canonical table/column structure
         fingerprint_src = json.dumps(

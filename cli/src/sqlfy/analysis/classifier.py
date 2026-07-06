@@ -28,8 +28,8 @@ Risk levels
 from __future__ import annotations
 
 import json
-import re
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal
@@ -157,9 +157,7 @@ def _alter_categories(stmt: exp.Alter) -> set[MigrationCategory]:
                 cats.add(MigrationCategory.INDEX_MANAGEMENT)
         elif isinstance(action, exp.AddConstraint):
             cats.add(MigrationCategory.CONSTRAINT_MODIFICATION)
-        elif isinstance(action, exp.RenameColumn):
-            cats.add(MigrationCategory.REFACTOR)
-        elif isinstance(action, exp.AlterRename):
+        elif isinstance(action, (exp.RenameColumn, exp.AlterRename)):
             cats.add(MigrationCategory.REFACTOR)
         elif isinstance(action, exp.AlterColumn):
             # ALTER TABLE ... MODIFY / SET DEFAULT / DROP DEFAULT

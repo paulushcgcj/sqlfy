@@ -56,15 +56,12 @@ Usage
 
 from __future__ import annotations
 
-import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
 
-from ..domain.schema_state import SchemaState, TableState
+from ..domain.schema_state import SchemaState
 from .query import QueryEngine
-
 
 # ─────────────────────────────────────────────
 # FINDING
@@ -78,10 +75,10 @@ class Finding:
     severity:  str            # error | warning | info
     category:  str            # structural | referential | modelling | connectivity
     message:   str            # human-readable description
-    table:     Optional[str] = None    # affected table (full name)
-    column:    Optional[str] = None    # affected column (if applicable)
-    detail:    Optional[str] = None    # extra context
-    fix:       Optional[str] = None    # suggested fix
+    table:     str | None = None    # affected table (full name)
+    column:    str | None = None    # affected column (if applicable)
+    detail:    str | None = None    # extra context
+    fix:       str | None = None    # suggested fix
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -105,8 +102,8 @@ class GodTableFinding:
     degree: int
     in_degree: int
     out_degree: int
-    community_id: Optional[int] = None
-    community_label: Optional[str] = None
+    community_id: int | None = None
+    community_label: str | None = None
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -131,10 +128,10 @@ class SurprisingJoinFinding:
     from_table: str
     to_table: str
     via_column: str
-    from_community: Optional[int] = None
-    to_community: Optional[int] = None
-    from_community_label: Optional[str] = None
-    to_community_label: Optional[str] = None
+    from_community: int | None = None
+    to_community: int | None = None
+    from_community_label: str | None = None
+    to_community_label: str | None = None
     surprise_score: float = 0.0
 
     def to_dict(self) -> dict:
@@ -207,12 +204,12 @@ class InsightsReport:
 
     def to_json(self, indent: int = 2) -> str:
         from ..models import (
+            Findings as _Findings,
+            GodTableFinding as _GodTableFinding,
+            InsightFinding as _InsightFinding,
+            InsightSeverity as _InsightSeverity,
             InsightsResult as _InsightsResult,
             InsightsSummary as _InsightsSummary,
-            InsightFinding as _InsightFinding,
-            Findings as _Findings,
-            InsightSeverity as _InsightSeverity,
-            GodTableFinding as _GodTableFinding,
             SurprisingJoinFinding as _SurprisingJoinFinding,
         )
         def _finding(f: Finding) -> _InsightFinding:
@@ -364,7 +361,7 @@ def _has_cycle(adj_directed: dict[str, set[str]]) -> list[list[str]]:
     """Detect cycles in the directed FK graph. Returns list of cycles found."""
     WHITE, GRAY, BLACK = 0, 1, 2
     color: dict[str, int] = {n: WHITE for n in adj_directed}
-    parent: dict[str, Optional[str]] = {n: None for n in adj_directed}
+    parent: dict[str, str | None] = {n: None for n in adj_directed}
     cycles: list[list[str]] = []
 
     def dfs(node: str) -> None:
@@ -812,7 +809,7 @@ class InsightsEngine:
                 table_name = match.group(1)
                 col_name = match.group(2)
                 col_def = match.group(3).upper()
-                
+
                 if 'NOT NULL' in col_def and 'DEFAULT' not in col_def:
                     full_table = next((f for f in state.tables if state.tables[f].name.upper() == table_name.upper()), table_name)
                     add(Finding(

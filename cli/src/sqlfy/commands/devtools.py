@@ -1,10 +1,13 @@
 """Developer tooling commands: lint, validate, deps, lineage, cache."""
+from __future__ import annotations
 
-import sys
+import contextlib
 import json
+import sys
 from pathlib import Path
 
 from ..analysis import ordering
+from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import reconstruct, reconstruct_at
 from ._utils import load_files, write_output
 
@@ -22,10 +25,14 @@ def cmd_lint(
 ) -> None:
     """Lint migration SQL files for quality and style using sqlfluff."""
     from ..analysis.linter import (
-        lint_migration, lint_directory, fix_migration,
-        format_text, format_json,
-        format_directory_text, format_directory_json,
         SQLFLUFF_AVAILABLE,
+        fix_migration,
+        format_directory_json,
+        format_directory_text,
+        format_json,
+        format_text,
+        lint_directory,
+        lint_migration,
     )
 
     if not SQLFLUFF_AVAILABLE:
@@ -175,7 +182,13 @@ def cmd_deps(
     summary_only: bool = False,
 ) -> int:
     """Analyze migration dependencies — detect circular deps and critical path."""
-    from ..analysis.deps import analyze_dependencies, format_text, format_json, format_dot, validate_dependencies
+    from ..analysis.deps import (
+        analyze_dependencies,
+        format_dot,
+        format_json,
+        format_text,
+        validate_dependencies,
+    )
 
     migrations_path = Path(migrations_dir)
     if not migrations_path.is_dir():
@@ -242,9 +255,12 @@ def cmd_lineage(
 ) -> None:
     """Column-level lineage and data flow analysis."""
     from ..analysis.lineage import (
-        extract_column_lineage, find_downstream, find_upstream,
-        find_unused_columns, find_god_columns,
-        format_lineage_text, format_lineage_json, format_lineage_mermaid,
+        extract_column_lineage,
+        find_god_columns,
+        find_unused_columns,
+        format_lineage_json,
+        format_lineage_mermaid,
+        format_lineage_text,
     )
 
     files = load_files(migrations_dir, json_input)
@@ -267,9 +283,9 @@ def cmd_lineage(
                 ]
             }, indent=2)
         else:
-            lines = [f"Unused Columns Report", "=" * 60, "", f"Found {len(unused)} unused column(s):", ""]
+            lines = ["Unused Columns Report", "=" * 60, "", f"Found {len(unused)} unused column(s):", ""]
             for col, version in unused:
-                lines += [f"  {col.full_name}", f"    Created: {version}", f"    Status: Never referenced", ""]
+                lines += [f"  {col.full_name}", f"    Created: {version}", "    Status: Never referenced", ""]
             if not unused:
                 lines.append("  (none)")
             output = "\n".join(lines)
@@ -356,7 +372,10 @@ def cmd_classify(
 ) -> int:
     """Classify migrations by semantic category (table_creation, data_migration, etc.)."""
     from ..analysis.classifier import (
-        classify_migrations, format_text, format_json, MigrationCategory,
+        MigrationCategory,
+        classify_migrations,
+        format_json,
+        format_text,
     )
 
     files = load_files(migrations_dir, json_input)
@@ -395,7 +414,7 @@ def cmd_safety(
     verbose: bool = False,
 ) -> int:
     """Score migrations by safety level (SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS)."""
-    from ..analysis.safety import score_migrations, format_text, format_json
+    from ..analysis.safety import format_json, format_text, score_migrations
 
     files = load_files(migrations_dir, json_input)
     scores = score_migrations(files, dialect=dialect)
@@ -430,7 +449,7 @@ def cmd_cost(
     weight_profile: str = "default",
 ) -> int:
     """Estimate migration execution cost based on SQL operations."""
-    from ..analysis.cost_estimator import estimate_migrations, format_text, format_json
+    from ..analysis.cost_estimator import estimate_migrations, format_json, format_text
 
     if no_recursive:
         p = Path(migrations_dir)
@@ -476,7 +495,7 @@ def cmd_cache(
     cache_action: str,
 ) -> None:
     """Manage the file-based caching system (clear or show info)."""
-    from ..cache import clear_cache, _CACHE_ROOT
+    from ..cache import _CACHE_ROOT, clear_cache
 
     if cache_action == "clear":
         clear_cache()
@@ -493,16 +512,136 @@ def cmd_cache(
         total_size = 0
         if cache_dir.exists():
             for f in cache_dir.glob("*.json"):
-                try:
+                with contextlib.suppress(OSError):
                     total_size += f.stat().st_size
-                except OSError:
-                    pass
         if stat_index.exists():
-            try:
+            with contextlib.suppress(OSError):
                 total_size += stat_index.stat().st_size
-            except OSError:
-                pass
 
         print(f"Cache location: {_CACHE_ROOT}")
         print(f"Cached entries: {cache_count}")
         print(f"Total size: {total_size / (1024 * 1024):.2f} MB")
+
+
+def cmd_pii_scan(
+    *,
+    migrations_dir: str | None = None,
+    json_input: str | None = None,
+    dialect: str = "oracle",
+    format: str = "text",
+    out: str | None = None,
+    min_confidence: float = 0.6,
+    extra_patterns: str | None = None,
+    at: str | None = None,
+) -> int:
+    """Scan schema columns for PII (Personally Identifiable Information) patterns."""
+    from ..analysis.pii_scanner import scan_pii
+    from ..reconstructor import reconstruct, reconstruct_at
+
+    files = load_files(migrations_dir, json_input)
+
+    # Build schema state
+    if at:
+        graph = reconstruct_at(files, at, dialect=dialect)
+    else:
+        graph = reconstruct(files, dialect=dialect)
+
+    state = SchemaStateBuilder.from_graph(graph, source_files=files)
+
+    # Load extra patterns if provided
+    extra_patterns_dict = None
+    if extra_patterns:
+        try:
+            with open(extra_patterns, encoding='utf-8') as f:
+                extra_data = json.load(f)
+                extra_patterns_dict = {str(k): [str(p) for p in v] for k, v in extra_data.items()}
+        except Exception as e:
+            print(f"Error loading extra patterns: {e}", file=sys.stderr)
+            return 1
+
+    # Run PII scan
+    result = scan_pii(state, extra_patterns_dict)
+
+    # Filter by confidence
+    filtered_findings = [f for f in result.findings if f.confidence >= min_confidence]
+
+    fmt = (format or "text").lower()
+
+    if fmt == "json":
+        # Convert to camelCase for JSON output
+        output_data = {
+            "tablesScanned": result.tables_scanned,
+            "columnsScanned": result.columns_scanned,
+            "piiTableCount": result.pii_table_count,
+            "piiColumnCount": len(filtered_findings),
+            "findings": [
+                {
+                    "tableName": f.table_name,
+                    "columnName": f.column_name,
+                    "columnType": f.column_type,
+                    "piiCategories": f.pii_categories,
+                    "confidence": f.confidence,
+                    "evidence": f.evidence,
+                }
+                for f in filtered_findings
+            ]
+        }
+        output = json.dumps(output_data, indent=2)
+        write_output(output, out)
+
+        if not filtered_findings:
+            print("No PII columns found.", file=sys.stderr)
+        else:
+            print(f"Found {len(filtered_findings)} PII columns across {result.pii_table_count} tables.", file=sys.stderr)
+    else:
+        # Text output
+        lines = []
+        a = lines.append
+
+        a(f"PII Scan — {result.tables_scanned} tables, {result.columns_scanned} columns scanned")
+
+        if not filtered_findings:
+            a("No PII columns found.")
+            output = "\n".join(lines)
+            write_output(output, out)
+            return 0
+
+        a(f"Found {len(filtered_findings)} PII columns across {result.pii_table_count} tables.")
+        a("")
+
+        # Group by confidence levels
+        high_confidence = [f for f in filtered_findings if f.confidence >= 0.8]
+        medium_confidence = [f for f in filtered_findings if 0.6 <= f.confidence < 0.8]
+
+        if high_confidence:
+            a("HIGH CONFIDENCE (≥0.8)")
+            for finding in sorted(high_confidence, key=lambda x: (x.table_name, x.column_name)):
+                categories_str = ", ".join(finding.pii_categories)
+                a(f"  {finding.table_name}.{finding.column_name:<25} {categories_str:<20} confidence={finding.confidence:.2f}")
+            a("")
+
+        if medium_confidence:
+            a("MEDIUM CONFIDENCE (0.6–0.8)")
+            for finding in sorted(medium_confidence, key=lambda x: (x.table_name, x.column_name)):
+                categories_str = ", ".join(finding.pii_categories)
+                a(f"  {finding.table_name}.{finding.column_name:<25} {categories_str:<20} confidence={finding.confidence:.2f}")
+            a("")
+
+        # Tables with most PII columns
+        table_pii_counts = {}
+        for finding in filtered_findings:
+            table_pii_counts[finding.table_name] = table_pii_counts.get(finding.table_name, 0) + 1
+
+        sorted_tables = sorted(table_pii_counts.items(), key=lambda x: x[1], reverse=True)
+        if sorted_tables:
+            a("Tables with most PII columns:")
+            for table_name, count in sorted_tables[:5]:  # Top 5
+                a(f"  {table_name} ({count} columns)")
+
+        output = "\n".join(lines)
+        write_output(output, out)
+
+        if filtered_findings:
+            print(f"  {len(filtered_findings)} PII column(s) found", file=sys.stderr)
+
+    return 0

@@ -1,11 +1,12 @@
 """Tests for naming convention enforcement (Feature #23)."""
+from __future__ import annotations
 
 import tempfile
-import pytest
 from pathlib import Path
 
-from sqlfy.analysis.naming import validate_naming, validate_naming_files
+import pytest
 
+from sqlfy.analysis.naming import validate_naming, validate_naming_files
 
 # ─── validate_naming (on-disk) ───────────────────────────────────────────────
 

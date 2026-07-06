@@ -4,12 +4,16 @@ sqlfy.parsing.extractors.drop
 Extractor for DROP TABLE and DROP INDEX statements.
 """
 from __future__ import annotations
+
 import sqlglot.expressions as exp
-from ...semantic.operations import (
-    AnyOperation, OperationProvenance,
-    DropTableOperation, DropIndexOperation,
-)
+
 from ...parsing.ast_helpers import _table_full
+from ...semantic.operations import (
+    AnyOperation,
+    DropIndexOperation,
+    DropTableOperation,
+    OperationProvenance,
+)
 from .base import BaseExtractor
 
 

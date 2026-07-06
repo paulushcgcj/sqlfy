@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="3" failures="0" skipped="0" tests="3" time="0.773" timestamp="2026-07-06T12:56:21.734010-07:00" hostname="CQTPW7QYKC"><testcase classname="" name="tests.test_diff_versions" time="0.000"><error message="collection failure">ImportError while importing test module '/Users/pcruz/Repos/paulushcgcj/sqlfy/cli/tests/test_diff_versions.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.14.6-macos-aarch64-none/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_diff_versions.py:7: in &lt;module&gt;
+    from sqlfy.commands.evolution import cmd_diff_versions
+src/sqlfy/commands/__init__.py:6: in &lt;module&gt;
+    from .build_graph import cmd_build_graph
+src/sqlfy/commands/build_graph.py:38: in &lt;module&gt;
+    from ..core import build_networkx_graph
+E   ImportError: cannot import name 'build_networkx_graph' from 'sqlfy.core' (/Users/pcruz/Repos/paulushcgcj/sqlfy/cli/src/sqlfy/core.py)</error></testcase><testcase classname="" name="tests.test_git_diff" time="0.000"><error message="collection failure">ImportError while importing test module '/Users/pcruz/Repos/paulushcgcj/sqlfy/cli/tests/test_git_diff.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.14.6-macos-aarch64-none/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_git_diff.py:11: in &lt;module&gt;
+    from sqlfy.commands._git_diff import (
+src/sqlfy/commands/__init__.py:6: in &lt;module&gt;
+    from .build_graph import cmd_build_graph
+src/sqlfy/commands/build_graph.py:38: in &lt;module&gt;
+    from ..core import build_networkx_graph
+E   ImportError: cannot import name 'build_networkx_graph' from 'sqlfy.core' (/Users/pcruz/Repos/paulushcgcj/sqlfy/cli/src/sqlfy/core.py)</error></testcase><testcase classname="" name="tests.test_graph_construction" time="0.000"><error message="collection failure">ImportError while importing test module '/Users/pcruz/Repos/paulushcgcj/sqlfy/cli/tests/test_graph_construction.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.14.6-macos-aarch64-none/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_graph_construction.py:13: in &lt;module&gt;
+    from sqlfy.core import (
+E   ImportError: cannot import name 'Column' from 'sqlfy.core' (/Users/pcruz/Repos/paulushcgcj/sqlfy/cli/src/sqlfy/core.py)</error></testcase></testsuite></testsuites>

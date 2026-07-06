@@ -22,18 +22,17 @@ same name to appear at multiple versions simultaneously.
 
 from __future__ import annotations
 
-import pkgutil
 import importlib
-from dataclasses import dataclass, field
-from typing import Iterator, Type
+import pkgutil
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 
+from .analysis.pii_v1 import PiiScanV1
 from .analysis.v1 import HealthV1, InsightsV1
 from .evolution.v1 import DiffV1, RollbackV1, SimulateV1
 from .graph.v1 import GraphManifestV1
 from .impact.v1 import ImpactV1
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ContractEntry
@@ -59,7 +58,7 @@ class ContractEntry:
     description: str
     """Human-readable purpose of this contract."""
 
-    model_class: Type[BaseModel]
+    model_class: type[BaseModel]
     """The Pydantic contract class.  Must be importable and schema-able."""
 
     deprecated: bool = False
@@ -103,6 +102,16 @@ _RAW: list[ContractEntry] = [
             "Includes a 0–100 health score, qualitative grade, and per-file status."
         ),
         model_class=HealthV1,
+    ),
+    ContractEntry(
+        name="pii_scan",
+        version="v1",
+        command="pii-scan",
+        description=(
+            "PII scan results produced by the pii-scan command. "
+            "Includes findings, table/column counts, and confidence-scored PII column identifications."
+        ),
+        model_class=PiiScanV1,
     ),
     # ── Impact ────────────────────────────────────────────────────────────
     ContractEntry(

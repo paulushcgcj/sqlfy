@@ -5,19 +5,16 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from sqlfy.analysis.classifier import (
-    MigrationCategory,
     ClassifiedMigration,
+    MigrationCategory,
     classify_migration,
     classify_migrations,
+    format_json,
+    format_text,
     group_by_category,
     group_by_risk,
-    format_text,
-    format_json,
 )
-
 
 # ─────────────────────────────────────────────
 # classify_migration — individual statement types

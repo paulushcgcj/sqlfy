@@ -20,6 +20,7 @@ convenience.  Domain sub-packages are also importable directly:
     from sqlfy.contracts.analysis.v1 import InsightsV1
     from sqlfy.contracts.impact.v1   import ImpactV1
 """
+from __future__ import annotations
 
 from .analysis.v1 import HealthV1, InsightsV1
 from .common.base import ContractBase

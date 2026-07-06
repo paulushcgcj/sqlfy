@@ -21,7 +21,6 @@ _handle_comment               COMMENT ON TABLE / COMMENT ON COLUMN
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 import sqlglot.expressions as exp
 
@@ -30,14 +29,13 @@ from ..domain.models import (
     Constraint,
     Index,
     MigrationAction,
-    Table,
     Sequence,
+    Table,
 )
 from ..domain.sqlglot_compat import SQLGLOT_HAS_MODIFY, parse_modify_native
 from .ast_helpers import _table_full, _table_schema_name
 from .column_parser import _parse_column_def
 from .constraint_parser import _parse_table_constraint
-
 
 # ─────────────────────────────────────────────
 # CREATE TABLE

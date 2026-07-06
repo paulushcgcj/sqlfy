@@ -5,7 +5,7 @@ Typer app for developer tool commands: lint, validate, naming, deps,
 lineage, classify, safety, domains, stability, cost, cache.
 """
 from __future__ import annotations
-from typing import Optional
+
 import typer
 
 app = typer.Typer(help="Developer tooling and schema quality commands.", no_args_is_help=True)
@@ -15,8 +15,8 @@ app = typer.Typer(help="Developer tooling and schema quality commands.", no_args
 def cmd_lint(
     path: str = typer.Argument(..., help="SQL file or directory to lint"),
     fmt: str = typer.Option("text", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
-    min_score: Optional[int] = typer.Option(None, "--min-score"),
+    out: str | None = typer.Option(None, "--out"),
+    min_score: int | None = typer.Option(None, "--min-score"),
 ) -> None:
     """Lint migration SQL files for quality and style."""
     from ..commands.devtools import cmd_lint as _cmd
@@ -27,7 +27,7 @@ def cmd_lint(
 def cmd_validate(
     migrations_dir: str = typer.Argument(...),
     fmt: str = typer.Option("text", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    out: str | None = typer.Option(None, "--out"),
     fix_numbering: bool = typer.Option(False, "--fix-numbering"),
 ) -> None:
     """Validate migration ordering and detect issues."""
@@ -39,8 +39,8 @@ def cmd_validate(
 def cmd_naming(
     migrations_dir: str = typer.Argument(...),
     fmt: str = typer.Option("text", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
-    pattern: Optional[str] = typer.Option(None, "--pattern"),
+    out: str | None = typer.Option(None, "--out"),
+    pattern: str | None = typer.Option(None, "--pattern"),
 ) -> None:
     """Enforce migration naming conventions."""
     from ..commands.devtools import cmd_naming as _cmd
@@ -54,7 +54,7 @@ def cmd_naming(
 def cmd_deps(
     migrations_dir: str = typer.Argument(...),
     fmt: str = typer.Option("text", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    out: str | None = typer.Option(None, "--out"),
     critical_path: bool = typer.Option(False, "--critical-path"),
 ) -> None:
     """Analyze migration dependencies and detect issues."""
@@ -64,12 +64,12 @@ def cmd_deps(
 
 @app.command("lineage")
 def cmd_lineage(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    column: Optional[str] = typer.Argument(None, help="TABLE.COLUMN identifier"),
-    json_input: Optional[str] = typer.Option(None, "--json-input"),
+    migrations_dir: str | None = typer.Argument(None),
+    column: str | None = typer.Argument(None, help="TABLE.COLUMN identifier"),
+    json_input: str | None = typer.Option(None, "--json-input"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     fmt: str = typer.Option("text", "--format"),
     downstream: bool = typer.Option(True, "--downstream"),
     upstream: bool = typer.Option(False, "--upstream"),
@@ -88,13 +88,13 @@ def cmd_lineage(
 
 @app.command("classify")
 def cmd_classify(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     fmt: str = typer.Option("text", "--format"),
-    category: Optional[str] = typer.Option(None, "--category"),
+    category: str | None = typer.Option(None, "--category"),
 ) -> None:
     """Classify migrations by semantic category."""
     from ..commands.devtools import cmd_classify as _cmd
@@ -104,13 +104,13 @@ def cmd_classify(
 
 @app.command("safety")
 def cmd_safety(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     fmt: str = typer.Option("text", "--format"),
-    threshold: Optional[str] = typer.Option(None, "--threshold"),
+    threshold: str | None = typer.Option(None, "--threshold"),
 ) -> None:
     """Score migrations by safety level."""
     from ..commands.devtools import cmd_safety as _cmd
@@ -120,11 +120,11 @@ def cmd_safety(
 
 @app.command("domains")
 def cmd_domains(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     fmt: str = typer.Option("text", "--format"),
 ) -> None:
     """Detect semantic business domains via community detection."""
@@ -135,11 +135,11 @@ def cmd_domains(
 
 @app.command("stability")
 def cmd_stability(
-    migrations_dir: Optional[str] = typer.Argument(None),
-    json_input: Optional[str] = typer.Option(None, "--json-input"),
+    migrations_dir: str | None = typer.Argument(None),
+    json_input: str | None = typer.Option(None, "--json-input"),
     dialect: str = typer.Option("oracle", "--dialect"),
-    at: Optional[str] = typer.Option(None, "--at"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    at: str | None = typer.Option(None, "--at"),
+    out: str | None = typer.Option(None, "--out"),
     fmt: str = typer.Option("text", "--format"),
 ) -> None:
     """Calculate schema stability metrics and churn rates."""
@@ -152,7 +152,7 @@ def cmd_stability(
 def cmd_cost(
     migrations_dir: str = typer.Argument(...),
     fmt: str = typer.Option("text", "--format"),
-    out: Optional[str] = typer.Option(None, "--out"),
+    out: str | None = typer.Option(None, "--out"),
 ) -> None:
     """Estimate migration execution cost (heuristic)."""
     from ..commands.devtools import cmd_cost as _cmd

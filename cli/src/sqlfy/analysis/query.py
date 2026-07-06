@@ -52,10 +52,8 @@ import json
 import re
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional
 
-from ..domain.schema_state import SchemaState, TableState, ColumnState
-
+from ..domain.schema_state import SchemaState
 
 # ─────────────────────────────────────────────
 # RESULT TYPE
@@ -154,13 +152,13 @@ class QueryEngine:
 
     def tables(
         self,
-        pattern:   Optional[str]  = None,   # regex / substring match on full name
-        schema:    Optional[str]  = None,   # exact schema match (case-insensitive)
-        has_pk:    Optional[bool] = None,   # filter by PK presence
-        is_orphan: Optional[bool] = None,   # filter by FK isolation
-        min_cols:  Optional[int]  = None,   # minimum column count
-        max_cols:  Optional[int]  = None,   # maximum column count
-        created_in: Optional[str] = None,   # exact migration version
+        pattern:   str | None  = None,   # regex / substring match on full name
+        schema:    str | None  = None,   # exact schema match (case-insensitive)
+        has_pk:    bool | None = None,   # filter by PK presence
+        is_orphan: bool | None = None,   # filter by FK isolation
+        min_cols:  int | None  = None,   # minimum column count
+        max_cols:  int | None  = None,   # maximum column count
+        created_in: str | None = None,   # exact migration version
     ) -> QueryResult:
         """Filter and list tables matching the given criteria."""
         filters: list[str] = []
@@ -220,14 +218,14 @@ class QueryEngine:
 
     def columns(
         self,
-        table:     Optional[str]  = None,   # table full name pattern
-        pattern:   Optional[str]  = None,   # column name pattern
-        type_like: Optional[str]  = None,   # data type substring
-        is_pk:     Optional[bool] = None,
-        is_fk:     Optional[bool] = None,
-        is_unique: Optional[bool] = None,
-        nullable:  Optional[bool] = None,
-        has_default: Optional[bool] = None,
+        table:     str | None  = None,   # table full name pattern
+        pattern:   str | None  = None,   # column name pattern
+        type_like: str | None  = None,   # data type substring
+        is_pk:     bool | None = None,
+        is_fk:     bool | None = None,
+        is_unique: bool | None = None,
+        nullable:  bool | None = None,
+        has_default: bool | None = None,
     ) -> QueryResult:
         """Filter columns across all (or one) table(s)."""
         filters: list[str] = []
@@ -293,7 +291,7 @@ class QueryEngine:
 
         if from_upper not in self._state.tables:
             return QueryResult(query=query_str, rows=[
-                {'step': '✗', 'table': from_upper, 'via': f'Table not found'}
+                {'step': '✗', 'table': from_upper, 'via': 'Table not found'}
             ], columns=['step', 'table', 'via'],
             meta={'found': False, 'reason': f'{from_upper} not in schema'})
 
@@ -466,7 +464,7 @@ class QueryEngine:
         """Detect circular FK references using DFS."""
         WHITE, GRAY, BLACK = 0, 1, 2
         color:  dict[str, int] = {n: WHITE for n in self._state.tables}
-        parent: dict[str, Optional[str]] = {n: None for n in self._state.tables}
+        parent: dict[str, str | None] = {n: None for n in self._state.tables}
         found:  list[list[str]] = []
         seen:   set[frozenset] = set()
 
@@ -579,20 +577,19 @@ class QueryEngine:
 
         # Seed with direct inbound references
         for r in self._state.relationships:
-            if r.to_table == upper:
-                if r.from_table not in visited:
-                    visited.add(r.from_table)
-                    action = f'CASCADE DELETE' if r.on_delete == 'CASCADE' else \
-                             f'SET NULL' if r.on_delete == 'SET_NULL' else \
+            if r.to_table == upper and r.from_table not in visited:
+                visited.add(r.from_table)
+                action = 'CASCADE DELETE' if r.on_delete == 'CASCADE' else \
+                             'SET NULL' if r.on_delete == 'SET_NULL' else \
                              'RESTRICT / ERROR'
-                    queue.append((r.from_table, 1, action))
-                    rows.append({
-                        'depth':       1,
-                        'table':       r.from_table,
-                        'fk':          r.constraint_name or 'unnamed',
-                        'via_column':  ', '.join(r.from_columns),
-                        'action':      action,
-                    })
+                queue.append((r.from_table, 1, action))
+                rows.append({
+                    'depth':       1,
+                    'table':       r.from_table,
+                    'fk':          r.constraint_name or 'unnamed',
+                    'via_column':  ', '.join(r.from_columns),
+                    'action':      action,
+                })
 
         # BFS further
         while queue:
@@ -601,8 +598,8 @@ class QueryEngine:
                 if r.to_table != current or r.from_table in visited:
                     continue
                 visited.add(r.from_table)
-                action = f'CASCADE' if r.on_delete == 'CASCADE' else \
-                         f'SET NULL' if r.on_delete == 'SET_NULL' else 'RESTRICT'
+                action = 'CASCADE' if r.on_delete == 'CASCADE' else \
+                         'SET NULL' if r.on_delete == 'SET_NULL' else 'RESTRICT'
                 queue.append((r.from_table, depth + 1, action))
                 rows.append({
                     'depth':      depth + 1,
@@ -621,7 +618,7 @@ class QueryEngine:
 
     # ── indexes ────────────────────────────────────────────────────────
 
-    def indexes(self, table: Optional[str] = None,
+    def indexes(self, table: str | None = None,
                 unique_only: bool = False) -> QueryResult:
         """List all indexes, optionally filtered by table or uniqueness."""
         query_str = 'SELECT indexes'

@@ -3,21 +3,26 @@ sqlfy.analysis
 ==============
 Schema analysis tools: diff, insights, validation, querying, vector retrieval, impact analysis.
 """
+from __future__ import annotations
 
-from .differ import SchemaDiffer, DiffResult
-from .insights import InsightsEngine
-from .validator import validate_graph_structure, validate_node_types, validate_edge_relations
 from .asker import Asker, ChatSession
-from .query import QueryEngine
-from .retriever import KeywordRetriever, EmbeddingRetriever, make_retriever
+from .differ import DiffResult, SchemaDiffer
 from .impact import (
-    analyze_impact,
     ImpactResult,
-    format_impact_text,
-    format_impact_json,
-    format_impact_from_diff_text,
+    analyze_impact,
     format_impact_from_diff_json,
+    format_impact_from_diff_text,
+    format_impact_json,
+    format_impact_text,
     merge_impact_results,
+)
+from .insights import InsightsEngine
+from .query import QueryEngine
+from .retriever import EmbeddingRetriever, KeywordRetriever, make_retriever
+from .validator import (
+    validate_edge_relations,
+    validate_graph_structure,
+    validate_node_types,
 )
 
 __all__ = [

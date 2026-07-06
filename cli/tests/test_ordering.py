@@ -3,20 +3,18 @@ test_ordering.py
 ================
 Test migration ordering validation.
 """
+from __future__ import annotations
 
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from sqlfy.analysis.ordering import (
-    parse_migration_filename,
-    validate_migrations,
-    suggest_renumbering,
-    format_text,
     format_json,
+    format_text,
+    parse_migration_filename,
+    suggest_renumbering,
+    validate_migrations,
 )
-
 
 # ─────────────────────────────────────────────
 # FILENAME PARSING TESTS
@@ -93,7 +91,7 @@ def test_validate_empty_directory():
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         report = validate_migrations(migrations_dir)
-        
+
         assert report.total_migrations == 0
         assert len(report.issues) == 0
         assert not report.has_errors
@@ -105,9 +103,9 @@ def test_validate_single_migration():
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__initial.sql").write_text("SELECT 1")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.total_migrations == 1
         assert len(report.issues) == 0
 
@@ -119,9 +117,9 @@ def test_validate_multiple_migrations_correct_order():
         (migrations_dir / "V1__first.sql").write_text("SELECT 1")
         (migrations_dir / "V2__second.sql").write_text("SELECT 2")
         (migrations_dir / "V3__third.sql").write_text("SELECT 3")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.total_migrations == 3
         assert len(report.issues) == 0
 
@@ -132,9 +130,9 @@ def test_detect_duplicate_versions():
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__first.sql").write_text("SELECT 1")
         (migrations_dir / "V1__duplicate.sql").write_text("SELECT 1")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.has_errors
         error = next(i for i in report.errors if i.code == "DUPLICATE_VERSION")
         assert error.version == "1"
@@ -148,9 +146,9 @@ def test_detect_version_gaps():
         (migrations_dir / "V1__first.sql").write_text("SELECT 1")
         (migrations_dir / "V2__second.sql").write_text("SELECT 2")
         (migrations_dir / "V5__fifth.sql").write_text("SELECT 5")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.has_warnings
         warning = next(i for i in report.warnings if i.code == "VERSION_GAP")
         assert "V2 → V5" in warning.message
@@ -166,9 +164,9 @@ def test_detect_out_of_order():
         # But by version: V2 should come before V10
         (migrations_dir / "V10__later.sql").write_text("SELECT 10")
         (migrations_dir / "V2__earlier.sql").write_text("SELECT 2")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.has_errors
         error = next(i for i in report.errors if i.code == "OUT_OF_ORDER")
         assert "not in version order" in error.message
@@ -180,9 +178,9 @@ def test_detect_invalid_filename():
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__valid.sql").write_text("SELECT 1")
         (migrations_dir / "invalid_migration.sql").write_text("SELECT 2")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.has_warnings
         warning = next(i for i in report.warnings if i.code == "INVALID_FILENAME")
         assert "invalid_migration.sql" in warning.filename
@@ -195,9 +193,9 @@ def test_ignore_non_sql_files():
         (migrations_dir / "V1__valid.sql").write_text("SELECT 1")
         (migrations_dir / "README.md").write_text("# Migrations")
         (migrations_dir / "config.json").write_text("{}")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert report.total_migrations == 1
         assert len(report.issues) == 0
 
@@ -209,9 +207,9 @@ def test_handle_dotted_versions():
         (migrations_dir / "V1.0__first.sql").write_text("SELECT 1")
         (migrations_dir / "V1.1__second.sql").write_text("SELECT 2")
         (migrations_dir / "V2.0__third.sql").write_text("SELECT 3")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         # Dotted versions should not trigger gap warnings
         assert not report.has_warnings
         assert not report.has_errors
@@ -224,9 +222,9 @@ def test_multiple_issues_sorted_by_severity():
         (migrations_dir / "V1__first.sql").write_text("SELECT 1")
         (migrations_dir / "V1__duplicate.sql").write_text("SELECT 1")  # ERROR
         (migrations_dir / "invalid.sql").write_text("SELECT 2")  # WARNING
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         # First issue should be the error
         assert report.issues[0].severity == "error"
         assert report.issues[1].severity == "warning"
@@ -243,9 +241,9 @@ def test_suggest_renumbering_no_changes():
         (migrations_dir / "V1__first.sql").write_text("")
         (migrations_dir / "V2__second.sql").write_text("")
         (migrations_dir / "V3__third.sql").write_text("")
-        
+
         suggestions = suggest_renumbering(migrations_dir)
-        
+
         assert len(suggestions) == 0
 
 
@@ -256,14 +254,14 @@ def test_suggest_renumbering_with_gaps():
         (migrations_dir / "V1__first.sql").write_text("")
         (migrations_dir / "V5__second.sql").write_text("")
         (migrations_dir / "V10__third.sql").write_text("")
-        
+
         suggestions = suggest_renumbering(migrations_dir)
-        
+
         assert len(suggestions) == 2
         assert suggestions[0]["old"] == "V5__second.sql"
         assert suggestions[0]["new"] == "V2__second.sql"
         assert suggestions[0]["version_new"] == "2"
-        
+
         assert suggestions[1]["old"] == "V10__third.sql"
         assert suggestions[1]["new"] == "V3__third.sql"
         assert suggestions[1]["version_new"] == "3"
@@ -277,9 +275,9 @@ def test_suggest_renumbering_out_of_order():
         (migrations_dir / "V10__first.sql").write_text("")  # Should be V1
         (migrations_dir / "V20__second.sql").write_text("")  # Should be V2
         (migrations_dir / "V30__third.sql").write_text("")  # Should be V3
-        
+
         suggestions = suggest_renumbering(migrations_dir)
-        
+
         # All should be renumbered to sequential order
         assert len(suggestions) == 3
         assert suggestions[0]["version_new"] == "1"
@@ -294,9 +292,9 @@ def test_renumbering_ignores_repeatable():
         (migrations_dir / "V1__first.sql").write_text("")
         (migrations_dir / "R__repeatable.sql").write_text("")
         (migrations_dir / "V5__second.sql").write_text("")
-        
+
         suggestions = suggest_renumbering(migrations_dir)
-        
+
         # Only versioned migrations should be included
         assert len(suggestions) == 1
         assert suggestions[0]["old"] == "V5__second.sql"
@@ -311,10 +309,10 @@ def test_format_text_no_issues():
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__first.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
         output = format_text(report)
-        
+
         assert "Total migrations: 1" in output
         assert "✓ All migrations validated" in output
 
@@ -325,10 +323,10 @@ def test_format_text_with_errors():
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__first.sql").write_text("")
         (migrations_dir / "V1__duplicate.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
         output = format_text(report, show_suggestions=True)
-        
+
         assert "❌ 1 error(s):" in output
         assert "[DUPLICATE_VERSION]" in output
         assert "→" in output  # Suggestion marker
@@ -341,10 +339,10 @@ def test_format_text_with_warnings():
         (migrations_dir / "V1__first.sql").write_text("")
         (migrations_dir / "V2__second.sql").write_text("")
         (migrations_dir / "V5__fifth.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
         output = format_text(report, show_suggestions=True)
-        
+
         assert "⚠  1 warning(s):" in output
         assert "[VERSION_GAP]" in output
 
@@ -352,15 +350,15 @@ def test_format_text_with_warnings():
 def test_format_json():
     """Test JSON formatting."""
     import json
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__first.sql").write_text("")
         (migrations_dir / "V1__duplicate.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
         output = format_json(report)
-        
+
         data = json.loads(output)
         assert data["total_migrations"] == 2
         assert data["has_errors"] is True
@@ -372,14 +370,14 @@ def test_format_json():
 def test_format_json_no_issues():
     """Test JSON formatting with no issues."""
     import json
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__first.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
         output = format_json(report)
-        
+
         data = json.loads(output)
         assert data["has_errors"] is False
         assert data["has_warnings"] is False
@@ -398,9 +396,9 @@ def test_version_gap_not_detected_for_dotted_versions():
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1.0__first.sql").write_text("")
         (migrations_dir / "V1.5__second.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         # Should not trigger gap warning for dotted versions
         assert not report.has_warnings
 
@@ -410,9 +408,9 @@ def test_single_migration_no_order_check():
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V99__only.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         assert not report.has_errors
         assert not report.has_warnings
 
@@ -422,13 +420,13 @@ def test_subdirectories_ignored():
     with tempfile.TemporaryDirectory() as tmpdir:
         migrations_dir = Path(tmpdir)
         (migrations_dir / "V1__first.sql").write_text("")
-        
+
         # Create a subdirectory with migrations (should be ignored)
         subdir = migrations_dir / "archive"
         subdir.mkdir()
         (subdir / "V2__old.sql").write_text("")
-        
+
         report = validate_migrations(migrations_dir)
-        
+
         # Should only count the one file in the root
         assert report.total_migrations == 1

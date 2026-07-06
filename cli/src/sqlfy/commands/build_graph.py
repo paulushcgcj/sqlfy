@@ -24,49 +24,52 @@ Orchestrates all existing graph features:
 
 from __future__ import annotations
 
-import sys
 import json
+import sys
 import time
-from pathlib import Path
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+from pathlib import Path
 
+from ..analysis.health import HealthAnalyzer
+from ..analysis.insights import InsightsEngine
+from ..analysis.query import QueryEngine
+from ..clustering import detect_communities, label_communities
 from ..core import build_networkx_graph
 from ..domain.schema_state import SchemaStateBuilder
-from ..reconstructor import reconstruct, reconstruct_at
-from ..clustering import detect_communities, label_communities
-from ..analysis.query import QueryEngine
-from ..analysis.insights import InsightsEngine
-from ..analysis.health import HealthAnalyzer
-from ..output.graph_export import export_graph_json, export_graph_html, export_graph_report
+from ..output.graph_export import (
+    export_graph_html,
+    export_graph_json,
+    export_graph_report,
+)
 from ..output.grapher import Grapher
+from ..reconstructor import reconstruct, reconstruct_at
 from ._utils import load_files
 
 
 @dataclass
 class GraphBuildResult:
     """Result of complete graph build process."""
-    
+
     output_dir: Path
     graph_path: Path
     html_path: Path
     report_path: Path
     manifest_path: Path
-    
+
     node_count: int
     edge_count: int
     community_count: int
     god_node_count: int
-    
+
     health_score: int
     insights_count: int
     query_count: int
     viz_count: int
-    
+
     total_time_seconds: float
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -92,7 +95,7 @@ class GraphBuildResult:
             },
             "timestamp": self.timestamp,
         }
-    
+
     def to_json(self) -> str:
         """Convert to JSON string."""
         return json.dumps(self.to_dict(), indent=2)
@@ -126,7 +129,7 @@ def cmd_build_graph(
     enable_splitting = not no_split
     skip_queries = no_queries
     skip_viz = no_viz
-    
+
     # Create output directories
     out_dir.mkdir(parents=True, exist_ok=True)
     queries_dir = out_dir / 'queries'
@@ -136,7 +139,7 @@ def cmd_build_graph(
     insights_dir.mkdir(exist_ok=True)
     if not skip_viz:
         viz_dir.mkdir(exist_ok=True)
-    
+
     print("╔══════════════════════════════════════════════════════════╗", file=sys.stderr)
     print("║         Schema Knowledge Graph Builder                   ║", file=sys.stderr)
     print("╚══════════════════════════════════════════════════════════╝", file=sys.stderr)
@@ -144,14 +147,14 @@ def cmd_build_graph(
     print(f"📂 Building graph from: {migrations_dir}", file=sys.stderr)
     print(f"📍 Output directory: {out_dir}", file=sys.stderr)
     print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Phase 1: Graph Construction
     # ─────────────────────────────────────────────────────────────
     print("🔨 Phase 1: Graph Construction", file=sys.stderr)
     graph = reconstruct_at(files, version, dialect=dialect) if version else reconstruct(files, dialect=dialect)
     print(f"   ✓ Reconstructing schema ({len(files)} migrations)", file=sys.stderr)
-    
+
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
     nx_graph = build_networkx_graph(graph, directed=True)
     node_count = nx_graph.number_of_nodes()
@@ -159,7 +162,7 @@ def cmd_build_graph(
     print(f"   ✓ Building NetworkX graph ({node_count} nodes, {edge_count} edges)", file=sys.stderr)
     print("   ✓ Validating graph structure", file=sys.stderr)
     print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Phase 2: Community Detection
     # ─────────────────────────────────────────────────────────────
@@ -168,11 +171,11 @@ def cmd_build_graph(
     community_count = comm_result.num_communities
     print(f"   ✓ Running Leiden clustering (resolution={resolution})", file=sys.stderr)
     print(f"   ✓ Detected {community_count} communities", file=sys.stderr)
-    
+
     labeled_communities = label_communities(comm_result.communities, nx_graph)
     community_labels = [label for label in labeled_communities.values()]
     print(f"   ✓ Labeling domains ({', '.join(community_labels[:3])}{'...' if len(community_labels) > 3 else ''})", file=sys.stderr)
-    
+
     # Save communities
     communities_data = {
         'communities': [
@@ -192,12 +195,12 @@ def cmd_build_graph(
     with open(out_dir / 'communities.json', 'w', encoding='utf-8') as f:
         json.dump(communities_data, f, indent=2)
     print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Phase 3: Analysis
     # ─────────────────────────────────────────────────────────────
     print("🔍 Phase 3: Analysis", file=sys.stderr)
-    
+
     # God nodes (highly-connected tables)
     god_nodes = []
     degree_dict = dict(nx_graph.degree())
@@ -205,33 +208,33 @@ def cmd_build_graph(
     god_nodes = [{'node': node, 'degree': degree} for node, degree in sorted_nodes[:10] if degree >= min_refs]
     god_node_count = len(god_nodes)
     print(f"   ✓ Computing god nodes (top {god_node_count} by degree centrality)", file=sys.stderr)
-    
+
     with open(out_dir / 'god-nodes.json', 'w', encoding='utf-8') as f:
         json.dump({'god_nodes': god_nodes, 'count': god_node_count, 'min_refs': min_refs}, f, indent=2)
-    
+
     # Insights
     insights_report = InsightsEngine.analyse(state, files=files, communities=comm_result.communities)
     insights_count = len(insights_report.findings)
     print(f"   ✓ Running insights engine ({insights_count} findings)", file=sys.stderr)
-    
+
     with open(insights_dir / 'schema-quality.json', 'w', encoding='utf-8') as f:
         f.write(insights_report.to_json())
-    
+
     # Health score
     health_analyzer_report = HealthAnalyzer.analyze(state, insights_report, migrations_dir or '.')
     health_score = health_analyzer_report.health_score.score
     print(f"   ✓ Computing health score ({health_score}/100)", file=sys.stderr)
-    
+
     with open(insights_dir / 'health-score.json', 'w', encoding='utf-8') as f:
         f.write(health_analyzer_report.to_json())
-    
+
     # Column lineage (if available)
     try:
         from ..analysis.lineage import extract_column_lineage, find_god_columns
         lineage_files = [(f['filename'], f['sql']) for f in files]
         lineage = extract_column_lineage(graph, lineage_files)
         god_cols = find_god_columns(lineage, min_refs=min_refs)
-        
+
         # Save god columns
         god_cols_data = {
             'god_columns': [
@@ -251,9 +254,9 @@ def cmd_build_graph(
         print("   ✓ Analyzing column lineage", file=sys.stderr)
     except ImportError:
         print("   ⚠ Column lineage analysis skipped (SQLLineage not installed)", file=sys.stderr)
-    
+
     print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Phase 4: Pre-computed Queries
     # ─────────────────────────────────────────────────────────────
@@ -261,50 +264,50 @@ def cmd_build_graph(
     if not skip_queries:
         print("📊 Phase 4: Pre-computed Queries", file=sys.stderr)
         engine = QueryEngine(state)
-        
+
         # Orphan tables
         orphans_result = engine.orphans()
         with open(queries_dir / 'orphan-tables.json', 'w', encoding='utf-8') as f:
             json.dump(orphans_result.to_dict(), f, indent=2)
         print(f"   ✓ Orphan tables ({len(orphans_result.rows)} found)", file=sys.stderr)
         query_count += 1
-        
+
         # Circular dependencies
         cycles_result = engine.cycles()
         with open(queries_dir / 'cycles.json', 'w', encoding='utf-8') as f:
             json.dump(cycles_result.to_dict(), f, indent=2)
         print(f"   ✓ Circular dependencies ({len(cycles_result.rows)} cycles detected)", file=sys.stderr)
         query_count += 1
-        
+
         # Disconnected islands
         islands_result = engine.islands()
         with open(queries_dir / 'islands.json', 'w', encoding='utf-8') as f:
             json.dump(islands_result.to_dict(), f, indent=2)
         print(f"   ✓ Disconnected islands ({islands_result.meta.get('component_count', 0)} found)", file=sys.stderr)
         query_count += 1
-        
+
         # Missing PKs
         missing_pk_result = engine.missing_pk()
         with open(queries_dir / 'missing-pk.json', 'w', encoding='utf-8') as f:
             json.dump(missing_pk_result.to_dict(), f, indent=2)
         print(f"   ✓ Missing PKs ({len(missing_pk_result.rows)} tables)", file=sys.stderr)
         query_count += 1
-        
+
         # Missing FK candidates
         missing_fk_result = engine.missing_fk()
         with open(queries_dir / 'missing-fk.json', 'w', encoding='utf-8') as f:
             json.dump(missing_fk_result.to_dict(), f, indent=2)
         print(f"   ✓ Missing FK candidates ({len(missing_fk_result.rows)} columns)", file=sys.stderr)
         query_count += 1
-        
+
         print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Phase 5: Visualizations
     # ─────────────────────────────────────────────────────────────
     viz_count = 0
     print("🎨 Phase 5: Visualizations", file=sys.stderr)
-    
+
     # NetworkX JSON + HTML + Report (always generated)
     export_graph_json(nx_graph, communities=comm_result.communities,
                       output_path=out_dir / 'graph.json')
@@ -315,25 +318,25 @@ def cmd_build_graph(
                       output_path=out_dir / 'graph.html')
     print("   ✓ Generating graph.html (interactive vis.js)", file=sys.stderr)
     viz_count += 1
-    
+
     # Additional formats (if not skipped)
     if not skip_viz:
         title = f"Schema V{state.version}"
-        
+
         # Mermaid ERD
         mermaid_output = Grapher.to_mermaid(state, title=title)
         with open(viz_dir / 'schema.mermaid', 'w', encoding='utf-8') as f:
             f.write(mermaid_output)
         print("   ✓ Generating schema.mermaid (ERD)", file=sys.stderr)
         viz_count += 1
-        
+
         # Graphviz DOT
         dot_output = Grapher.to_dot(state, title=title)
         with open(viz_dir / 'schema.dot', 'w', encoding='utf-8') as f:
             f.write(dot_output)
         print("   ✓ Generating schema.dot (Graphviz)", file=sys.stderr)
         viz_count += 1
-        
+
         # Excalidraw JSON
         try:
             from ..output.excalidraw_exporter import to_excalidraw
@@ -344,7 +347,7 @@ def cmd_build_graph(
             viz_count += 1
         except Exception as e:
             print(f"   ⚠ Excalidraw export failed: {e}", file=sys.stderr)
-        
+
         # Draw.io XML
         try:
             from ..output.drawio_exporter import to_drawio
@@ -355,14 +358,14 @@ def cmd_build_graph(
             viz_count += 1
         except Exception as e:
             print(f"   ⚠ Draw.io export failed: {e}", file=sys.stderr)
-    
+
     print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Phase 6: Report Generation
     # ─────────────────────────────────────────────────────────────
     print("📝 Phase 6: Report Generation", file=sys.stderr)
-    
+
     # Comprehensive GRAPH_REPORT.md
     export_graph_report(nx_graph, communities=comm_result.communities,
                         output_path=out_dir / 'GRAPH_REPORT.md')
@@ -373,21 +376,21 @@ def cmd_build_graph(
     with open(out_dir / 'manifest.json', 'w', encoding='utf-8') as f:
         f.write(manifest)
     print("   ✓ Writing manifest.json (metadata)", file=sys.stderr)
-    
+
     print(file=sys.stderr)
-    
+
     # ─────────────────────────────────────────────────────────────
     # Summary
     # ─────────────────────────────────────────────────────────────
     elapsed = time.time() - start_time
-    
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", file=sys.stderr)
     print("✅ GRAPH BUILD COMPLETE", file=sys.stderr)
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", file=sys.stderr)
     print(file=sys.stderr)
     print(f"📦 Output: {out_dir}/", file=sys.stderr)
     print(f"   • graph.json ({node_count} nodes, {edge_count} edges)", file=sys.stderr)
-    print(f"   • graph.html (interactive)", file=sys.stderr)
+    print("   • graph.html (interactive)", file=sys.stderr)
     print(f"   • GRAPH_REPORT.md ({(out_dir / 'GRAPH_REPORT.md').stat().st_size:,} bytes)", file=sys.stderr)
     print(f"   • {community_count} community files", file=sys.stderr)
     print(f"   • {query_count} pre-computed queries", file=sys.stderr)
@@ -396,11 +399,11 @@ def cmd_build_graph(
     print("🔗 Next steps:", file=sys.stderr)
     print(f"   • Open {out_dir / 'graph.html'} in browser for interactive exploration", file=sys.stderr)
     print(f"   • Read {out_dir / 'GRAPH_REPORT.md'} for detailed analysis", file=sys.stderr)
-    print(f"   • Use queries/ for quick insights", file=sys.stderr)
-    print(f"   • Import graph.json for programmatic analysis", file=sys.stderr)
+    print("   • Use queries/ for quick insights", file=sys.stderr)
+    print("   • Import graph.json for programmatic analysis", file=sys.stderr)
     print(file=sys.stderr)
     print(f"⏱️  Total time: {elapsed:.2f}s", file=sys.stderr)
-    
+
     # Build result
     result = GraphBuildResult(
         output_dir=out_dir,
@@ -418,7 +421,7 @@ def cmd_build_graph(
         viz_count=viz_count,
         total_time_seconds=elapsed,
     )
-    
+
     # Write build result
     with open(out_dir / 'build-result.json', 'w', encoding='utf-8') as f:
         f.write(result.to_json())

@@ -1,12 +1,13 @@
 """Graph visualization commands: graph and graph-migrations."""
+from __future__ import annotations
 
 import sys
 from pathlib import Path
 from typing import TypedDict
 
 from ..domain.schema_state import SchemaStateBuilder
-from ..reconstructor import reconstruct, reconstruct_at
 from ..output.grapher import Grapher
+from ..reconstructor import reconstruct, reconstruct_at
 from ._utils import load_files, write_output
 
 
@@ -48,8 +49,9 @@ def cmd_graph(
         elif fmt == "mermaid":
             output = Grapher.to_mermaid(state, title=title)
         elif fmt == "excalidraw":
-            from ..output.excalidraw_exporter import to_excalidraw
             import json as _json
+
+            from ..output.excalidraw_exporter import to_excalidraw
             output = _json.dumps(to_excalidraw(state, title=title), indent=2)
         elif fmt == "drawio":
             from ..output.drawio_exporter import to_drawio
@@ -60,7 +62,11 @@ def cmd_graph(
         return
 
     from ..core import build_networkx_graph
-    from ..output.graph_export import export_graph_json, export_graph_html, export_graph_report
+    from ..output.graph_export import (
+        export_graph_html,
+        export_graph_json,
+        export_graph_report,
+    )
 
     nx_graph = build_networkx_graph(graph, directed=True)
     out_dir = Path(output_dir or "sqlfy-out")
@@ -101,7 +107,13 @@ def cmd_graph_migrations(
 ) -> None:
     """Visualize migration timeline and dependency graph."""
     files = load_files(migrations_dir, json_input, use_cache=False)
-    from ..migration_graph import build_migration_graph, format_dot, format_html, format_timeline, format_json
+    from ..migration_graph import (
+        build_migration_graph,
+        format_dot,
+        format_html,
+        format_json,
+        format_timeline,
+    )
 
     migration_graph = build_migration_graph(files)
     fmt = (format or "timeline").lower()

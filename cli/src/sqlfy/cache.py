@@ -3,12 +3,13 @@
 Provides stat-based fast path to avoid re-parsing unchanged migrations.
 Cache entries are stored in sqlfy-out/cache/ by default.
 """
+from __future__ import annotations
 
 import atexit
+import contextlib
 import hashlib
 import json
 import os
-import sys
 import tempfile
 from pathlib import Path
 
@@ -44,33 +45,29 @@ def _save_stat_index() -> None:
         os.close(fd)
         os.replace(tmp, index_file)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.close(fd)
-        except OSError:
-            pass
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
 
 
 def file_hash(path: Path) -> str:
     """Compute SHA256(content + filename).
-    
+
     Uses stat-based fastpath: if size and mtime_ns match cached entry,
     return cached hash without reading file content.
-    
+
     Args:
         path: Path to the file.
-    
+
     Returns:
         SHA256 hex digest of file content + filename.
     """
     global _stat_index_dirty
-    
+
     p = Path(path).resolve()
     abs_key = str(p)
-    
+
     # Stat fastpath
     st = None
     try:
@@ -80,7 +77,7 @@ def file_hash(path: Path) -> str:
             return entry["hash"]
     except OSError:
         pass
-    
+
     # Cache miss — compute full SHA256
     content = p.read_bytes()
     h = hashlib.sha256()
@@ -88,21 +85,21 @@ def file_hash(path: Path) -> str:
     h.update(b"\x00")
     h.update(p.name.encode())  # Include filename for uniqueness
     digest = h.hexdigest()
-    
+
     # Update stat index
     if st:
         _stat_index[abs_key] = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "hash": digest}
         _stat_index_dirty = True
-    
+
     return digest
 
 
 def load_cached(path: Path) -> dict | None:
     """Load cached migration parse result.
-    
+
     Args:
         path: Path to the migration file.
-    
+
     Returns:
         Cached dict with {filename, sql} if found, else None.
     """
@@ -118,7 +115,7 @@ def load_cached(path: Path) -> dict | None:
 
 def save_cached(path: Path, result: dict) -> None:
     """Save migration parse result atomically.
-    
+
     Args:
         path: Path to the migration file.
         result: Dict with {filename, sql} to cache.
@@ -127,21 +124,17 @@ def save_cached(path: Path, result: dict) -> None:
     cache_dir = _CACHE_ROOT / "migrations"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / f"{h}.json"
-    
+
     fd, tmp = tempfile.mkstemp(dir=cache_dir, suffix=".tmp")
     try:
         os.write(fd, json.dumps(result).encode())
         os.close(fd)
         os.replace(tmp, cache_file)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.close(fd)
-        except OSError:
-            pass
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
 
 
 def clear_cache() -> None:
@@ -149,16 +142,12 @@ def clear_cache() -> None:
     cache_dir = _CACHE_ROOT / "migrations"
     if cache_dir.exists():
         for f in cache_dir.glob("*.json"):
-            try:
+            with contextlib.suppress(OSError):
                 f.unlink()
-            except OSError:
-                pass
     stat_index = _CACHE_ROOT / "stat-index.json"
     if stat_index.exists():
-        try:
+        with contextlib.suppress(OSError):
             stat_index.unlink()
-        except OSError:
-            pass
 
 
 # Load stat index once on import
