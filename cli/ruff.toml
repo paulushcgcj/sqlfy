@@ -14,11 +14,21 @@ lint.select = [
 
 # Rules to explicitly avoid (codebase convention)
 lint.ignore = [
+    "B007",   # unused loop control variable — some tests use loops for side effects
+    "B008",   # function call in argument defaults — typer uses this pattern
+    "B904",   # raise within except clause — codebase uses simple raise
     "E501",   # line too long — project already has long lines
+    "E701",   # multiple statements on one line (colon) — codebase uses compact style
+    "E702",   # multiple statements on one line (semicolon) — codebase uses compact style
+    "E741",   # ambiguous variable name — some variables are single letters
     "N802",   # function name should be lowercase — allows legacy CamelCase
     "N803",   # argument name should be lowercase
     "N806",   # variable in function should be lowercase
+    "N815",   # mixedCase variable in class scope — external API fields (Excalidraw)
+    "SIM102", # use single if instead of nested — codebase uses nested for clarity
+    "SIM105", # use contextlib.suppress — codebase uses try/except/pass
     "SIM108", # use ternary operator — current style prefers if/else
+    "W293",   # blank line contains whitespace — docstrings have trailing whitespace
 ]
 
 # Import ordering
