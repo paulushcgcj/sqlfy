@@ -25,6 +25,7 @@ from .evolution import (
     cmd_simulate,
 )
 from .graph import cmd_graph, cmd_graph_migrations
+from .hooks import cmd_hooks_install, cmd_hooks_status, cmd_hooks_uninstall
 from .impact import cmd_impact
 from .provenance import cmd_provenance
 from .schema import cmd_chunks, cmd_dump, cmd_export, cmd_manifest, legacy_main
@@ -43,4 +44,5 @@ __all__ = [
     "cmd_provenance",
     "cmd_pii_scan",
     "cmd_watch",
+    "cmd_hooks_install", "cmd_hooks_uninstall", "cmd_hooks_status",
 ]
