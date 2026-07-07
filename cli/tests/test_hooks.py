@@ -1,10 +1,8 @@
 """Tests for git hook management commands."""
+
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
-
-import pytest
 
 from sqlfy.commands.hooks import (
     MARKER_END,

@@ -1,6 +1,9 @@
 ```
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Build artifacts
+cli/build/
+cli/sqlfy-out/
+cli/src/sqlfy.egg-info/
+
+# Test results
+test-results.xml
 ```

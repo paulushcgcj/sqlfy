@@ -1,10 +1,10 @@
 """Git hook management commands for sqlfy."""
+
 from __future__ import annotations
 
 import os
 import sys
 from pathlib import Path
-
 
 MARKER_START = "# sqlfy-hook-start"
 MARKER_END = "# sqlfy-hook-end"
