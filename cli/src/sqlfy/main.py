@@ -24,6 +24,9 @@ from .commands import (
     cmd_graph,
     cmd_graph_migrations,
     cmd_health,
+    cmd_hooks_install,
+    cmd_hooks_status,
+    cmd_hooks_uninstall,
     cmd_impact,
     cmd_insights,
     cmd_integrity,
@@ -51,6 +54,7 @@ KNOWN_SUBCOMMANDS = {
     "naming",
     "domains", "stability", "validate", "deps", "lineage", "drift",
     "classify", "safety", "pii-scan",
+    "hooks",
 }
 
 
@@ -437,6 +441,28 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true",
                    help="Force rebuild even if shrink-safety gate is triggered")
     p.set_defaults(func=cmd_watch)
+
+    # hooks
+    p_hooks = sub.add_parser("hooks", help="Manage git pre-commit hooks for SQL linting and safety checks")
+    hooks_sub = p_hooks.add_subparsers(dest="hooks_action", required=True)
+    
+    # hooks install
+    p_install = hooks_sub.add_parser("install", help="Install sqlfy pre-commit hook")
+    p_install.add_argument("--path", default=".", metavar="DIR",
+                           help="Path to git repository (default: current directory)")
+    p_install.set_defaults(func=cmd_hooks_install)
+    
+    # hooks uninstall
+    p_uninstall = hooks_sub.add_parser("uninstall", help="Remove sqlfy pre-commit hook")
+    p_uninstall.add_argument("--path", default=".", metavar="DIR",
+                             help="Path to git repository (default: current directory)")
+    p_uninstall.set_defaults(func=cmd_hooks_uninstall)
+    
+    # hooks status
+    p_status = hooks_sub.add_parser("status", help="Check if sqlfy hooks are installed")
+    p_status.add_argument("--path", default=".", metavar="DIR",
+                          help="Path to git repository (default: current directory)")
+    p_status.set_defaults(func=cmd_hooks_status)
 
     return parser
 
