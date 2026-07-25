@@ -1,0 +1,138 @@
+{
+  "canvas": {
+    "width": 1210,
+    "height": 1138,
+    "fps": 20,
+    "frames": 41
+  },
+  "signature": "@sqlfy",
+  "title": {
+    "prefix": "The architecture of",
+    "highlight": "sqlfy",
+    "subtitle": "SQL migration analysis, health scoring & schema simulation engine"
+  },
+  "input_title": "Migration Sources",
+  "inputs": [
+    {
+      "label": "SQL Files",
+      "icon": "file",
+      "color": "#7ee3d6"
+    },
+    {
+      "label": "Flyway",
+      "icon": "folder",
+      "color": "#ff7ab6"
+    },
+    {
+      "label": "Config",
+      "icon": "file",
+      "color": "#f4b64e"
+    },
+    {
+      "label": "Schema",
+      "icon": "db",
+      "color": "#7ee3d6"
+    }
+  ],
+  "core": {
+    "title": "Analysis Core",
+    "subtitle": "(deterministic SQL parsing & graph engine)",
+    "cards": [
+      {
+        "title": "Scan & Parse",
+        "body": "Discover migration files\nsqlglot AST extraction",
+        "icon": "scan"
+      },
+      {
+        "title": "Reconstruct",
+        "body": "Apply migrations sequentially\nbuild schema graph state",
+        "icon": "db"
+      },
+      {
+        "title": "Analyze",
+        "body": "PII, health score, differ\nrollback & simulator",
+        "icon": "shield"
+      }
+    ]
+  },
+  "decision": {
+    "title": "Safe?",
+    "body": "idempotent\nbreaking-free"
+  },
+  "output": {
+    "label": "Graph / Report",
+    "icon": "file"
+  },
+  "loop_label": "Loop until migration graph consistent and checks pass",
+  "retry_label": "Syntax error or unsafe migration",
+  "left_panel": {
+    "title": "Migration Corpus",
+    "badge": "read / analyze",
+    "cards": [
+      {
+        "title": "Flyway/Liquibase",
+        "body": "versioned SQL scripts\nincremental changelogs",
+        "icon": "folder"
+      },
+      {
+        "title": "Dialects",
+        "body": "Postgres, SQLite, MySQL\ncustom adapter rules",
+        "icon": "file"
+      },
+      {
+        "title": "Samples",
+        "body": "test data and baseline\nreference schemas",
+        "icon": "file"
+      }
+    ]
+  },
+  "center_panel": {
+    "title": "Analysis Pipeline",
+    "subtitle": "(state inspection & graph network)",
+    "footer": "AST + Semantic",
+    "cards": [
+      {
+        "title": "Collector",
+        "body": "file collection\nand fingerprinting",
+        "icon": "folder"
+      },
+      {
+        "title": "Reconstructor",
+        "body": "apply statements\nto schema state",
+        "icon": "db"
+      },
+      {
+        "title": "NetworkX",
+        "body": "graph build\nand clustering",
+        "icon": "hash"
+      },
+      {
+        "title": "Validators",
+        "body": "safety & dependency\nchecks",
+        "icon": "shield"
+      }
+    ]
+  },
+  "right_panel": {
+    "title": "Deliverables",
+    "incoming_label": "Export",
+    "return_label": "Artifacts",
+    "cards": [
+      {
+        "title": "Interactive ERD",
+        "body": "graph.html visualization\nforce simulation canvas",
+        "icon": "package"
+      },
+      {
+        "title": "Audit Report",
+        "body": "GRAPH_REPORT.md\ncommunity insights",
+        "icon": "file"
+      },
+      {
+        "title": "JSON & Cypher",
+        "body": "GraphRAG ready export\nNeo4j / FalkorDB push",
+        "icon": "file"
+      }
+    ]
+  }
+}

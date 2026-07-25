@@ -1,0 +1,138 @@
+{
+  "canvas": {
+    "width": 1210,
+    "height": 1138,
+    "fps": 20,
+    "frames": 41
+  },
+  "signature": "@SQLfy",
+  "title": {
+    "prefix": "The Architecture of",
+    "highlight": "SQLfy",
+    "subtitle": "Flyway Migrations → AST → Schema State → RAG & ERD"
+  },
+  "input_title": "Migration Sources",
+  "inputs": [
+    {
+      "label": "Flyway",
+      "icon": "folder",
+      "color": "#7ee3d6"
+    },
+    {
+      "label": "Oracle",
+      "icon": "file",
+      "color": "#ff7ab6"
+    },
+    {
+      "label": "Postgres",
+      "icon": "file",
+      "color": "#f4b64e"
+    },
+    {
+      "label": "MySQL",
+      "icon": "file",
+      "color": "#7ee3d6"
+    }
+  ],
+  "core": {
+    "title": "Processing Pipeline",
+    "subtitle": "(incremental AST reconstruction)",
+    "cards": [
+      {
+        "title": "Parse",
+        "body": "SQLGlot multi-dialect\nAST parsing",
+        "icon": "scan"
+      },
+      {
+        "title": "Reconstruct",
+        "body": "Incremental state\ncreates, alters, drops",
+        "icon": "shield"
+      },
+      {
+        "title": "Export",
+        "body": "Schema graph state\nLLM RAG & ERDs",
+        "icon": "db"
+      }
+    ]
+  },
+  "decision": {
+    "title": "Valid?",
+    "body": "safe, traced\nconsistent"
+  },
+  "output": {
+    "label": "Schema Graph",
+    "icon": "file"
+  },
+  "loop_label": "Loop until dependency order verified, safety scored, graph updated",
+  "retry_label": "Circular dependency or syntax error",
+  "left_panel": {
+    "title": "Migration Inputs",
+    "badge": "multi-dialect",
+    "cards": [
+      {
+        "title": "Flyway SQL",
+        "body": "V1__, V2__ version\nordered files",
+        "icon": "folder"
+      },
+      {
+        "title": "DDL Dialects",
+        "body": "Oracle, Postgres\nMySQL, SQLite",
+        "icon": "file"
+      },
+      {
+        "title": "Metadata",
+        "body": "Git provenance\nand integrity hash",
+        "icon": "file"
+      }
+    ]
+  },
+  "center_panel": {
+    "title": "Engine Core",
+    "subtitle": "(ast parser & state graph)",
+    "footer": "AST + Reconstructor",
+    "cards": [
+      {
+        "title": "AST Parser",
+        "body": "robust sqlglot\ntree parsing",
+        "icon": "folder"
+      },
+      {
+        "title": "State Engine",
+        "body": "table & column\nstate tracking",
+        "icon": "file"
+      },
+      {
+        "title": "Graph State",
+        "body": "networkx foreign\nkey relations",
+        "icon": "hash"
+      },
+      {
+        "title": "Insights",
+        "body": "safety & health\nscore engine",
+        "icon": "db"
+      }
+    ]
+  },
+  "right_panel": {
+    "title": "Outputs & RAG",
+    "incoming_label": "Generate",
+    "return_label": "Artifacts",
+    "cards": [
+      {
+        "title": "LLM Chunks",
+        "body": "vector & bm25\nrag context",
+        "icon": "package"
+      },
+      {
+        "title": "Interactive ERD",
+        "body": "mermaid, dot, excalidraw\nvisual graphs",
+        "icon": "file"
+      },
+      {
+        "title": "Safety Audits",
+        "body": "orphan tables, PII\nrisk scoring",
+        "icon": "file"
+      }
+    ]
+  }
+}

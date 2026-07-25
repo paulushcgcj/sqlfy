@@ -68,6 +68,10 @@ irm https://raw.githubusercontent.com/paulushcgcj/sqlfy/main/install.ps1 | iex
 
 ## 🔄 How It Works
 
+<div align="center">
+<img src="assets/readme/architecture.gif" alt="SQLfy Architecture & Processing Pipeline" width="100%" />
+</div>
+
 ```
 Flyway SQL files  →  sqlglot AST  →  Reconstructor  →  Schema Graph State  →  LLM Chunks / ERDs
 ```
