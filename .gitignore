@@ -390,6 +390,23 @@ sketch
 .history
 .ionide
 
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,linux,macos,node,react
 graphify-out
 AGENTS.md
+src/cli/sqlfy-out/cache/**
+cli/sqlfy-out/cache/**
+cli/src/sqlfy-out/cache/**
