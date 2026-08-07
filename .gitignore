@@ -410,3 +410,7 @@ AGENTS.md
 src/cli/sqlfy-out/cache/**
 cli/sqlfy-out/cache/**
 cli/src/sqlfy-out/cache/**
+kevin_readme.md
+cli/out.json
+cli/mofdb/**
+cli/mofdb2/**
