@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import logging.config
 import sys
+from pathlib import Path
 
 from .commands import (
     _QUERY_TYPES,
@@ -56,6 +59,42 @@ KNOWN_SUBCOMMANDS = {
     "classify", "safety", "pii-scan",
     "hooks",
 }
+
+_LOGGING_CONFIG_PATH = Path(__file__).with_name("logging.yaml")
+
+
+def _configure_logging() -> None:
+    """Configure logging from YAML, with a safe basic logging fallback."""
+    try:
+        import yaml
+    except ImportError:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
+        logging.getLogger(__name__).warning(
+            "PyYAML is not installed; using basic logging configuration."
+        )
+        return
+
+    if not _LOGGING_CONFIG_PATH.exists():
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
+        logging.getLogger(__name__).warning(
+            "Logging config not found at %s; using basic logging configuration.",
+            _LOGGING_CONFIG_PATH,
+        )
+        return
+
+    try:
+        with _LOGGING_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+            config = yaml.safe_load(handle)
+        if not isinstance(config, dict):
+            raise ValueError("logging YAML must deserialize to a mapping")
+        logging.config.dictConfig(config)
+    except Exception as exc:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
+        logging.getLogger(__name__).warning(
+            "Failed to load logging config from %s (%s); using basic logging configuration.",
+            _LOGGING_CONFIG_PATH,
+            exc,
+        )
 
 
 def _subcommand_parser() -> argparse.ArgumentParser:
@@ -481,6 +520,9 @@ def _legacy_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    _configure_logging()
+    logger = logging.getLogger("main")
+
     argv = sys.argv[1:]
     first_positional = next((a for a in argv if not a.startswith("-")), None)
 
@@ -488,7 +530,9 @@ def main() -> None:
         args = _subcommand_parser().parse_args(argv)
         _meta = frozenset({'func', 'subcommand'})
         kw = {k: v for k, v in vars(args).items() if k not in _meta}
+        logger.debug("Executing subcommand '%s' with args: %s", args.subcommand, kw)
         result = args.func(**kw)
+        logger.debug("results: %s", result)
         if isinstance(result, int):
             sys.exit(result)
     else:
