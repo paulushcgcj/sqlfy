@@ -129,7 +129,7 @@ def cmd_build_graph(
 
     out_dir: Path = Path(output_dir or 'graphify-out')
     files = load_files(migrations_dir, json_input)
-    logger.debug("loaded files: %s", files)
+    logger.debug("loaded files: %s", len(files))
     version = at
     enable_splitting = not no_split
     skip_queries = no_queries
