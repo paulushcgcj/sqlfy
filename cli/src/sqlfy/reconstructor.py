@@ -170,13 +170,15 @@ class Reconstructor:
     def snapshot(self) -> SchemaGraph:
         """Return an immutable snapshot of the current schema state."""
         edges = self._derive_edges()
-        return SchemaGraph(
+        sg = SchemaGraph(
             tables=deepcopy(self.tables),
             seqs=deepcopy(self.seqs),
             edges=edges,
             mig_hist=list(self.mig_hist),
             actions=list(self.actions),
         )
+        sg._seq_links = dict(getattr(self, "_seq_links", {}))
+        return sg
 
     def reset(self) -> None:
         """Reset to empty state."""
@@ -541,7 +543,32 @@ class Reconstructor:
         elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'ADD' in expr_up:
             acts += self._alter_add_constraint_regex(f'ALTER {raw_expr}', version)
 
+        # CREATE TRIGGER ... ON <table> ... <seq>.NEXTVAL
+        elif cmd_name == 'CREATE' and 'TRIGGER' in expr_up:
+            acts += self._create_trigger_regex(f'CREATE {raw_expr}', version)
+
         return acts
+
+    # ── Regex fallback helpers ──────────────────────────────────────────────
+
+    def _create_trigger_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
+        tbl_m = re.search(r'ON\s+(?:\"?([\w$]+)\"?\.)?\"?([\w$]+)\"?', raw_sql, re.I)
+        if not tbl_m:
+            return []
+        sch, tbl = tbl_m.groups()
+        tbl_full = f"{sch}.{tbl}".upper() if sch else tbl.upper()
+
+        seq_m = re.findall(r'(?:\"?([\w$]+)\"?\.)?\"?([\w$]+)\"?\.NEXTVAL', raw_sql, re.I)
+        if not hasattr(self, "_seq_links"):
+            self._seq_links = {}
+
+        for _, seq in seq_m:
+            seq_up = seq.upper()
+            seq_full = f"{sch}.{seq_up}".upper() if sch else seq_up
+            self._seq_links[seq_full] = (tbl_full, "EXTRACTED")
+            self._seq_links[seq_up] = (tbl_full, "EXTRACTED")
+
+        return [MigrationAction(action="CREATE_TRIGGER", object_type="TRIGGER", object_name=tbl_full, version=version)]
 
     # ── Regex fallback helpers ──────────────────────────────────────────────
 

@@ -90,16 +90,53 @@ def build_networkx_graph(
 
     # ── FK edges ──────────────────────────────────────────────────────────────
     for edge in schema_graph.edges:
-        G.add_edge(
-            edge.from_table,
-            edge.to_table,
-            relation="foreign_key",
-            confidence="EXTRACTED",
-            from_cols=edge.from_cols,
-            to_cols=edge.to_cols,
-            on_delete=edge.on_delete,
-            constraint_name=edge.constraint_name,
-        )
+        if edge.from_table in G.nodes and edge.to_table in G.nodes:
+            G.add_edge(
+                edge.from_table,
+                edge.to_table,
+                relation="foreign_key",
+                confidence="EXTRACTED",
+                from_cols=edge.from_cols,
+                to_cols=edge.to_cols,
+                on_delete=edge.on_delete,
+                constraint_name=edge.constraint_name,
+            )
+
+    # ── Sequence-to-Table edges ───────────────────────────────────────────────
+    seq_links = getattr(schema_graph, "_seq_links", {})
+    for seq_id, seq in schema_graph.seqs.items():
+        tbl_target = None
+        conf_str = "INFERRED"
+
+        if seq_id in seq_links:
+            tbl_target, conf_str = seq_links[seq_id]
+        elif seq.name in seq_links:
+            tbl_target, conf_str = seq_links[seq.name]
+        else:
+            name = seq.name
+            cands = []
+            if name.endswith("_SEQ"): cands.append(name[:-4])
+            elif name.endswith("_SQ"): cands.append(name[:-3])
+            elif name.startswith("SEQ_"): cands.append(name[4:])
+            elif name.startswith("SQ_"): cands.append(name[3:])
+
+            for cand in cands:
+                if cand in schema_graph.tables:
+                    tbl_target = cand
+                    break
+                cand_full = f"{seq.schema}.{cand}" if seq.schema else cand
+                if cand_full in schema_graph.tables:
+                    tbl_target = cand_full
+                    break
+
+        if tbl_target and tbl_target in G.nodes and seq_id in G.nodes:
+            G.add_edge(
+                tbl_target,
+                seq_id,
+                relation="uses_sequence",
+                confidence=conf_str,
+                constraint_name=f"sequence:{seq.name}:{conf_str}",
+            )
 
     # ── Migration nodes and action edges ─────────────────────────────────────
     if include_migration_nodes:
