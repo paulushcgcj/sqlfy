@@ -23,12 +23,16 @@ from ..domain.models import EdgeRelation, SchemaGraph
 def build_networkx_graph(
     schema_graph: SchemaGraph,
     directed: bool = False,
+    include_column_nodes: bool = False,
+    include_migration_nodes: bool = False,
 ) -> nx.Graph | nx.DiGraph:
     """Convert a SchemaGraph to a NetworkX graph.
 
     Args:
         schema_graph: The schema graph from reconstruct() or apply_migrations().
         directed: If True, return a DiGraph; otherwise an undirected Graph.
+        include_column_nodes: If True, create separate nodes for columns (default False).
+        include_migration_nodes: If True, create separate nodes for migrations (default False).
 
     Returns:
         NetworkX graph with typed nodes and relationship edges.
@@ -37,6 +41,17 @@ def build_networkx_graph(
 
     # ── Table and column nodes ────────────────────────────────────────────────
     for table_id, table in schema_graph.tables.items():
+        columns_attr = [
+            {
+                "name": col.name,
+                "type": col.type,
+                "nullable": col.nullable,
+                "primary_key": col.primary_key,
+                "unique": col.unique,
+                "default": col.default,
+            }
+            for col in table.columns
+        ]
         G.add_node(
             table_id,
             label=table.name,
@@ -44,20 +59,22 @@ def build_networkx_graph(
             created_in=table.created_in,
             modified_in=table.modified_in,
             column_count=len(table.columns),
+            columns=columns_attr,
             schema=table.schema,
         )
-        for col in table.columns:
-            col_id = f"{table_id}.{col.name}"
-            G.add_node(
-                col_id,
-                label=col.name,
-                type="column",
-                data_type=col.type,
-                nullable=col.nullable,
-                primary_key=col.primary_key,
-                unique=col.unique,
-            )
-            G.add_edge(table_id, col_id, relation="contains", confidence="EXTRACTED")
+        if include_column_nodes:
+            for col in table.columns:
+                col_id = f"{table_id}.{col.name}"
+                G.add_node(
+                    col_id,
+                    label=col.name,
+                    type="column",
+                    data_type=col.type,
+                    nullable=col.nullable,
+                    primary_key=col.primary_key,
+                    unique=col.unique,
+                )
+                G.add_edge(table_id, col_id, relation="contains", confidence="EXTRACTED")
 
     # ── Sequence nodes ────────────────────────────────────────────────────────
     for seq_id, seq in schema_graph.seqs.items():
@@ -85,31 +102,32 @@ def build_networkx_graph(
         )
 
     # ── Migration nodes and action edges ─────────────────────────────────────
-    for mig in schema_graph.mig_hist:
-        mig_id = f"migration:{mig.version}"
-        G.add_node(
-            mig_id,
-            label=mig.version,
-            type="migration",
-            description=mig.description,
-        )
-
-    for action in schema_graph.actions:
-        mig_id = f"migration:{action.version}"
-        relation: EdgeRelation = "modifies"
-        if action.action == "CREATE":
-            relation = "creates"
-        elif action.action == "DROP":
-            relation = "drops"
-        if mig_id in G.nodes and action.object_name in G.nodes:
-            G.add_edge(
+    if include_migration_nodes:
+        for mig in schema_graph.mig_hist:
+            mig_id = f"migration:{mig.version}"
+            G.add_node(
                 mig_id,
-                action.object_name,
-                relation=relation,
-                confidence="EXTRACTED",
-                action_type=action.action,
-                object_type=action.object_type,
+                label=mig.version,
+                type="migration",
+                description=mig.description,
             )
+
+        for action in schema_graph.actions:
+            mig_id = f"migration:{action.version}"
+            relation: EdgeRelation = "modifies"
+            if action.action == "CREATE":
+                relation = "creates"
+            elif action.action == "DROP":
+                relation = "drops"
+            if mig_id in G.nodes and action.object_name in G.nodes:
+                G.add_edge(
+                    mig_id,
+                    action.object_name,
+                    relation=relation,
+                    confidence="EXTRACTED",
+                    action_type=action.action,
+                    object_type=action.object_type,
+                )
 
     return G
 

@@ -178,10 +178,36 @@ def export_graph_html(
 
     # Prepare vis.js nodes
     nodes_data = []
+    valid_node_ids = set()
+
     for node_id, attrs in graph.nodes(data=True):
+        ntype = attrs.get('type', 'unknown')
+        if ntype == 'column':
+            continue  # Columns are stored inside table node attributes
+
+        valid_node_ids.add(node_id)
         cid = node_community.get(node_id, 0)
         color = _get_community_color(cid)
         degree = graph.degree(node_id)
+
+        cols = attrs.get('columns', [])
+        cols_summary = ""
+        if cols:
+            cols_lines = [
+                f"• {c['name']} <i>({c['type']})</i>{' [PK]' if c.get('primary_key') else ''}"
+                for c in cols[:12]
+            ]
+            if len(cols) > 12:
+                cols_lines.append(f"<i>... +{len(cols) - 12} more columns</i>")
+            cols_summary = "<br/><br/><b>Columns:</b><br/>" + "<br/>".join(cols_lines)
+
+        title_str = (
+            f"<b>{ntype.capitalize()}: {node_id}</b><br/>"
+            f"Columns: {attrs.get('column_count', len(cols))}<br/>"
+            f"Connections: {degree}<br/>"
+            f"Domain: {community_labels.get(cid, '')}"
+            f"{cols_summary}"
+        )
 
         nodes_data.append({
             'id': node_id,
@@ -190,14 +216,16 @@ def export_graph_html(
             'size': min(50, 10 + degree * 2),
             'community': cid,
             'community_name': community_labels.get(cid, f'Community {cid}'),
-            'type': attrs.get('type', 'unknown'),
+            'type': ntype,
             'degree': degree,
-            'title': f"{attrs.get('type', 'unknown')}: {node_id}<br/>Degree: {degree}<br/>{community_labels.get(cid, '')}"
+            'title': title_str,
         })
 
     # Prepare vis.js edges
     edges_data = []
     for u, v, attrs in graph.edges(data=True):
+        if u not in valid_node_ids or v not in valid_node_ids:
+            continue
         relation = attrs.get('relation', '')
         confidence = attrs.get('confidence', 'EXTRACTED')
 

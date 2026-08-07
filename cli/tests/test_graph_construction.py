@@ -79,7 +79,7 @@ def test_single_table_to_networkx():
         mig_hist=[],
     )
 
-    G = build_networkx_graph(schema)
+    G = build_networkx_graph(schema, include_column_nodes=True)
 
     # Check table node
     assert "users" in G.nodes
@@ -207,7 +207,7 @@ def test_migration_nodes_and_edges():
         ],
     )
 
-    G = build_networkx_graph(schema)
+    G = build_networkx_graph(schema, include_migration_nodes=True)
 
     # Check migration node
     assert "migration:V1" in G.nodes
@@ -278,7 +278,7 @@ def test_validate_graph_structure_valid():
         mig_hist=[],
     )
 
-    G = build_networkx_graph(schema)
+    G = build_networkx_graph(schema, include_column_nodes=True)
     warnings = validate_graph_structure(G)
 
     # Should have no warnings for a well-formed graph with columns
@@ -340,7 +340,7 @@ def test_validate_node_types():
         mig_hist=[],
     )
 
-    G = build_networkx_graph(schema)
+    G = build_networkx_graph(schema, include_column_nodes=True)
     type_counts = validate_node_types(G)
 
     assert type_counts["table"] == 1
@@ -393,7 +393,7 @@ def test_validate_edge_relations():
         mig_hist=[],
     )
 
-    G = build_networkx_graph(schema)
+    G = build_networkx_graph(schema, include_column_nodes=True)
     relation_counts = validate_edge_relations(G)
 
     assert relation_counts["contains"] == 1  # users contains id
