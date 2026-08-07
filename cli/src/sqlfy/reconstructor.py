@@ -142,7 +142,13 @@ class Reconstructor:
         self.mig_hist.append(MigrationHistory(version=vsn, description=ver['description']))
 
         clean_sql = sanitize_sql(sql, dialect=self.dialect)
-        stmts = sqlglot.parse(clean_sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN)
+        try:
+            stmts = sqlglot.parse(clean_sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN)
+        except Exception as exc:
+            log.warning(f"V{vsn}: Tokenization/Parse error in {filename}: {exc} — attempting regex fallback")
+            cmd_type = "ALTER" if "ALTER" in clean_sql.upper() else ("CREATE" if "CREATE" in clean_sql.upper() else "UNKNOWN")
+            expr_body = clean_sql.split(maxsplit=1)[-1] if " " in clean_sql else clean_sql
+            stmts = [exp.Command(this=cmd_type, expression=expr_body)]
 
         for stmt in stmts:
             if stmt is None:
@@ -397,6 +403,11 @@ class Reconstructor:
                         c = _parse_table_constraint(con_node)
                         if c:
                             table.constraints.append(c)
+                            if c.type == "primary_key":
+                                for col in table.columns:
+                                    if col.name in c.columns:
+                                        col.primary_key = True
+                                        col.nullable = False
                             mark()
                             act = MigrationAction(action='ADD_CONSTRAINT', object_type='CONSTRAINT',
                                                   object_name=f'{full}.{c.name or "unnamed"}', version=version)
@@ -525,6 +536,83 @@ class Reconstructor:
         # ALTER TABLE ... RENAME COLUMN old TO new
         elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'RENAME' in expr_up and 'COLUMN' in expr_up:
             acts += self._alter_rename_column_regex(f'ALTER {raw_expr}', version)
+
+        # ALTER TABLE ... ADD CONSTRAINT (Foreign Keys & Primary Keys)
+        elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'ADD' in expr_up:
+            acts += self._alter_add_constraint_regex(f'ALTER {raw_expr}', version)
+
+        return acts
+
+    # ── Regex fallback helpers ──────────────────────────────────────────────
+
+    def _alter_add_constraint_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
+        acts: list[MigrationAction] = []
+
+        # 1. Foreign Key: ALTER TABLE [schema.]table ADD [CONSTRAINT name] FOREIGN KEY (cols) REFERENCES [schema.]to_table (to_cols)
+        fk_m = re.search(
+            r'ALTER\s+TABLE\s+(?:\"?([\w$]+)\"?\.)?\"?([\w$]+)\"?\s+'
+            r'ADD\s+(?:CONSTRAINT\s+\"?([\w$]+)\"?\s+)?FOREIGN\s+KEY\s*\(([^)]+)\)\s*'
+            r'REFERENCES\s+(?:\"?([\w$]+)\"?\.)?\"?([\w$]+)\"?\s*\(([^)]+)\)',
+            raw_sql, re.I | re.S
+        )
+        if fk_m:
+            from_sch, from_tbl, c_name, from_cols_raw, to_sch, to_tbl, to_cols_raw = fk_m.groups()
+            from_full = f"{from_sch}.{from_tbl}".upper() if from_sch else from_tbl.upper()
+            to_full = f"{to_sch}.{to_tbl}".upper() if to_sch else to_tbl.upper()
+            from_cols = [c.strip().strip('"').upper() for c in from_cols_raw.split(',')]
+            to_cols = [c.strip().strip('"').upper() for c in to_cols_raw.split(',')]
+            c_name_str = c_name.upper() if c_name else f"fk_{from_tbl}_{to_tbl}"
+
+            table = self.tables.get(from_full) or self.tables.get(from_tbl.upper())
+            if table:
+                table.constraints.append(Constraint(
+                    name=c_name_str,
+                    type="foreign_key",
+                    columns=from_cols,
+                    references={"table": to_full, "columns": to_cols},
+                ))
+
+            act = MigrationAction(
+                action="ADD_CONSTRAINT",
+                object_type="FOREIGN_KEY",
+                object_name=f"{from_full}.{c_name_str}",
+                version=version,
+            )
+            acts.append(act)
+            return acts
+
+        # 2. Primary Key: ALTER TABLE [schema.]table ADD [CONSTRAINT name] PRIMARY KEY (cols)
+        pk_m = re.search(
+            r'ALTER\s+TABLE\s+(?:\"?([\w$]+)\"?\.)?\"?([\w$]+)\"?\s+'
+            r'ADD\s+(?:CONSTRAINT\s+\"?([\w$]+)\"?\s+)?PRIMARY\s+KEY\s*\(([^)]+)\)',
+            raw_sql, re.I | re.S
+        )
+        if pk_m:
+            sch, tbl, c_name, pk_cols_raw = pk_m.groups()
+            tbl_full = f"{sch}.{tbl}".upper() if sch else tbl.upper()
+            pk_cols = [c.strip().strip('"').upper() for c in pk_cols_raw.split(',')]
+            c_name_str = c_name.upper() if c_name else f"pk_{tbl}"
+
+            table = self.tables.get(tbl_full) or self.tables.get(tbl.upper())
+            if table:
+                for col in table.columns:
+                    if col.name in pk_cols:
+                        col.primary_key = True
+                        col.nullable = False
+                table.constraints.append(Constraint(
+                    name=c_name_str,
+                    type="primary_key",
+                    columns=pk_cols,
+                ))
+
+            act = MigrationAction(
+                action="ADD_CONSTRAINT",
+                object_type="PRIMARY_KEY",
+                object_name=f"{tbl_full}.{c_name_str}",
+                version=version,
+            )
+            acts.append(act)
+            return acts
 
         return acts
 
