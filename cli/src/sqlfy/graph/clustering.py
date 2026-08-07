@@ -265,17 +265,14 @@ def label_communities(
     graph: nx.Graph | nx.DiGraph,
 ) -> dict[int, str]:
     """
-    Generate human-readable labels for communities based on node types.
-
-    Uses heuristics:
-    - Most common schema name prefix
-    - Most common node type
-    - Size of community
+    Generate human-readable domain labels for communities based on node centrality and table prefixes.
 
     Returns:
       {community_id: label}
     """
+    from collections import Counter
     labels: dict[int, str] = {}
+    G_undirected = graph.to_undirected() if graph.is_directed() else graph
 
     for cid, nodes in communities.items():
         if cid == -1:
@@ -286,28 +283,38 @@ def label_communities(
             labels[cid] = f'Community {cid}'
             continue
 
-        # Count node types
+        # Find highest-degree anchor node in this community
+        anchor_node = max(nodes, key=lambda n: G_undirected.degree(n) if n in G_undirected else 0)
+        clean_anchor = anchor_node.split('.')[-1]
+
+        # Count schema prefixes and node types
         type_counts: dict[str, int] = defaultdict(int)
         schema_counts: dict[str, int] = defaultdict(int)
+        prefix_tokens = []
 
         for node in nodes:
-            node_data = graph.nodes.get(node, {})
-            node_type = node_data.get('type', 'unknown')
-            type_counts[node_type] += 1
-
-            # Extract schema prefix from node ID (e.g., "APP.USERS" → "APP")
+            ntype = graph.nodes.get(node, {}).get('type', 'node')
+            type_counts[ntype] += 1
             if '.' in node:
-                schema = node.split('.')[0]
-                schema_counts[schema] += 1
+                schema_counts[node.split('.')[0]] += 1
+            clean_name = node.split('.')[-1]
+            parts = clean_name.split('_')
+            if parts and len(parts[0]) >= 3:
+                prefix_tokens.append(parts[0].upper())
 
-        # Find most common type and schema
-        most_common_type = max(type_counts, key=lambda k: type_counts.get(k) or 0) if type_counts else 'unknown'
+        most_common_type = max(type_counts, key=lambda k: type_counts.get(k) or 0) if type_counts else 'node'
         most_common_schema = max(schema_counts, key=lambda k: schema_counts.get(k) or 0) if schema_counts else None
+        schema_prefix = f"{most_common_schema} " if most_common_schema else ""
 
-        # Generate label
-        if most_common_schema:
-            labels[cid] = f'{most_common_schema} {most_common_type.title()}s ({len(nodes)} nodes)'
-        else:
-            labels[cid] = f'{most_common_type.title()}s ({len(nodes)} nodes)'
+        anchor_label = clean_anchor if len(clean_anchor) > 1 else clean_anchor
+        type_str = f" {most_common_type.title()}s" if most_common_type != 'node' else ""
+
+        if prefix_tokens:
+            top_token, token_count = Counter(prefix_tokens).most_common(1)[0]
+            if token_count >= max(3, int(len(nodes) * 0.3)):
+                labels[cid] = f"{schema_prefix}{top_token}{type_str} Domain ({len(nodes)} nodes)"
+                continue
+
+        labels[cid] = f"{schema_prefix}{anchor_label}{type_str} Domain ({len(nodes)} nodes)"
 
     return labels

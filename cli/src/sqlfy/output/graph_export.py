@@ -38,21 +38,24 @@ from ..clustering import detect_communities, label_communities
 def _compute_communities(
     graph: nx.Graph[Any] | nx.DiGraph[Any],
     resolution: float = 1.0,
-    min_cohesion: float = 0.1,
+    min_cohesion: float = 0.01,
     enable_splitting: bool = True,
 ) -> dict[int, list[str]]:
     """
-    Compute community assignments for nodes using Leiden/Louvain.
-
-    Args:
-        graph: NetworkX graph to analyze
-        resolution: Resolution parameter (>1 = more communities, <1 = fewer)
-        min_cohesion: Minimum cohesion score to keep a community
-        enable_splitting: Whether to split oversized communities
-
-    Returns:
-        Dictionary mapping community ID to list of node IDs
+    Compute community assignments for graph or reuse existing node attributes.
     """
+    from collections import defaultdict
+    existing_comm: dict[int, list[str]] = defaultdict(list)
+    has_existing = False
+    for n, attrs in graph.nodes(data=True):
+        cid = attrs.get('community', attrs.get('community_id'))
+        if cid is not None:
+            existing_comm[int(cid)].append(n)
+            has_existing = True
+
+    if has_existing:
+        return dict(existing_comm)
+
     result = detect_communities(
         graph,
         resolution=resolution,
