@@ -117,6 +117,7 @@ def cmd_build_graph(
     min_refs: int = 20,
     no_queries: bool = False,
     no_viz: bool = False,
+    optimize_html: bool = False,
     out: Path | None = None,
 ) -> None:
     """
@@ -320,7 +321,7 @@ def cmd_build_graph(
     viz_count += 1
 
     export_graph_html(nx_graph, communities=comm_result.communities,
-                      output_path=out_dir / 'graph.html')
+                      output_path=out_dir / 'graph.html', optimize_html=optimize_html)
     print("   ✓ Generating graph.html (interactive vis.js)", file=sys.stderr)
     viz_count += 1
 

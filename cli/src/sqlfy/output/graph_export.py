@@ -146,6 +146,7 @@ def export_graph_html(
     resolution: float = 1.0,
     min_cohesion: float = 0.1,
     enable_splitting: bool = True,
+    optimize_html: bool = False,
 ) -> None:
     """
     Export interactive HTML visualization using vis.js.
@@ -164,6 +165,7 @@ def export_graph_html(
         resolution: Community detection resolution (>1 = more communities)
         min_cohesion: Minimum cohesion score for communities
         enable_splitting: Whether to split oversized communities
+        optimize_html: If True, freeze physics after stabilization and generate tooltips dynamically on-demand
     """
     if communities is None:
         communities = _compute_communities(graph, resolution, min_cohesion, enable_splitting)
@@ -176,8 +178,9 @@ def export_graph_html(
         for node in nodes:
             node_community[node] = cid
 
-    # Prepare vis.js nodes
+    # Prepare vis.js nodes and column lookup table
     nodes_data = []
+    table_columns_data: dict[str, list[dict[str, Any]]] = {}
     valid_node_ids = set()
 
     for node_id, attrs in graph.nodes(data=True):
@@ -191,23 +194,29 @@ def export_graph_html(
         degree = graph.degree(node_id)
 
         cols = attrs.get('columns', [])
-        cols_summary = ""
         if cols:
-            cols_lines = [
-                f"• {c['name']} <i>({c['type']})</i>{' [PK]' if c.get('primary_key') else ''}"
-                for c in cols[:12]
-            ]
-            if len(cols) > 12:
-                cols_lines.append(f"<i>... +{len(cols) - 12} more columns</i>")
-            cols_summary = "<br/><br/><b>Columns:</b><br/>" + "<br/>".join(cols_lines)
+            table_columns_data[node_id] = cols
 
-        title_str = (
-            f"<b>{ntype.capitalize()}: {node_id}</b><br/>"
-            f"Columns: {attrs.get('column_count', len(cols))}<br/>"
-            f"Connections: {degree}<br/>"
-            f"Domain: {community_labels.get(cid, '')}"
-            f"{cols_summary}"
-        )
+        if optimize_html:
+            title_str = f"<b>{ntype.capitalize()}: {node_id}</b><br/>Columns: {attrs.get('column_count', len(cols))}<br/>Connections: {degree}"
+        else:
+            cols_summary = ""
+            if cols:
+                cols_lines = [
+                    f"• {c['name']} <i>({c['type']})</i>{' [PK]' if c.get('primary_key') else ''}"
+                    for c in cols[:12]
+                ]
+                if len(cols) > 12:
+                    cols_lines.append(f"<i>... +{len(cols) - 12} more columns</i>")
+                cols_summary = "<br/><br/><b>Columns:</b><br/>" + "<br/>".join(cols_lines)
+
+            title_str = (
+                f"<b>{ntype.capitalize()}: {node_id}</b><br/>"
+                f"Columns: {attrs.get('column_count', len(cols))}<br/>"
+                f"Connections: {degree}<br/>"
+                f"Domain: {community_labels.get(cid, '')}"
+                f"{cols_summary}"
+            )
 
         nodes_data.append({
             'id': node_id,
@@ -251,7 +260,10 @@ def export_graph_html(
     ]
 
     # Render HTML
-    html_content = _render_html_template(nodes_data, edges_data, legend_data, graph)
+    html_content = _render_html_template(
+        nodes_data, edges_data, legend_data, graph,
+        table_columns=table_columns_data, optimize_html=optimize_html
+    )
 
     # Write output
     output_path = Path(output_path)
@@ -259,17 +271,31 @@ def export_graph_html(
     output_path.write_text(html_content)
 
 
-def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any]],
-                          legend: list[dict[str, Any]], graph: nx.Graph[Any] | nx.DiGraph[Any]) -> str:
+def _render_html_template(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+    legend: list[dict[str, Any]],
+    graph: nx.Graph[Any] | nx.DiGraph[Any],
+    table_columns: dict[str, Any] | None = None,
+    optimize_html: bool = False,
+) -> str:
     """Render HTML template with vis.js visualization."""
 
     nodes_json = json.dumps(nodes, ensure_ascii=False)
     edges_json = json.dumps(edges, ensure_ascii=False)
     legend_json = json.dumps(legend, ensure_ascii=False)
+    table_columns_json = json.dumps(table_columns or {}, ensure_ascii=False)
 
     graph_type = 'directed' if isinstance(graph, nx.DiGraph) else 'undirected'
     node_count = graph.number_of_nodes()
     edge_count = graph.number_of_edges()
+
+    freeze_physics_script = """
+    network.once('stabilizationIterationsDone', function() {
+      network.setOptions({ physics: { enabled: false } });
+      console.log('Layout stabilized - physics simulation frozen for maximum performance.');
+    });
+    """ if optimize_html else ""
 
     return f"""<!DOCTYPE html>
 <html>
@@ -288,7 +314,7 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
     }}
     #graph {{ flex: 1; }}
     #sidebar {{
-      width: 320px;
+      width: 340px;
       background: #1e2235;
       border-left: 1px solid rgba(255,255,255,0.1);
       display: flex;
@@ -318,64 +344,52 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
     }}
     .legend-item {{
       padding: 10px 12px;
-      cursor: pointer;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px;
+      margin-bottom: 8px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      border-radius: 6px;
-      margin-bottom: 4px;
-      transition: background 0.15s;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }}
-    .legend-item:hover {{ background: rgba(255,255,255,0.05); }}
-    .legend-item.hidden {{ opacity: 0.4; }}
+    .legend-item:hover {{ background: rgba(255,255,255,0.08); }}
+    .legend-item.hidden {{ opacity: 0.3; }}
     .legend-dot {{
-      width: 14px;
-      height: 14px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
-      flex-shrink: 0;
+      margin-right: 10px;
     }}
-    .legend-label {{ flex: 1; font-size: 13px; }}
-    .legend-count {{
-      font-size: 12px;
-      color: #94a3b8;
-      font-weight: 500;
-    }}
-    .stats {{
+    .legend-label {{ flex: 1; font-size: 13px; font-weight: 500; }}
+    .legend-count {{ font-size: 12px; color: #94a3b8; font-family: monospace; }}
+    #inspector {{
       padding: 16px;
-      background: rgba(124,58,237,0.1);
-      border-radius: 8px;
-      margin-bottom: 16px;
+      background: rgba(255,255,255,0.02);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: none;
     }}
-    .stats-row {{ display: flex; justify-content: space-between; margin-bottom: 6px; }}
-    .stats-label {{ color: #94a3b8; font-size: 13px; }}
-    .stats-value {{ font-weight: 600; font-size: 14px; }}
+    #inspector.active {{ display: block; }}
+    .col-item {{
+      font-size: 12px;
+      font-family: monospace;
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.05);
+    }}
+    .col-pk {{ color: #fbbf24; font-weight: bold; }}
   </style>
 </head>
 <body>
   <div id="graph"></div>
   <div id="sidebar">
-    <input id="search" type="text" placeholder="Search nodes..." />
-
+    <input type="text" id="search" placeholder="Search tables or sequences..." />
     <div class="section">
-      <div class="stats">
-        <div class="stats-row">
-          <span class="stats-label">Graph Type</span>
-          <span class="stats-value">{graph_type}</span>
-        </div>
-        <div class="stats-row">
-          <span class="stats-label">Nodes</span>
-          <span class="stats-value">{node_count}</span>
-        </div>
-        <div class="stats-row">
-          <span class="stats-label">Edges</span>
-          <span class="stats-value">{edge_count}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">Communities</div>
+      <div class="section-title">Domains / Communities</div>
       <div id="legend"></div>
+    </div>
+    <div id="inspector">
+      <div class="section-title">Node Inspector</div>
+      <div id="inspector-content">Select a table to view columns and connections.</div>
     </div>
   </div>
 
@@ -383,6 +397,7 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
     const nodesData = {nodes_json};
     const edgesData = {edges_json};
     const legendData = {legend_json};
+    const tableColumns = {table_columns_json};
 
     const nodes = new vis.DataSet(nodesData);
     const edges = new vis.DataSet(edgesData);
@@ -427,6 +442,7 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
     }};
 
     const network = new vis.Network(container, {{ nodes, edges }}, options);
+    {freeze_physics_script}
 
     // Hidden communities tracking
     const hiddenCommunities = new Set();
@@ -437,7 +453,6 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
       const query = e.target.value.toLowerCase().trim();
 
       if (!query) {{
-        // Reset: show all nodes except those in hidden communities
         nodesData.forEach(n => {{
           if (!hiddenCommunities.has(n.community)) {{
             nodes.update({{ id: n.id, hidden: false }});
@@ -446,7 +461,6 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
         return;
       }}
 
-      // Hide nodes that don't match query
       nodesData.forEach(n => {{
         const matches = n.label.toLowerCase().includes(query) ||
                        n.id.toLowerCase().includes(query) ||
@@ -476,14 +490,12 @@ def _render_html_template(nodes: list[dict[str, Any]], edges: list[dict[str, Any
           item.classList.add('hidden');
         }}
 
-        // Update node visibility
         nodesData.forEach(n => {{
           if (n.community === c.cid) {{
             nodes.update({{ id: n.id, hidden: hiddenCommunities.has(c.cid) }});
           }}
         }});
 
-        // Re-apply search if active
         const query = searchInput.value.toLowerCase().trim();
         if (query) {{
           searchInput.dispatchEvent(new Event('input'));

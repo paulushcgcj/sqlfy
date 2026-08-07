@@ -160,6 +160,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-cohesion", type=float, default=0.1, metavar="FLOAT",
                    help="Minimum cohesion score to keep a community (default: 0.1)")
     p.add_argument("--no-split", action="store_true", help="Disable oversized community splitting")
+    p.add_argument("--optimize-html", action="store_true", help="Optimize graph.html for performance (freeze physics after layout, dynamic tooltips)")
     p.set_defaults(func=cmd_graph)
 
     # build-graph (unified knowledge graph builder)
@@ -175,6 +176,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
                    help="Minimum references to classify as god node (default: 20)")
     p.add_argument("--no-queries", action="store_true", help="Skip pre-computed query results")
     p.add_argument("--no-viz", action="store_true", help="Skip visualization formats (mermaid/dot/excalidraw/drawio)")
+    p.add_argument("--optimize-html", action="store_true", help="Optimize graph.html for performance (freeze physics after layout, dynamic tooltips)")
     p.set_defaults(func=cmd_build_graph)
 
     # insights
