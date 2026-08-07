@@ -31,8 +31,24 @@ def cmd_graph(
     resolution: float = 1.0,
     min_cohesion: float = 0.1,
     no_split: bool = False,
+    optimize_html: bool = False,
 ) -> None:
-    """Output a schema graph in DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, or report format."""
+    if json_input:
+        jp = Path(json_input)
+        if jp.exists() and jp.suffix == ".json":
+            import json as _json
+            with open(jp, encoding="utf-8") as f:
+                data = _json.load(f)
+            if "nodes" in data and "links" in data or "edges" in data:
+                import networkx as nx
+                from ..output.graph_export import export_graph_html
+                nx_graph = nx.node_link_graph(data)
+                out_dir = Path(output_dir or "sqlfy-out")
+                out_dir.mkdir(parents=True, exist_ok=True)
+                export_graph_html(nx_graph, output_path=out_dir / "graph.html", optimize_html=optimize_html)
+                print(f"✓ Instant HTML export from {jp} in < 1s to {out_dir / 'graph.html'}", file=sys.stderr)
+                return
+
     files = load_files(migrations_dir, json_input)
     graph = (
         reconstruct_at(files, at, dialect=dialect)
@@ -81,7 +97,7 @@ def cmd_graph(
         print(f"✓ Exported NetworkX graph to {p}", file=sys.stderr)
     elif fmt == "html":
         p = out_dir / "graph.html"
-        export_graph_html(nx_graph, output_path=p, **export_kwargs)
+        export_graph_html(nx_graph, output_path=p, optimize_html=optimize_html, **export_kwargs)
         print(f"✓ Exported interactive visualization to {p}", file=sys.stderr)
     elif fmt == "report":
         p = out_dir / "GRAPH_REPORT.md"

@@ -239,6 +239,7 @@ def export_graph_html(
         confidence = attrs.get('confidence', 'EXTRACTED')
 
         edges_data.append({
+            'id': f"{u}→{v}:{relation}",
             'from': u,
             'to': v,
             'label': relation,
@@ -314,52 +315,81 @@ def _render_html_template(
     }}
     #graph {{ flex: 1; }}
     #sidebar {{
-      width: 340px;
+      width: 360px;
       background: #1e2235;
       border-left: 1px solid rgba(255,255,255,0.1);
       display: flex;
       flex-direction: column;
       overflow-y: auto;
     }}
+    .search-container {{
+      position: relative;
+      padding: 16px 16px 8px;
+    }}
     #search {{
       width: 100%;
-      padding: 14px;
+      padding: 12px 14px;
       background: #0f172a;
-      border: 1px solid rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
       border-radius: 6px;
       color: #f1f5f9;
       font-size: 14px;
-      margin: 16px;
-      width: calc(100% - 32px);
     }}
     #search:focus {{ outline: 2px solid #7c3aed; outline-offset: 2px; }}
-    .section {{ padding: 0 16px 16px; }}
+    #search-results {{
+      position: absolute;
+      top: 60px;
+      left: 16px;
+      right: 16px;
+      background: #0f172a;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }}
+    #search-results.active {{ display: block; }}
+    .search-item {{
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: monospace;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      justify-content: space-between;
+    }}
+    .search-item:hover {{ background: #7c3aed; color: #fff; }}
+    .section {{ padding: 8px 16px 16px; }}
     .section-title {{
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #94a3b8;
-      margin-bottom: 12px;
+      margin: 12px 0 8px;
       font-weight: 600;
     }}
     .legend-item {{
-      padding: 10px 12px;
+      padding: 8px 12px;
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 6px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       cursor: pointer;
+      user-select: none;
       transition: all 0.15s ease;
     }}
     .legend-item:hover {{ background: rgba(255,255,255,0.08); }}
-    .legend-item.hidden {{ opacity: 0.3; }}
+    .legend-item.hidden {{ opacity: 0.35; text-decoration: line-through; }}
     .legend-dot {{
       width: 10px;
       height: 10px;
       border-radius: 50%;
       margin-right: 10px;
+      flex-shrink: 0;
     }}
     .legend-label {{ flex: 1; font-size: 13px; font-weight: 500; }}
     .legend-count {{ font-size: 12px; color: #94a3b8; font-family: monospace; }}
@@ -377,19 +407,40 @@ def _render_html_template(
       border-bottom: 1px dashed rgba(255,255,255,0.05);
     }}
     .col-pk {{ color: #fbbf24; font-weight: bold; }}
+    .focus-btn {{
+      margin-top: 10px;
+      width: 100%;
+      padding: 8px;
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }}
+    .focus-btn:hover {{ background: #6d28d9; }}
   </style>
 </head>
 <body>
   <div id="graph"></div>
   <div id="sidebar">
-    <input type="text" id="search" placeholder="Search tables or sequences..." />
+    <div class="search-container">
+      <input type="text" id="search" placeholder="Type table/seq name to search & focus..." autocomplete="off" />
+      <div id="search-results"></div>
+    </div>
+
     <div class="section">
-      <div class="section-title">Domains / Communities</div>
+      <div class="section-title">Object Types</div>
+      <div id="type-legend"></div>
+
+      <div class="section-title">Top Domains / Communities</div>
       <div id="legend"></div>
     </div>
+
     <div id="inspector">
       <div class="section-title">Node Inspector</div>
-      <div id="inspector-content">Select a table to view columns and connections.</div>
+      <div id="inspector-content">Select a node to inspect columns & connections.</div>
     </div>
   </div>
 
@@ -444,35 +495,51 @@ def _render_html_template(
     const network = new vis.Network(container, {{ nodes, edges }}, options);
     {freeze_physics_script}
 
-    // Hidden communities tracking
+    const hiddenTypes = new Set();
     const hiddenCommunities = new Set();
 
-    // Search functionality
-    const searchInput = document.getElementById('search');
-    searchInput.addEventListener('input', (e) => {{
-      const query = e.target.value.toLowerCase().trim();
-
-      if (!query) {{
-        nodesData.forEach(n => {{
-          if (!hiddenCommunities.has(n.community)) {{
-            nodes.update({{ id: n.id, hidden: false }});
-          }}
-        }});
-        return;
-      }}
-
+    function updateVisibility() {{
+      const updates = [];
       nodesData.forEach(n => {{
-        const matches = n.label.toLowerCase().includes(query) ||
-                       n.id.toLowerCase().includes(query) ||
-                       n.type.toLowerCase().includes(query);
-        const inHiddenCommunity = hiddenCommunities.has(n.community);
-        nodes.update({{ id: n.id, hidden: !matches || inHiddenCommunity }});
+        const isTypeHidden = hiddenTypes.has(n.type);
+        const isCommHidden = hiddenCommunities.has(n.community);
+        updates.push({{ id: n.id, hidden: isTypeHidden || isCommHidden }});
       }});
+      nodes.update(updates);
+    }}
+
+    // Render Type Legend
+    const typeLegendEl = document.getElementById('type-legend');
+    const typeCounts = {{}};
+    nodesData.forEach(n => typeCounts[n.type] = (typeCounts[n.type] || 0) + 1);
+
+    const typeColors = {{ 'table': '#3b82f6', 'sequence': '#10b981', 'unknown': '#94a3b8' }};
+    Object.keys(typeCounts).forEach(type => {{
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `
+        <div class="legend-dot" style="background-color: ${{typeColors[type] || '#8b5cf6'}}"></div>
+        <div class="legend-label">${{type.toUpperCase()}}S</div>
+        <div class="legend-count">${{typeCounts[type]}}</div>
+      `;
+      item.addEventListener('click', () => {{
+        if (hiddenTypes.has(type)) {{
+          hiddenTypes.delete(type);
+          item.classList.remove('hidden');
+        }} else {{
+          hiddenTypes.add(type);
+          item.classList.add('hidden');
+        }}
+        updateVisibility();
+      }});
+      typeLegendEl.appendChild(item);
     }});
 
-    // Legend rendering and toggling
+    // Render Top Communities (limit to top 15 in legend sidebar)
     const legendEl = document.getElementById('legend');
-    legendData.forEach(c => {{
+    const topLegend = legendData.slice(0, 15);
+
+    topLegend.forEach(c => {{
       const item = document.createElement('div');
       item.className = 'legend-item';
       item.innerHTML = `
@@ -489,29 +556,146 @@ def _render_html_template(
           hiddenCommunities.add(c.cid);
           item.classList.add('hidden');
         }}
-
-        nodesData.forEach(n => {{
-          if (n.community === c.cid) {{
-            nodes.update({{ id: n.id, hidden: hiddenCommunities.has(c.cid) }});
-          }}
-        }});
-
-        const query = searchInput.value.toLowerCase().trim();
-        if (query) {{
-          searchInput.dispatchEvent(new Event('input'));
-        }}
+        updateVisibility();
       }});
 
       legendEl.appendChild(item);
     }});
 
-    // Node click handler - show neighbors
-    network.on('click', (params) => {{
-      if (params.nodes.length > 0) {{
-        const nodeId = params.nodes[0];
-        const neighbors = network.getConnectedNodes(nodeId);
-        console.log(`Node: ${{nodeId}}, Neighbors: ${{neighbors.length}}`);
+    // Interactive Search with Live Dropdown & Auto Camera Focus
+    const searchInput = document.getElementById('search');
+    const searchResults = document.getElementById('search-results');
+
+    function focusOnNode(nodeId) {{
+      network.focus(nodeId, {{
+        scale: 1.2,
+        animation: {{ duration: 500, easingFunction: 'easeInOutQuad' }}
+      }});
+      network.selectNodes([nodeId]);
+      showInspector(nodeId);
+    }}
+
+    searchInput.addEventListener('input', (e) => {{
+      const query = e.target.value.toLowerCase().trim();
+      searchResults.innerHTML = '';
+
+      if (!query) {{
+        searchResults.classList.remove('active');
+        return;
       }}
+
+      const matches = nodesData.filter(n =>
+        n.id.toLowerCase().includes(query) || n.label.toLowerCase().includes(query)
+      ).slice(0, 15);
+
+      if (matches.length === 0) {{
+        searchResults.classList.remove('active');
+        return;
+      }}
+
+      matches.forEach(m => {{
+        const div = document.createElement('div');
+        div.className = 'search-item';
+        div.innerHTML = `<span>${{m.id}}</span><span style="opacity:0.7">${{m.type}}</span>`;
+        div.addEventListener('click', () => {{
+          searchInput.value = m.id;
+          searchResults.classList.remove('active');
+          focusOnNode(m.id);
+        }});
+        searchResults.appendChild(div);
+      }});
+
+      searchResults.classList.add('active');
+    }});
+
+    document.addEventListener('click', (e) => {{
+      if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {{
+        searchResults.classList.remove('active');
+      }}
+    }});
+
+    function highlightConnected(selectedId) {{
+      const connectedNodes = new Set(network.getConnectedNodes(selectedId));
+      connectedNodes.add(selectedId);
+      const connectedEdgeIds = new Set(network.getConnectedEdges(selectedId));
+
+      const nodeUpdates = nodesData.map(n => {{
+        if (connectedNodes.has(n.id)) {{
+          return {{ id: n.id, opacity: 1.0, font: {{ color: '#ffffff', size: n.id === selectedId ? 15 : 13 }} }};
+        }} else {{
+          return {{ id: n.id, opacity: 0.12, font: {{ color: '#475569', size: 10 }} }};
+        }}
+      }});
+
+      const edgeUpdates = edgesData.map(e => {{
+        if (connectedEdgeIds.has(e.id) || e.from === selectedId || e.to === selectedId) {{
+          return {{
+            id: e.id,
+            color: {{ color: '#38bdf8', opacity: 1.0, highlight: '#38bdf8' }},
+            width: 4,
+            arrows: {{ to: {{ enabled: true, scaleFactor: 1.0 }} }}
+          }};
+        }} else {{
+          return {{
+            id: e.id,
+            color: {{ color: '#1e293b', opacity: 0.05 }},
+            width: 1
+          }};
+        }}
+      }});
+
+      nodes.update(nodeUpdates);
+      edges.update(edgeUpdates);
+    }}
+
+    function resetHighlight() {{
+      const nodeUpdates = nodesData.map(n => ({{
+        id: n.id,
+        opacity: 1.0,
+        font: {{ color: '#f1f5f9', size: 12 }}
+      }}));
+
+      const edgeUpdates = edgesData.map(e => ({{
+        id: e.id,
+        color: {{ color: '#94a3b8', opacity: e.dashes ? 0.6 : 1.0 }},
+        width: e.width || 1,
+        arrows: {{ to: {{ enabled: true, scaleFactor: 0.5 }} }}
+      }}));
+
+      nodes.update(nodeUpdates);
+      edges.update(edgeUpdates);
+    }}
+
+    function showInspector(nodeId) {{
+      highlightConnected(nodeId);
+
+      const nodeObj = nodesData.find(n => n.id === nodeId);
+      const cols = tableColumns[nodeId] || [];
+      const neighbors = network.getConnectedNodes(nodeId);
+
+      let colsHtml = '';
+      if (cols.length > 0) {{
+        colsHtml = '<div style="margin-top:10px;"><b>Columns (' + cols.length + '):</b></div>' +
+          cols.map(c => `<div class="col-item">${{c.primary_key ? '<span class="col-pk">[PK]</span> ' : ''}}${{c.name}} <span style="color:#94a3b8">(${{c.type}})</span></div>`).join('');
+      }}
+
+      inspectorContent.innerHTML = `
+        <div style="font-size:15px; font-weight:bold; color:#7c3aed; margin-bottom:4px;">${{nodeId}}</div>
+        <div style="font-size:12px; color:#94a3b8;">Type: ${{nodeObj ? nodeObj.type.toUpperCase() : 'TABLE'}} | Domain: ${{nodeObj ? nodeObj.community_name : ''}}</div>
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">Connections: ${{neighbors.length}}</div>
+        <button class="focus-btn" onclick="focusOnNode('${{nodeId}}')">🔍 Focus Camera On Table</button>
+        ${{colsHtml}}
+      `;
+      inspectorEl.classList.add('active');
+    }}
+
+    network.on('selectNode', (params) => {{
+      if (params.nodes.length > 0) showInspector(params.nodes[0]);
+    }});
+
+    network.on('deselectNode', () => {{
+      resetHighlight();
+      inspectorEl.classList.remove('active');
     }});
   </script>
 </body>
