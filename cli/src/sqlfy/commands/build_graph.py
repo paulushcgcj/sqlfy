@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,8 @@ from ..output.grapher import Grapher
 from ..reconstructor import reconstruct, reconstruct_at
 from ._utils import load_files
 
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class GraphBuildResult:
@@ -126,6 +129,7 @@ def cmd_build_graph(
 
     out_dir: Path = Path(output_dir or 'graphify-out')
     files = load_files(migrations_dir, json_input)
+    logger.debug("loaded files: %s", files)
     version = at
     enable_splitting = not no_split
     skip_queries = no_queries

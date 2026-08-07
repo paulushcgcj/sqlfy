@@ -130,10 +130,11 @@ class Reconstructor:
         Apply a single migration file.
         Safe to call multiple times — already-applied versions are skipped.
         """
-        ver  = parse_flyway_ver(filename)
-        vsn  = ver['version']
+        ver = parse_flyway_ver(filename)
+        vsn = ver['version']
+        applied_key = vsn if ver.get('is_flyway', True) else filename
 
-        if vsn in self._applied:
+        if applied_key in self._applied:
             return MigrationResult(version=vsn, filename=filename, skipped=True)
 
         result = MigrationResult(version=vsn, filename=filename)
@@ -155,7 +156,7 @@ class Reconstructor:
                 log.warning(msg)
                 result.errors.append(msg)
 
-        self._applied.add(vsn)
+        self._applied.add(applied_key)
         return result
 
     def snapshot(self) -> SchemaGraph:

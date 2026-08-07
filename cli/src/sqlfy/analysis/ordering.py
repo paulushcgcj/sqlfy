@@ -59,7 +59,7 @@ class ValidationReport:
 
 def parse_migration_filename(filename: str) -> dict | None:
     """
-    Parse Flyway migration filename.
+    Parse Flyway migration filename or relative path.
 
     Supports formats:
     - V1__description.sql (simple versioned)
@@ -69,13 +69,15 @@ def parse_migration_filename(filename: str) -> dict | None:
     - U1__undo.sql (undo migration)
 
     Args:
-        filename: Migration filename (e.g., "V1__create_users.sql")
+        filename: Migration filename or path (e.g., "dir/V1__create_users.sql")
 
     Returns:
         Dict with parsed metadata, or None if not a valid Flyway filename.
     """
+    basename = Path(filename).name
+
     # Versioned migration: V<version>__<description>.sql
-    match = re.match(r'^V(\d+(?:[._]\d+)*)__(.+)\.sql$', filename, re.IGNORECASE)
+    match = re.match(r'^V(\d+(?:[._]\d+)*)__(.+)\.sql$', basename, re.IGNORECASE)
     if match:
         version_str = match.group(1).replace('_', '.')
         description = match.group(2)
@@ -87,7 +89,7 @@ def parse_migration_filename(filename: str) -> dict | None:
         }
 
     # Repeatable migration: R__<description>.sql
-    match = re.match(r'^R__(.+)\.sql$', filename, re.IGNORECASE)
+    match = re.match(r'^R__(.+)\.sql$', basename, re.IGNORECASE)
     if match:
         return {
             "type": "repeatable",
@@ -97,7 +99,7 @@ def parse_migration_filename(filename: str) -> dict | None:
         }
 
     # Undo migration: U<version>__<description>.sql
-    match = re.match(r'^U(\d+(?:[._]\d+)*)__(.+)\.sql$', filename, re.IGNORECASE)
+    match = re.match(r'^U(\d+(?:[._]\d+)*)__(.+)\.sql$', basename, re.IGNORECASE)
     if match:
         version_str = match.group(1).replace('_', '.')
         return {
