@@ -19,13 +19,13 @@ from typing import Literal
 class Column:
     name: str
     type: str
-    precision: int | None
-    scale: int | None
-    nullable: bool
-    default: str | None
-    primary_key: bool
-    unique: bool
-    references: dict | None   # { table, column }
+    precision: int | None = None
+    scale: int | None = None
+    nullable: bool = True
+    default: str | None = None
+    primary_key: bool = False
+    unique: bool = False
+    references: dict | None = None   # { table, column }
 
 
 @dataclass

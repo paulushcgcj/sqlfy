@@ -44,6 +44,7 @@ from .domain.sqlglot_compat import (
     parse_modify_native,
 )
 from .migrations.parser import parse_flyway_ver
+from .parsing.sanitizer import sanitize_sql
 from .parsing.ast_helpers import (
     _table_full,
     _table_schema_name,
@@ -140,7 +141,8 @@ class Reconstructor:
         result = MigrationResult(version=vsn, filename=filename)
         self.mig_hist.append(MigrationHistory(version=vsn, description=ver['description']))
 
-        stmts = sqlglot.parse(sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN)
+        clean_sql = sanitize_sql(sql, dialect=self.dialect)
+        stmts = sqlglot.parse(clean_sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN)
 
         for stmt in stmts:
             if stmt is None:
@@ -490,20 +492,27 @@ class Reconstructor:
 
     def _command_fallback(self, stmt: exp.Command, version: str) -> list[MigrationAction]:
         """
-        Handle statements sqlglot cannot fully parse — CREATE INDEX, ALTER MODIFY,
+        Handle statements sqlglot cannot fully parse — CREATE TABLE, CREATE INDEX, ALTER MODIFY,
         RENAME COLUMN etc. — via targeted regex on the raw SQL text.
 
         sqlglot Command gives us:
           stmt.this       = verb  e.g. 'ALTER' | 'CREATE'
           stmt.expression = rest  e.g. ' TABLE app.t MODIFY (col VARCHAR2(100))'
         """
-        cmd_name = (stmt.this or '').strip().upper()
-        raw_expr = (stmt.expression or '').strip()
+        cmd_str = stmt.this.name if hasattr(stmt.this, "name") else str(stmt.this or "")
+        expr_str = stmt.expression.name if hasattr(stmt.expression, "name") else str(stmt.expression or "")
+
+        cmd_name = cmd_str.strip().upper()
+        raw_expr = expr_str.strip()
         expr_up  = raw_expr.upper()
         acts: list[MigrationAction] = []
 
+        # CREATE TABLE
+        if cmd_name == 'CREATE' and re.match(r'^(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+TEMPORARY\s+)?TABLE\b', expr_up):
+            acts += self._create_table_regex(f'CREATE {raw_expr}', version)
+
         # CREATE [UNIQUE] INDEX
-        if cmd_name == 'CREATE' and re.match(r'^(?:UNIQUE\s+)?INDEX\b', expr_up):
+        elif cmd_name == 'CREATE' and re.match(r'^(?:UNIQUE\s+)?INDEX\b', expr_up):
             acts += self._create_index_regex(f'CREATE {raw_expr}', version)
 
         # ALTER TABLE ... MODIFY (col TYPE ...)
@@ -520,6 +529,54 @@ class Reconstructor:
         return acts
 
     # ── Regex fallback helpers ──────────────────────────────────────────────
+
+    def _create_table_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
+        m = re.search(r'CREATE\s+TABLE\s+(?:\"?(\w+)\"?\.)?\"?(\w+)\"?', raw_sql, re.I)
+        if not m:
+            return []
+        schema_str, name_str = m.group(1), m.group(2)
+        full = f"{schema_str}.{name_str}" if schema_str else name_str
+        full = full.upper()
+
+        if full in self.tables:
+            return []
+
+        table = Table(
+            id=full,
+            schema=schema_str.upper() if schema_str else None,
+            name=name_str.upper(),
+            full=full,
+            created_in=version,
+        )
+
+        body_match = re.search(r'\((.*)\)', raw_sql, re.I | re.S)
+        if body_match:
+            body = body_match.group(1)
+            col_matches = re.findall(r'"?(\w+)"?\s+([A-Z0-9_]+(?:\s*\([^)]+\))?)', body, re.I)
+            for c_name, c_type in col_matches:
+                c_name_up = c_name.upper()
+                if c_name_up not in ("PRIMARY", "KEY", "CONSTRAINT", "FOREIGN", "CHECK", "UNIQUE", "NOT", "NULL"):
+                    table.columns.append(Column(
+                        name=c_name_up,
+                        type=c_type.upper(),
+                        precision=None,
+                        scale=None,
+                        nullable=True,
+                        default=None,
+                        primary_key=False,
+                        unique=False,
+                        references=None,
+                    ))
+
+        self.tables[full] = table
+        act = MigrationAction(
+            action="CREATE_TABLE",
+            object_type="TABLE",
+            object_name=full,
+            version=version,
+        )
+        table.actions.append(act)
+        return [act]
 
     def _create_index_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
         m = re.match(
