@@ -112,7 +112,7 @@ def cmd_build_graph(
     at: str | None = None,
     output_dir: str | None = None,
     resolution: float = 1.0,
-    min_cohesion: float = 0.5,
+    min_cohesion: float = 0.01,
     no_split: bool = False,
     min_refs: int = 20,
     no_queries: bool = False,

@@ -169,8 +169,8 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("--output-dir", metavar="PATH", help="Output directory (default: graphify-out)")
     p.add_argument("--resolution", type=float, default=1.0, metavar="FLOAT",
                    help="Community detection resolution (default: 1.0)")
-    p.add_argument("--min-cohesion", type=float, default=0.5, metavar="FLOAT",
-                   help="Minimum cohesion score to keep a community (default: 0.5)")
+    p.add_argument("--min-cohesion", type=float, default=0.01, metavar="FLOAT",
+                   help="Minimum cohesion score to keep a community (default: 0.01)")
     p.add_argument("--no-split", action="store_true", help="Disable oversized community splitting")
     p.add_argument("--min-refs", type=int, default=20, metavar="N",
                    help="Minimum references to classify as god node (default: 20)")
