@@ -114,6 +114,7 @@ def cmd_build_graph(
     min_refs: int = 20,
     no_queries: bool = False,
     no_viz: bool = False,
+    out: Path | None = None,
 ) -> None:
     """
     Build complete schema knowledge graph.
