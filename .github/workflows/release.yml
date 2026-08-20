@@ -179,7 +179,7 @@ jobs:
           WHEELS=(dist/*.whl)
           test "${#WHEELS[@]}" -eq 1
           WHEEL="${WHEELS[0]}"
-          uv run --isolated --no-project --with "${WHEEL}" python -c "import sqlfy; from importlib.metadata import version; assert version('sqlfy') == '${GITHUB_REF_NAME#v}'"
+          uv run --isolated --no-project --with "${WHEEL}" python -c "import sqlfy; from importlib.metadata import version; assert version('sqlfy-cli') == '${GITHUB_REF_NAME#v}'"
         working-directory: cli
 
       - name: Upload dist artifacts
