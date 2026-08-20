@@ -52,5 +52,10 @@
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.16",
     "vitest": "^4.1.7"
+  },
+  "overrides": {
+    "js-yaml": "4.3.1",
+    "postcss": "8.5.23",
+    "undici": "7.29.0"
   }
 }
