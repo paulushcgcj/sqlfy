@@ -3,64 +3,238 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  build:
+  changelog:
+    name: Generate changelog
+    runs-on: ubuntu-latest
+    outputs:
+      release_body: ${{ steps.cliff.outputs.content }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes with git-cliff
+        id: cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: CHANGES.md
+          GITHUB_REPO: ${{ github.repository }}
+
+  build-binaries:
+    name: Build binary (${{ matrix.os }})
+    needs: changelog
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            target: linux-x86_64
-          - os: macos-13
-            target: macos-x86_64
+            asset_name: sqlfy-cli-linux-x86_64
+            artifact_suffix: linux-x86_64
+          - os: macos-15-intel # Intel runner — covers x86_64 Mac users
+            asset_name: sqlfy-cli-macos-x86_64
+            artifact_suffix: macos-x86_64
           - os: macos-latest
-            target: macos-aarch64
+            asset_name: sqlfy-cli-macos-aarch64
+            artifact_suffix: macos-aarch64
           - os: windows-latest
-            target: windows-x86_64
-
-    runs-on: ${{ matrix.os }}
-
+            asset_name: sqlfy-cli-windows-x86_64.exe
+            artifact_suffix: windows-x86_64
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          enable-cache: true
 
-      - uses: astral-sh/setup-uv@v5
-
-      - run: uv sync --frozen
+      - name: Update version to match tag
+        shell: bash
+        run: |
+          # The release tag is the single source of truth for artifact versions.
+          # -i.bak works with both GNU sed and macOS BSD sed.
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          sed -i.bak "s/^version = \".*\"/version = \"${TAG_VERSION}\"/" pyproject.toml
+          rm -f pyproject.toml.bak
+          uv lock
         working-directory: cli
 
-      - name: Build
-        run: uv run pyinstaller --onefile --name sqlfy pyinstaller_entry.py
+      - name: Install project + PyInstaller
+        run: uv sync --frozen --all-extras
         working-directory: cli
 
-      - name: Rename (Unix)
+      - name: Build binary (Linux / macOS)
         if: runner.os != 'Windows'
-        run: mv cli/dist/sqlfy cli/dist/sqlfy-${{ matrix.target }}
+        run: |
+          uv run pyinstaller \
+            --onefile \
+            --name "${{ matrix.asset_name }}" \
+            --hidden-import sqlfy.contracts.analysis.v1 \
+            --hidden-import sqlfy.contracts.analysis.pii_v1 \
+            --hidden-import sqlfy.contracts.graph.v1 \
+            --hidden-import sqlfy.contracts.evolution.v1 \
+            --hidden-import sqlfy.contracts.impact.v1 \
+            --hidden-import sqlfy.contracts.common.metadata \
+            --hidden-import sqlfy.contracts.common.base \
+            --hidden-import sqlfy.contracts.common.envelope \
+            --hidden-import sqlfy.commands.hooks \
+            --hidden-import sqlfy.commands.analysis \
+            --hidden-import sqlfy.commands.evolution \
+            --hidden-import sqlfy.commands.ai \
+            --hidden-import sqlfy.commands.graph \
+            --hidden-import sqlfy.commands.build_graph \
+            --hidden-import sqlfy.commands.export \
+            --hidden-import sqlfy.commands._git_diff \
+            --hidden-import sqlfy.commands.devtools \
+            --hidden-import sqlfy.commands.watch \
+            --hidden-import sqlfy.commands.provenance \
+            --hidden-import sqlfy.commands._utils \
+            --hidden-import sqlfy.commands.impact \
+            --hidden-import sqlfy.commands.schema \
+            pyinstaller_entry.py
+        working-directory: cli
 
-      - name: Rename (Windows)
+      - name: Build binary (Windows)
         if: runner.os == 'Windows'
-        run: mv cli/dist/sqlfy.exe cli/dist/sqlfy-${{ matrix.target }}.exe
+        shell: pwsh
+        run: |
+          uv run pyinstaller `
+            --onefile `
+            --name "${{ matrix.asset_name }}" `
+            --hidden-import sqlfy.contracts.analysis.v1 `
+            --hidden-import sqlfy.contracts.analysis.pii_v1 `
+            --hidden-import sqlfy.contracts.graph.v1 `
+            --hidden-import sqlfy.contracts.evolution.v1 `
+            --hidden-import sqlfy.contracts.impact.v1 `
+            --hidden-import sqlfy.contracts.common.metadata `
+            --hidden-import sqlfy.contracts.common.base `
+            --hidden-import sqlfy.contracts.common.envelope `
+            --hidden-import sqlfy.commands.hooks `
+            --hidden-import sqlfy.commands.analysis `
+            --hidden-import sqlfy.commands.evolution `
+            --hidden-import sqlfy.commands.ai `
+            --hidden-import sqlfy.commands.graph `
+            --hidden-import sqlfy.commands.build_graph `
+            --hidden-import sqlfy.commands.export `
+            --hidden-import sqlfy.commands._git_diff `
+            --hidden-import sqlfy.commands.devtools `
+            --hidden-import sqlfy.commands.watch `
+            --hidden-import sqlfy.commands.provenance `
+            --hidden-import sqlfy.commands._utils `
+            --hidden-import sqlfy.commands.impact `
+            --hidden-import sqlfy.commands.schema `
+            pyinstaller_entry.py
+        working-directory: cli
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.target }}
-          path: cli/dist/sqlfy*
+          name: binary-${{ matrix.artifact_suffix }}
+          path: cli/dist/${{ matrix.asset_name }}*
+          retention-days: 1
 
-  release:
-    needs: build
+  build-python:
+    name: Build Python package
+    needs: changelog
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-          path: dist/
+      - uses: actions/checkout@v4
 
-      - uses: softprops/action-gh-release@v2
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          files: dist/*
+          enable-cache: true
+
+      - name: Update version to match tag
+        shell: bash
+        run: |
+          # The release tag is the single source of truth for artifact versions.
+          # -i.bak works with both GNU sed and macOS BSD sed.
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          sed -i.bak "s/^version = \".*\"/version = \"${TAG_VERSION}\"/" pyproject.toml
+          rm -f pyproject.toml.bak
+          uv lock
+        working-directory: cli
+
+      - name: Build wheel and source distribution
+        run: uv build
+        working-directory: cli
+
+      - name: Validate Python artifacts
+        shell: bash
+        run: |
+          test -f dist/*.whl
+          test -f dist/*.tar.gz
+          uvx --from check-wheel-contents check-wheel-contents dist/*.whl
+          WHEELS=(dist/*.whl)
+          test "${#WHEELS[@]}" -eq 1
+          WHEEL="${WHEELS[0]}"
+          uv run --isolated --no-project --with "${WHEEL}" python -c "import sqlfy; from importlib.metadata import version; assert version('sqlfy') == '${GITHUB_REF_NAME#v}'"
+        working-directory: cli
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: cli/dist/
+          retention-days: 1
+
+  create-release:
+    name: Create GitHub Release
+    needs: [changelog, build-binaries, build-python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "${{ github.ref_name }}"
+          body: ${{ needs.changelog.outputs.release_body }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          files: release-assets/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish verified package to PyPI
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/sqlfy-cli/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Download verified Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: cli/dist/
+
+      - name: Publish to PyPI (OIDC — no token needed)
+        run: uv publish --trusted-publishing always
+        working-directory: cli

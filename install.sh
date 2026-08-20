@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="paulushcgcj/sqlfy"
-BINARY="sqlfy"
+BINARY="sqlfy-cli"
 INSTALL_DIR="/usr/local/bin"
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')

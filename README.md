@@ -6,8 +6,10 @@
 
 **Schema Graph Engine** — Parse Flyway migrations into an AST, reconstruct your database schema state, and export LLM-ready vector context & interactive ERDs.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+[![PyPI version](https://img.shields.io/pypi/v/sqlfy-cli.svg)](https://pypi.org/project/sqlfy-cli/)
+[![Python versions](https://img.shields.io/pypi/pyversions/sqlfy-cli.svg)](https://pypi.org/project/sqlfy-cli/)
+[![CI](https://github.com/paulushcgcj/sqlfy/actions/workflows/ci.yml/badge.svg)](https://github.com/paulushcgcj/sqlfy/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![React 19 & Tauri 2](https://img.shields.io/badge/desktop-React%2019%20%2B%20Tauri%202-cyan)](app/)
 [![Tests](https://img.shields.io/badge/tests-140%2B%20pytest-success)](cli/tests/)
 
@@ -44,7 +46,7 @@ The app comes pre-loaded with sample Oracle DDL. Drop your own Flyway migration 
 ```bash
 cd cli
 pip install .        # install package
-sqlfy ./samples      # run human-readable schema summary
+sqlfy-cli ./samples  # run human-readable schema summary
 ```
 
 ---
@@ -61,8 +63,16 @@ curl -fsSL https://raw.githubusercontent.com/paulushcgcj/sqlfy/main/install.sh |
 irm https://raw.githubusercontent.com/paulushcgcj/sqlfy/main/install.ps1 | iex
 ```
 
+**Via pip / uv (all platforms)**
+
+```bash
+pip install sqlfy-cli
+# or
+uv tool install sqlfy-cli
+```
+
 > **macOS Note:** If you encounter a security warning, run once:
-> `xattr -d com.apple.quarantine /usr/local/bin/sqlfy`
+> `xattr -d com.apple.quarantine /usr/local/bin/sqlfy-cli`
 
 ---
 

@@ -56,23 +56,48 @@ from .semantic.operations import AnyOperation, OperationProvenance
 log = logging.getLogger(__name__)
 
 
+def _split_top_level(text: str, sep: str = ",") -> list[str]:
+    """Split *text* on *sep* at paren depth zero (skips nested parens)."""
+    parts: list[str] = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif ch == sep and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+    parts.append(text[start:])
+    return parts
+
+
+def _split_identifiers(text: str) -> list[str]:
+    """Split a comma-separated column list into upper-cased identifiers."""
+    return [c.strip().strip('"').upper() for c in _split_top_level(text) if c.strip()]
+
+
 # ─────────────────────────────────────────────
 # RESULT TYPE  — what apply_file() returns
 # ─────────────────────────────────────────────
 
+
 @dataclass
 class MigrationResult:
     """Result of applying one migration file."""
-    version:  str
+
+    version: str
     filename: str
-    actions:  list[MigrationAction] = field(default_factory=list)
-    errors:   list[str]             = field(default_factory=list)
-    skipped:  bool                  = False   # True if already applied
+    actions: list[MigrationAction] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    skipped: bool = False  # True if already applied
 
 
 # ─────────────────────────────────────────────
 # RECONSTRUCTOR
 # ─────────────────────────────────────────────
+
 
 class Reconstructor:
     """
@@ -93,17 +118,17 @@ class Reconstructor:
         graph_at_v2 = Reconstructor().apply_up_to(files, version='2')
     """
 
-    def __init__(self, dialect: str = 'oracle') -> None:
-        self.dialect  = dialect
-        self.tables:   dict[str, Table]    = {}
-        self.seqs:     dict[str, Sequence] = {}
+    def __init__(self, dialect: str = "oracle") -> None:
+        self.dialect = dialect
+        self.tables: dict[str, Table] = {}
+        self.seqs: dict[str, Sequence] = {}
         self.mig_hist: list[MigrationHistory] = []
-        self.actions:  list[MigrationAction]  = []
-        self._applied: set[str] = set()   # versions already applied
+        self.actions: list[MigrationAction] = []
+        self._applied: set[str] = set()  # filenames already applied
         self.semantic_ops: list[AnyOperation] = []  # semantic operations (Phase 9)
 
         # Log sqlglot capabilities on first instantiation
-        if not hasattr(Reconstructor, '_logged_capabilities'):
+        if not hasattr(Reconstructor, "_logged_capabilities"):
             log_sqlglot_capabilities()
             Reconstructor._logged_capabilities = True
 
@@ -111,35 +136,49 @@ class Reconstructor:
 
     def apply_all(self, files: list[dict]) -> SchemaGraph:
         """Apply all migration files (sorted by Flyway version) and return the final SchemaGraph."""
-        sorted_files = sorted(files, key=lambda f: parse_flyway_ver(f['filename'])['order'])
+        sorted_files = sorted(
+            files, key=lambda f: parse_flyway_ver(f["filename"])["order"]
+        )
         for f in sorted_files:
-            self.apply_file(f['filename'], f['sql'])
+            self.apply_file(f["filename"], f["sql"])
         return self.snapshot()
 
     def apply_up_to(self, files: list[dict], version: str) -> SchemaGraph:
         """Apply migrations up to and including *version*, return that SchemaGraph."""
-        sorted_files = sorted(files, key=lambda f: parse_flyway_ver(f['filename'])['order'])
-        target_order = parse_flyway_ver(f'V{version}__x.sql')['order']
+        sorted_files = sorted(
+            files, key=lambda f: parse_flyway_ver(f["filename"])["order"]
+        )
+        target_order = parse_flyway_ver(f"V{version}__x.sql")["order"]
         for f in sorted_files:
-            if parse_flyway_ver(f['filename'])['order'] <= target_order:
-                self.apply_file(f['filename'], f['sql'])
+            if parse_flyway_ver(f["filename"])["order"] <= target_order:
+                self.apply_file(f["filename"], f["sql"])
         return self.snapshot()
 
     def apply_file(self, filename: str, sql: str) -> MigrationResult:
         """
         Apply a single migration file.
-        Safe to call multiple times — already-applied versions are skipped.
+        Safe to call multiple times — already-applied files are skipped.
+        Rollback (U-prefixed) files are never applied in forward reconstruction.
+        Files are deduplicated by full relative path, so subfolders may reuse
+        the same version number (e.g. per-schema or per-object-type folders).
         """
-        ver  = parse_flyway_ver(filename)
-        vsn  = ver['version']
+        ver = parse_flyway_ver(filename)
+        vsn = ver["version"]
 
-        if vsn in self._applied:
+        if ver.get("kind") in ("rollback", "callback"):
+            return MigrationResult(version=vsn, filename=filename, skipped=True)
+
+        if filename in self._applied:
             return MigrationResult(version=vsn, filename=filename, skipped=True)
 
         result = MigrationResult(version=vsn, filename=filename)
-        self.mig_hist.append(MigrationHistory(version=vsn, description=ver['description']))
+        self.mig_hist.append(
+            MigrationHistory(version=vsn, description=ver["description"])
+        )
 
-        stmts = sqlglot.parse(sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN)
+        stmts = sqlglot.parse(
+            sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN
+        )
 
         for stmt in stmts:
             if stmt is None:
@@ -151,11 +190,11 @@ class Reconstructor:
                 result.actions.extend(acts)
                 self.actions.extend(acts)
             except Exception as exc:
-                msg = f'V{vsn}: error processing statement — {exc}'
+                msg = f"V{vsn}: error processing statement — {exc}"
                 log.warning(msg)
                 result.errors.append(msg)
 
-        self._applied.add(vsn)
+        self._applied.add(filename)
         return result
 
     def snapshot(self) -> SchemaGraph:
@@ -188,7 +227,9 @@ class Reconstructor:
         extractor = get_extractor(stmt)
         if extractor:
             prov = OperationProvenance.of(
-                source_file=version, version=version, statement_index=0,
+                source_file=version,
+                version=version,
+                statement_index=0,
                 raw_sql=stmt.sql(dialect=self.dialect),
             )
             try:
@@ -198,25 +239,25 @@ class Reconstructor:
         # ────────────────────────────────────────────────────────────────────
 
         if isinstance(stmt, exp.Create):
-            kind = stmt.args.get('kind', '')
-            if kind == 'TABLE':
+            kind = stmt.args.get("kind", "")
+            if kind == "TABLE":
                 acts += self._create_table(stmt, version)
-            elif kind == 'SEQUENCE':
+            elif kind == "SEQUENCE":
                 acts += self._create_sequence(stmt, version)
-            elif kind == 'INDEX':
+            elif kind == "INDEX":
                 acts += self._create_index_ast(stmt, version)
 
         elif isinstance(stmt, exp.Drop):
-            kind = stmt.args.get('kind', '')
-            if kind == 'TABLE':
+            kind = stmt.args.get("kind", "")
+            if kind == "TABLE":
                 acts += self._drop_table(stmt, version)
-            elif kind == 'INDEX':
+            elif kind == "INDEX":
                 acts += self._drop_index(stmt, version)
-            elif kind == 'SEQUENCE':
+            elif kind == "SEQUENCE":
                 acts += self._drop_sequence(stmt, version)
 
         elif isinstance(stmt, exp.Alter):
-            if stmt.args.get('kind') == 'TABLE':
+            if stmt.args.get("kind") == "TABLE":
                 acts += self._alter_table(stmt, version)
 
         elif isinstance(stmt, exp.Comment):
@@ -231,44 +272,59 @@ class Reconstructor:
 
     def _create_table(self, stmt: exp.Create, version: str) -> list[MigrationAction]:
         schema_node = stmt.this
-        table_node  = schema_node.this
+        table_node = schema_node.this
         schema_str, name_str = _table_schema_name(table_node)
-        full = f'{schema_str}.{name_str}' if schema_str else name_str
+        full = f"{schema_str}.{name_str}" if schema_str else name_str
 
         # Honour OR REPLACE / IF NOT EXISTS
-        if stmt.args.get('exists') and full in self.tables:
+        if stmt.args.get("exists") and full in self.tables:
             return []
 
-        columns: list[Column]         = []
+        columns: list[Column] = []
         constraints: list[Constraint] = []
 
         for node in schema_node.expressions:
             if isinstance(node, exp.ColumnDef):
                 col = _parse_column_def(node)
                 if col.primary_key:
-                    constraints.append(Constraint(
-                        name=f'PK_{name_str}', type='primary_key', columns=[col.name]
-                    ))
+                    constraints.append(
+                        Constraint(
+                            name=f"PK_{name_str}",
+                            type="primary_key",
+                            columns=[col.name],
+                        )
+                    )
                 if col.references:
-                    constraints.append(Constraint(
-                        name=None, type='foreign_key', columns=[col.name],
-                        references={
-                            'table':    col.references['table'],
-                            'columns':  [col.references['column']],
-                            'on_delete': None,
-                        },
-                    ))
+                    constraints.append(
+                        Constraint(
+                            name=None,
+                            type="foreign_key",
+                            columns=[col.name],
+                            references={
+                                "table": col.references["table"],
+                                "columns": [col.references["column"]],
+                                "on_delete": None,
+                            },
+                        )
+                    )
                 columns.append(col)
             elif isinstance(node, exp.Constraint):
                 c = _parse_table_constraint(node)
                 if c:
                     constraints.append(c)
 
-        act = MigrationAction(action='CREATE', object_type='TABLE', object_name=full, version=version)
+        act = MigrationAction(
+            action="CREATE", object_type="TABLE", object_name=full, version=version
+        )
         self.tables[full] = Table(
-            id=full, schema=schema_str, name=name_str, full=full,
-            columns=columns, constraints=constraints,
-            created_in=version, actions=[act],
+            id=full,
+            schema=schema_str,
+            name=name_str,
+            full=full,
+            columns=columns,
+            constraints=constraints,
+            created_in=version,
+            actions=[act],
         )
         return [act]
 
@@ -280,10 +336,12 @@ class Reconstructor:
         full = _table_full(stmt.this)
 
         # IF EXISTS — no error if missing
-        if stmt.args.get('exists') and full not in self.tables:
+        if stmt.args.get("exists") and full not in self.tables:
             return []
 
-        act = MigrationAction(action='DROP', object_type='TABLE', object_name=full, version=version)
+        act = MigrationAction(
+            action="DROP", object_type="TABLE", object_name=full, version=version
+        )
         self.tables.pop(full, None)
         return [act]
 
@@ -292,60 +350,98 @@ class Reconstructor:
     def _create_sequence(self, stmt: exp.Create, version: str) -> list[MigrationAction]:
         table_node = stmt.this
         schema_str, name_str = _table_schema_name(table_node)
-        full = f'{schema_str}.{name_str}' if schema_str else name_str
+        full = f"{schema_str}.{name_str}" if schema_str else name_str
 
         start_with = increment_by = 1
-        props = stmt.args.get('properties')
+        props = stmt.args.get("properties")
         if props:
             for p in props.expressions:
                 if isinstance(p, exp.SequenceProperties):
-                    if p.args.get('start'):
-                        start_with   = int(p.args['start'].name)
-                    if p.args.get('increment'):
-                        increment_by = int(p.args['increment'].name)
+                    if p.args.get("start"):
+                        start_with = int(p.args["start"].name)
+                    if p.args.get("increment"):
+                        increment_by = int(p.args["increment"].name)
 
         self.seqs[full] = Sequence(
-            name=name_str, schema=schema_str, full=full,
-            start_with=start_with, increment_by=increment_by, created_in=version,
+            name=name_str,
+            schema=schema_str,
+            full=full,
+            start_with=start_with,
+            increment_by=increment_by,
+            created_in=version,
         )
-        return [MigrationAction(action='CREATE_SEQUENCE', object_type='SEQUENCE', object_name=full, version=version)]
+        return [
+            MigrationAction(
+                action="CREATE_SEQUENCE",
+                object_type="SEQUENCE",
+                object_name=full,
+                version=version,
+            )
+        ]
 
     # ── DROP SEQUENCE ───────────────────────────────────────────────────────
 
     def _drop_sequence(self, stmt: exp.Drop, version: str) -> list[MigrationAction]:
         name_node = stmt.this
-        full = _table_full(name_node) if isinstance(name_node, exp.Table) else str(name_node).upper()
+        full = (
+            _table_full(name_node)
+            if isinstance(name_node, exp.Table)
+            else str(name_node).upper()
+        )
         self.seqs.pop(full, None)
-        return [MigrationAction(action='DROP_SEQUENCE', object_type='SEQUENCE', object_name=full, version=version)]
+        return [
+            MigrationAction(
+                action="DROP_SEQUENCE",
+                object_type="SEQUENCE",
+                object_name=full,
+                version=version,
+            )
+        ]
 
     # ── CREATE INDEX (AST path) ─────────────────────────────────────────────
 
-    def _create_index_ast(self, stmt: exp.Create, version: str) -> list[MigrationAction]:
+    def _create_index_ast(
+        self, stmt: exp.Create, version: str
+    ) -> list[MigrationAction]:
         """Handles the (rare) case where sqlglot successfully parses CREATE INDEX."""
         idx_node = stmt.this
         if not isinstance(idx_node, (exp.Index,)):
             return []
-        tbl_node = idx_node.args.get('table')
+        tbl_node = idx_node.args.get("table")
         if not tbl_node:
             return []
-        full     = _table_full(tbl_node)
-        idx_name = idx_node.name.upper() if idx_node.name else 'UNNAMED_IDX'
-        cols     = [e.name.upper() for e in (idx_node.args.get('expressions') or [])]
-        unique   = bool(stmt.args.get('unique'))
-        table    = self.tables.get(full)
+        full = _table_full(tbl_node)
+        idx_name = idx_node.name.upper() if idx_node.name else "UNNAMED_IDX"
+        cols = [e.name.upper() for e in (idx_node.args.get("expressions") or [])]
+        unique = bool(stmt.args.get("unique"))
+        table = self.tables.get(full)
         if table:
-            table.indexes.append(Index(name=idx_name, columns=cols, unique=unique, created_in=version))
-        act = MigrationAction(action='CREATE_INDEX', object_type='INDEX', object_name=f'{full}.{idx_name}', version=version)
+            table.indexes.append(
+                Index(name=idx_name, columns=cols, unique=unique, created_in=version)
+            )
+        act = MigrationAction(
+            action="CREATE_INDEX",
+            object_type="INDEX",
+            object_name=f"{full}.{idx_name}",
+            version=version,
+        )
         return [act]
 
     # ── DROP INDEX ──────────────────────────────────────────────────────────
 
     def _drop_index(self, stmt: exp.Drop, version: str) -> list[MigrationAction]:
-        idx_name = stmt.this.name.upper() if stmt.this else ''
+        idx_name = stmt.this.name.upper() if stmt.this else ""
         # Remove the index from whichever table owns it
         for t in self.tables.values():
             t.indexes = [i for i in t.indexes if i.name != idx_name]
-        return [MigrationAction(action='DROP_INDEX', object_type='INDEX', object_name=idx_name, version=version)]
+        return [
+            MigrationAction(
+                action="DROP_INDEX",
+                object_type="INDEX",
+                object_name=idx_name,
+                version=version,
+            )
+        ]
 
     # ── ALTER TABLE ─────────────────────────────────────────────────────────
 
@@ -353,7 +449,7 @@ class Reconstructor:
         table_node = stmt.this
         if not isinstance(table_node, exp.Table):
             return []
-        full  = _table_full(table_node)
+        full = _table_full(table_node)
         table = self.tables.get(full)
         acts: list[MigrationAction] = []
 
@@ -361,8 +457,7 @@ class Reconstructor:
             if table and version not in table.modified_in:
                 table.modified_in.append(version)
 
-        for action_node in stmt.args.get('actions', []):
-
+        for action_node in stmt.args.get("actions", []):
             # ADD COLUMN(S) - handle both Schema-wrapped and direct ColumnDef
             if isinstance(action_node, exp.ColumnDef) and table:
                 # Direct ColumnDef (common in ALTER TABLE ADD COLUMN)
@@ -370,9 +465,14 @@ class Reconstructor:
                 if not any(c.name == col.name for c in table.columns):
                     table.columns.append(col)
                 mark()
-                act = MigrationAction(action='ADD_COLUMN', object_type='COLUMN',
-                                      object_name=f'{full}.{col.name}', version=version)
-                acts.append(act); table.actions.append(act)
+                act = MigrationAction(
+                    action="ADD_COLUMN",
+                    object_type="COLUMN",
+                    object_name=f"{full}.{col.name}",
+                    version=version,
+                )
+                acts.append(act)
+                table.actions.append(act)
 
             elif isinstance(action_node, exp.Schema):
                 # Schema-wrapped ColumnDef(s)
@@ -383,9 +483,14 @@ class Reconstructor:
                         if not any(c.name == col.name for c in table.columns):
                             table.columns.append(col)
                         mark()
-                        act = MigrationAction(action='ADD_COLUMN', object_type='COLUMN',
-                                              object_name=f'{full}.{col.name}', version=version)
-                        acts.append(act); table.actions.append(act)
+                        act = MigrationAction(
+                            action="ADD_COLUMN",
+                            object_type="COLUMN",
+                            object_name=f"{full}.{col.name}",
+                            version=version,
+                        )
+                        acts.append(act)
+                        table.actions.append(act)
 
             # ADD CONSTRAINT
             elif isinstance(action_node, exp.AddConstraint):
@@ -395,39 +500,60 @@ class Reconstructor:
                         if c:
                             table.constraints.append(c)
                             mark()
-                            act = MigrationAction(action='ADD_CONSTRAINT', object_type='CONSTRAINT',
-                                                  object_name=f'{full}.{c.name or "unnamed"}', version=version)
-                            acts.append(act); table.actions.append(act)
+                            act = MigrationAction(
+                                action="ADD_CONSTRAINT",
+                                object_type="CONSTRAINT",
+                                object_name=f"{full}.{c.name or 'unnamed'}",
+                                version=version,
+                            )
+                            acts.append(act)
+                            table.actions.append(act)
 
             # DROP COLUMN / CONSTRAINT / INDEX
             elif isinstance(action_node, exp.Drop):
-                drop_kind = action_node.args.get('kind', '')
-                obj_name  = action_node.this.name.upper() if action_node.this else ''
+                drop_kind = action_node.args.get("kind", "")
+                obj_name = action_node.this.name.upper() if action_node.this else ""
 
-                if drop_kind == 'COLUMN' and table:
+                if drop_kind == "COLUMN" and table:
                     table.columns = [c for c in table.columns if c.name != obj_name]
                     mark()
-                    act = MigrationAction(action='DROP_COLUMN', object_type='COLUMN',
-                                          object_name=f'{full}.{obj_name}', version=version)
-                    acts.append(act); table.actions.append(act)
+                    act = MigrationAction(
+                        action="DROP_COLUMN",
+                        object_type="COLUMN",
+                        object_name=f"{full}.{obj_name}",
+                        version=version,
+                    )
+                    acts.append(act)
+                    table.actions.append(act)
 
-                elif drop_kind == 'CONSTRAINT' and table:
-                    table.constraints = [c for c in table.constraints if (c.name or '') != obj_name]
+                elif drop_kind == "CONSTRAINT" and table:
+                    table.constraints = [
+                        c for c in table.constraints if (c.name or "") != obj_name
+                    ]
                     mark()
-                    act = MigrationAction(action='DROP_CONSTRAINT', object_type='CONSTRAINT',
-                                          object_name=f'{full}.{obj_name}', version=version)
-                    acts.append(act); table.actions.append(act)
+                    act = MigrationAction(
+                        action="DROP_CONSTRAINT",
+                        object_type="CONSTRAINT",
+                        object_name=f"{full}.{obj_name}",
+                        version=version,
+                    )
+                    acts.append(act)
+                    table.actions.append(act)
 
-                elif drop_kind == 'INDEX' and table:
+                elif drop_kind == "INDEX" and table:
                     table.indexes = [i for i in table.indexes if i.name != obj_name]
-                    act = MigrationAction(action='DROP_INDEX', object_type='INDEX',
-                                          object_name=f'{full}.{obj_name}', version=version)
+                    act = MigrationAction(
+                        action="DROP_INDEX",
+                        object_type="INDEX",
+                        object_name=f"{full}.{obj_name}",
+                        version=version,
+                    )
                     acts.append(act)
 
             # RENAME COLUMN
             elif isinstance(action_node, exp.RenameColumn):
                 old_col = action_node.this
-                new_col = action_node.args.get('to')
+                new_col = action_node.args.get("to")
                 if old_col and new_col and table:
                     old_name = old_col.name.upper()
                     new_name = new_col.name.upper()
@@ -436,25 +562,38 @@ class Reconstructor:
                             col.name = new_name
                             break
                     for con in table.constraints:
-                        con.columns = [new_name if c == old_name else c for c in con.columns]
+                        con.columns = [
+                            new_name if c == old_name else c for c in con.columns
+                        ]
                     mark()
-                    act = MigrationAction(action='RENAME_COLUMN', object_type='COLUMN',
-                                          object_name=f'{full}.{old_name} → {new_name}', version=version)
+                    act = MigrationAction(
+                        action="RENAME_COLUMN",
+                        object_type="COLUMN",
+                        object_name=f"{full}.{old_name} → {new_name}",
+                        version=version,
+                    )
                     acts.append(act)
-                    if table: table.actions.append(act)
+                    if table:
+                        table.actions.append(act)
 
             # RENAME TABLE (fallback for dialects that parse it this way)
-            elif hasattr(exp, 'RenameTable') and isinstance(action_node, exp.RenameTable):
+            elif hasattr(exp, "RenameTable") and isinstance(
+                action_node, exp.RenameTable
+            ):
                 new_node = action_node.this
                 if isinstance(new_node, exp.Table) and table:
                     new_schema, new_name = _table_schema_name(new_node)
-                    new_full = f'{new_schema}.{new_name}' if new_schema else new_name
-                    table.name  = new_name
-                    table.full  = new_full
-                    table.id    = new_full
+                    new_full = f"{new_schema}.{new_name}" if new_schema else new_name
+                    table.name = new_name
+                    table.full = new_full
+                    table.id = new_full
                     self.tables[new_full] = self.tables.pop(full)
-                    act = MigrationAction(action='RENAME_TABLE', object_type='TABLE',
-                                          object_name=f'{full} → {new_full}', version=version)
+                    act = MigrationAction(
+                        action="RENAME_TABLE",
+                        object_type="TABLE",
+                        object_name=f"{full} → {new_full}",
+                        version=version,
+                    )
                     acts.append(act)
 
         return acts
@@ -462,32 +601,34 @@ class Reconstructor:
     # ── COMMENT ON ──────────────────────────────────────────────────────────
 
     def _apply_comment(self, stmt: exp.Comment) -> None:
-        kind = stmt.args.get('kind', '').upper()
-        text = stmt.expression.name if stmt.expression else ''
+        kind = stmt.args.get("kind", "").upper()
+        text = stmt.expression.name if stmt.expression else ""
 
-        if kind == 'TABLE':
+        if kind == "TABLE":
             node = stmt.this
             if isinstance(node, exp.Table):
                 t = self.tables.get(_table_full(node))
                 if t:
-                    t.comments['__table__'] = text
+                    t.comments["__table__"] = text
 
-        elif kind == 'COLUMN':
+        elif kind == "COLUMN":
             node = stmt.this
             if isinstance(node, exp.Column):
-                col_name   = node.name.upper()
-                table_node = node.args.get('table')
-                db_node    = node.args.get('db')
+                col_name = node.name.upper()
+                table_node = node.args.get("table")
+                db_node = node.args.get("db")
                 if table_node:
                     tname = table_node.name.upper()
-                    full  = f'{db_node.name.upper()}.{tname}' if db_node else tname
+                    full = f"{db_node.name.upper()}.{tname}" if db_node else tname
                     t = self.tables.get(full)
                     if t:
                         t.comments[col_name] = text
 
     # ── COMMAND FALLBACK ────────────────────────────────────────────────────
 
-    def _command_fallback(self, stmt: exp.Command, version: str) -> list[MigrationAction]:
+    def _command_fallback(
+        self, stmt: exp.Command, version: str
+    ) -> list[MigrationAction]:
         """
         Handle statements sqlglot cannot fully parse — CREATE INDEX, ALTER MODIFY,
         RENAME COLUMN etc. — via targeted regex on the raw SQL text.
@@ -496,60 +637,372 @@ class Reconstructor:
           stmt.this       = verb  e.g. 'ALTER' | 'CREATE'
           stmt.expression = rest  e.g. ' TABLE app.t MODIFY (col VARCHAR2(100))'
         """
-        cmd_name = (stmt.this or '').strip().upper()
-        raw_expr = (stmt.expression or '').strip()
-        expr_up  = raw_expr.upper()
+        cmd_name = (
+            (stmt.this.name if hasattr(stmt.this, "name") else str(stmt.this or ""))
+            .strip()
+            .upper()
+        )
+        raw_expr = (
+            stmt.expression.name
+            if hasattr(stmt.expression, "name")
+            else str(stmt.expression or "")
+        ).strip()
+        expr_up = raw_expr.upper()
         acts: list[MigrationAction] = []
 
         # CREATE [UNIQUE] INDEX
-        if cmd_name == 'CREATE' and re.match(r'^(?:UNIQUE\s+)?INDEX\b', expr_up):
-            acts += self._create_index_regex(f'CREATE {raw_expr}', version)
+        if cmd_name == "CREATE" and re.match(r"^(?:UNIQUE\s+)?INDEX\b", expr_up):
+            acts += self._create_index_regex(f"CREATE {raw_expr}", version)
+
+        # CREATE TABLE ... ( ... ) — sqlglot often falls back to Command on
+        # Oracle DDL with storage clauses (NO INMEMORY, ENABLE STORAGE IN ROW)
+        elif cmd_name == "CREATE" and re.match(r"^TABLE\b", expr_up):
+            acts += self._create_table_regex(f"CREATE {raw_expr}", version)
 
         # ALTER TABLE ... MODIFY (col TYPE ...)
-        elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'MODIFY' in expr_up:
+        elif (
+            cmd_name == "ALTER" and expr_up.startswith("TABLE") and "MODIFY" in expr_up
+        ):
             if SQLGLOT_HAS_MODIFY:
-                acts += self._alter_modify_native(f'ALTER {raw_expr}', version)
+                acts += self._alter_modify_native(f"ALTER {raw_expr}", version)
             else:
-                acts += self._alter_modify_regex(f'ALTER {raw_expr}', version)
+                acts += self._alter_modify_regex(f"ALTER {raw_expr}", version)
 
         # ALTER TABLE ... RENAME COLUMN old TO new
-        elif cmd_name == 'ALTER' and expr_up.startswith('TABLE') and 'RENAME' in expr_up and 'COLUMN' in expr_up:
-            acts += self._alter_rename_column_regex(f'ALTER {raw_expr}', version)
+        elif (
+            cmd_name == "ALTER"
+            and expr_up.startswith("TABLE")
+            and "RENAME" in expr_up
+            and "COLUMN" in expr_up
+        ):
+            acts += self._alter_rename_column_regex(f"ALTER {raw_expr}", version)
+
+        # ALTER TABLE ... ADD CONSTRAINT ... (FOREIGN KEY | PRIMARY KEY | UNIQUE | CHECK)
+        elif (
+            cmd_name == "ALTER"
+            and expr_up.startswith("TABLE")
+            and "ADD CONSTRAINT" in expr_up
+        ):
+            acts += self._alter_add_constraint_regex(f"ALTER {raw_expr}", version)
 
         return acts
 
     # ── Regex fallback helpers ──────────────────────────────────────────────
 
-    def _create_index_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
-        m = re.match(
-            r'^CREATE\s+(UNIQUE\s+)?INDEX\s+"?(\w+(?:\.\w+)?)"?\s+ON\s+"?(\w+(?:\.\w+)?)"?\s*\(([^)]+)\)',
-            raw_sql.strip(), re.I
+    def _alter_add_constraint_regex(
+        self, raw_sql: str, version: str
+    ) -> list[MigrationAction]:
+        """Handle Oracle ``ALTER TABLE x ADD CONSTRAINT c <TYPE> ...`` statements
+        (FOREIGN KEY / PRIMARY KEY / UNIQUE / CHECK) when sqlglot falls back to
+        Command. Regex over the raw SQL text."""
+        m = re.search(
+            r'^ALTER\s+TABLE\s+((?:"?[\w.]+"?)+)\s+ADD\s+CONSTRAINT\s+'
+            r'"?([\w.]+)"?\s+'
+            r"(PRIMARY\s+KEY|UNIQUE|FOREIGN\s+KEY|CHECK)\s*"
+            r"(?:\(([^)]*)\))?\s*(?:REFERENCES\s+((?:\"?[\w.]+\"?)+)\s*\(([^)]*)\))?",
+            raw_sql.strip(),
+            re.I | re.S,
         )
         if not m:
             return []
-        unique   = bool(m.group(1))
-        idx_name = m.group(2).replace('"', '').upper().split('.')[-1]
-        tbl_full = m.group(3).replace('"', '').upper()
-        cols     = [re.sub(r'\s+(ASC|DESC)$', '', c.strip(), flags=re.I).replace('"', '').upper()
-                    for c in m.group(4).split(',')]
+        tbl_full = m.group(1).replace('"', "").upper()
+        con_name = m.group(2).replace('"', "").upper()
+        kind = m.group(3).upper().replace(" ", "_")
+        cols = (
+            [c.strip().replace('"', "").upper() for c in m.group(4).split(",")]
+            if m.group(4)
+            else []
+        )
+
+        constraint_type = {
+            "PRIMARY_KEY": "primary_key",
+            "UNIQUE": "unique",
+            "FOREIGN_KEY": "foreign_key",
+            "CHECK": "check",
+        }.get(kind, "check")
+
+        references: dict | None = None
+        if constraint_type == "foreign_key" and m.group(5):
+            references = {
+                "table": m.group(5).replace('"', "").upper(),
+                "columns": (
+                    [c.strip().replace('"', "").upper() for c in m.group(6).split(",")]
+                    if m.group(6)
+                    else []
+                ),
+                "on_delete": None,
+            }
+
+        table = self.tables.get(tbl_full)
+        if table:
+            if not any(c.name == con_name for c in table.constraints):
+                table.constraints.append(
+                    Constraint(
+                        name=con_name,
+                        type=constraint_type,
+                        columns=cols,
+                        references=references,
+                    )
+                )
+            if version not in table.modified_in:
+                table.modified_in.append(version)
+
+        return [
+            MigrationAction(
+                action="ADD_CONSTRAINT",
+                object_type="CONSTRAINT",
+                object_name=f"{tbl_full}.{con_name}",
+                version=version,
+            )
+        ]
+
+    def _create_table_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
+        """Handle Oracle ``CREATE TABLE`` statements sqlglot falls back to Command on.
+
+        Matches the table name, then splits the parenthesised body on top-level
+        commas (handling nested parens in CHECK constraints) and parses each
+        entry as a column definition or table-level constraint.
+        """
+        m = re.match(r"^CREATE\s+TABLE\s+([\w.]+)", raw_sql.strip(), re.I | re.S)
+        if not m:
+            return []
+        full = m.group(1).replace('"', "").upper()
+        schema_str = full.split(".")[0] if "." in full else None
+        name_str = full.split(".")[-1]
+
+        # Scan for the first '(' and its balanced closing paren; the table
+        # body may be followed by storage clauses (NO INMEMORY ...) and
+        # unrelated COMMENT statements — only the balanced body matters.
+        body = ""
+        start = raw_sql.find("(")
+        if start != -1:
+            depth = 0
+            for i in range(start, len(raw_sql)):
+                if raw_sql[i] == "(":
+                    depth += 1
+                elif raw_sql[i] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        body = raw_sql[start + 1 : i]
+                        break
+
+        columns: list[Column] = []
+        constraints: list[Constraint] = []
+
+        for entry in _split_top_level(body, ","):
+            entry = entry.strip().rstrip(";").strip()
+            if not entry:
+                continue
+            if re.match(
+                r"^CONSTRAINT\b|^(?:PRIMARY|FOREIGN|UNIQUE|CHECK)\s+KEY?\b", entry, re.I
+            ):
+                self._parse_table_constraint_regex(entry, name_str, constraints)
+                continue
+
+            # Column definition: NAME TYPE [ (prec[,scale]) ] [BYTE|CHAR] [constraints...]
+            cm = re.match(
+                r'^"?([\w$]+)"?\s+'
+                r"([A-Z][A-Z0-9_ ]*?)\s*"
+                r"(?:\((\d+)\s*(?:,\s*(\d+))?\s*\))?\s*"
+                r"(BYTE|CHAR)?\s*(.*)$",
+                entry,
+                re.I,
+            )
+            if not cm:
+                continue
+            col_name = cm.group(1).upper()
+            col_type = cm.group(2).strip().upper()
+            precision = int(cm.group(3)) if cm.group(3) else None
+            scale = int(cm.group(4)) if cm.group(4) else None
+
+            nullable = True
+            default_val: str | None = None
+            primary_key = False
+            unique = False
+            references: dict | None = None
+            tail = (cm.group(6) or "").upper()
+
+            if "NOT NULL" in tail:
+                nullable = False
+            dm = re.search(r"DEFAULT\s+([^\s,]+)", tail)
+            if dm:
+                default_val = dm.group(1).strip("'\"")
+            if "PRIMARY KEY" in tail:
+                primary_key = True
+                nullable = False
+            if "UNIQUE" in tail and "PRIMARY" not in tail:
+                unique = True
+            rm = re.search(r"REFERENCES\s+([\w.]+)\s*\(([^)]+)\)", tail)
+            if rm:
+                ref_table = rm.group(1).replace('"', "").upper()
+                ref_col = re.sub(r"\s+", "", rm.group(2)).upper()
+                references = {"table": ref_table, "column": ref_col}
+
+            columns.append(
+                Column(
+                    name=col_name,
+                    type=col_type,
+                    precision=precision,
+                    scale=scale,
+                    nullable=nullable,
+                    default=default_val,
+                    primary_key=primary_key,
+                    unique=unique,
+                    references=references,
+                )
+            )
+            if primary_key:
+                constraints.append(
+                    Constraint(
+                        name=f"PK_{name_str}",
+                        type="primary_key",
+                        columns=[col_name],
+                    )
+                )
+            if references:
+                constraints.append(
+                    Constraint(
+                        name=None,
+                        type="foreign_key",
+                        columns=[col_name],
+                        references={
+                            "table": references["table"],
+                            "columns": [references["column"]],
+                            "on_delete": None,
+                        },
+                    )
+                )
+
+        act = MigrationAction(
+            action="CREATE", object_type="TABLE", object_name=full, version=version
+        )
+        self.tables[full] = Table(
+            id=full,
+            schema=schema_str,
+            name=name_str,
+            full=full,
+            columns=columns,
+            constraints=constraints,
+            created_in=version,
+            actions=[act],
+        )
+        return [act]
+
+    def _parse_table_constraint_regex(
+        self, entry: str, table_name: str, constraints: list[Constraint]
+    ) -> None:
+        """Parse table-level constraints from a CREATE TABLE body entry."""
+        # CONSTRAINT name PRIMARY KEY (cols)
+        m = re.match(
+            r"^CONSTRAINT\s+([\w.$]+)\s+PRIMARY\s+KEY\s*\(([^)]+)\)",
+            entry,
+            re.I,
+        )
+        if m:
+            constraints.append(
+                Constraint(
+                    name=m.group(1).replace('"', "").upper(),
+                    type="primary_key",
+                    columns=_split_identifiers(m.group(2)),
+                )
+            )
+            return
+        # CONSTRAINT name FOREIGN KEY (cols) REFERENCES t (cols)
+        m = re.match(
+            r"^CONSTRAINT\s+([\w.$]+)\s+FOREIGN\s+KEY\s*\(([^)]+)\)\s+"
+            r"REFERENCES\s+([\w.]+)\s*\(([^)]+)\)",
+            entry,
+            re.I,
+        )
+        if m:
+            constraints.append(
+                Constraint(
+                    name=m.group(1).replace('"', "").upper(),
+                    type="foreign_key",
+                    columns=_split_identifiers(m.group(2)),
+                    references={
+                        "table": m.group(3).replace('"', "").upper(),
+                        "columns": _split_identifiers(m.group(4)),
+                        "on_delete": None,
+                    },
+                )
+            )
+            return
+        # FOREIGN KEY (cols) REFERENCES t (cols)
+        m = re.match(
+            r"^FOREIGN\s+KEY\s*\(([^)]+)\)\s+REFERENCES\s+([\w.]+)\s*\(([^)]+)\)",
+            entry,
+            re.I,
+        )
+        if m:
+            constraints.append(
+                Constraint(
+                    name=None,
+                    type="foreign_key",
+                    columns=_split_identifiers(m.group(1)),
+                    references={
+                        "table": m.group(2).replace('"', "").upper(),
+                        "columns": _split_identifiers(m.group(3)),
+                        "on_delete": None,
+                    },
+                )
+            )
+            return
+        # UNIQUE (cols)
+        m = re.match(r"^UNIQUE\s*\(([^)]+)\)", entry, re.I)
+        if m:
+            constraints.append(
+                Constraint(
+                    name=None, type="unique", columns=_split_identifiers(m.group(1))
+                )
+            )
+
+    def _create_index_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
+        m = re.match(
+            r'^CREATE\s+(UNIQUE\s+)?INDEX\s+"?(\w+(?:\.\w+)?)"?\s+ON\s+"?(\w+(?:\.\w+)?)"?\s*\(([^)]+)\)',
+            raw_sql.strip(),
+            re.I,
+        )
+        if not m:
+            return []
+        unique = bool(m.group(1))
+        idx_name = m.group(2).replace('"', "").upper().split(".")[-1]
+        tbl_full = m.group(3).replace('"', "").upper()
+        cols = [
+            re.sub(r"\s+(ASC|DESC)$", "", c.strip(), flags=re.I)
+            .replace('"', "")
+            .upper()
+            for c in m.group(4).split(",")
+        ]
         table = self.tables.get(tbl_full)
         if table:
             if not any(i.name == idx_name for i in table.indexes):
-                table.indexes.append(Index(name=idx_name, columns=cols, unique=unique, created_in=version))
+                table.indexes.append(
+                    Index(
+                        name=idx_name, columns=cols, unique=unique, created_in=version
+                    )
+                )
             if version not in table.modified_in:
                 table.modified_in.append(version)
-        return [MigrationAction(action='CREATE_INDEX', object_type='INDEX',
-                                object_name=f'{tbl_full}.{idx_name}', version=version)]
+        return [
+            MigrationAction(
+                action="CREATE_INDEX",
+                object_type="INDEX",
+                object_name=f"{tbl_full}.{idx_name}",
+                version=version,
+            )
+        ]
 
     def _alter_modify_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
         m = re.match(
             r'^ALTER\s+TABLE\s+"?(\w+(?:\.\w+)?)"?\s+MODIFY\s*(?:\((.+)\)|(.+))\s*$',
-            raw_sql.strip(), re.I | re.S
+            raw_sql.strip(),
+            re.I | re.S,
         )
         if not m:
             return []
-        full  = m.group(1).replace('"', '').upper()
-        body  = (m.group(2) or m.group(3) or '').strip()
+        full = m.group(1).replace('"', "").upper()
+        body = (m.group(2) or m.group(3) or "").strip()
         table = self.tables.get(full)
         if not table:
             return []
@@ -558,13 +1011,17 @@ class Reconstructor:
         # Split on comma (respecting parens)
         depth, cur, defs = 0, [], []
         for ch in body:
-            if ch == '(':   depth += 1
-            elif ch == ')': depth -= 1
-            if ch == ',' and depth == 0:
-                defs.append(''.join(cur).strip()); cur = []
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            if ch == "," and depth == 0:
+                defs.append("".join(cur).strip())
+                cur = []
             else:
                 cur.append(ch)
-        if cur: defs.append(''.join(cur).strip())
+        if cur:
+            defs.append("".join(cur).strip())
 
         for defn in defs:
             # Match: "colname type(precision, scale) rest"
@@ -574,13 +1031,15 @@ class Reconstructor:
                 continue
             col_name = cm.group(1).upper()
             type_raw = cm.group(2).upper().strip()  # Strip whitespace from type
-            rest     = cm.group(3).strip()
+            rest = cm.group(3).strip()
 
             for col in table.columns:
                 if col.name != col_name:
                     continue
                 # Match type with optional precision and scale (handles spaces: NUMBER(10, 2))
-                tm = re.match(r'(\w[\w ]*?)(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?$', type_raw)
+                tm = re.match(
+                    r"(\w[\w ]*?)(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?$", type_raw
+                )
                 if tm:
                     col.type = tm.group(1).strip()
                     # Update precision and scale based on what's explicitly provided
@@ -592,23 +1051,30 @@ class Reconstructor:
                     else:
                         # No precision specified, keep existing (rare case)
                         pass
-                if re.search(r'NOT\s+NULL', rest, re.I):
+                if re.search(r"NOT\s+NULL", rest, re.I):
                     col.nullable = False
-                elif re.search(r'\bNULL\b', rest, re.I):
+                elif re.search(r"\bNULL\b", rest, re.I):
                     col.nullable = True
-                dm = re.search(r'DEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|NULL)|$)', rest, re.I)
+                dm = re.search(
+                    r"DEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|NULL)|$)", rest, re.I
+                )
                 if dm:
                     col.default = dm.group(1).strip()
                 break
 
             if version not in table.modified_in:
                 table.modified_in.append(version)
-            act = MigrationAction(action='MODIFY_COLUMN', object_type='COLUMN',
-                                  object_name=f'{full}.{col_name}', version=version)
+            act = MigrationAction(
+                action="MODIFY_COLUMN",
+                object_type="COLUMN",
+                object_name=f"{full}.{col_name}",
+                version=version,
+            )
             acts.append(act)
             table.actions.append(act)
 
         return acts
+
     # ── Native sqlglot MODIFY parser ────────────────────────────────────────
 
     def _alter_modify_native(self, raw_sql: str, version: str) -> list[MigrationAction]:
@@ -621,7 +1087,9 @@ class Reconstructor:
         path is not yet active.
         """
         try:
-            table_name, modifications = parse_modify_native(raw_sql, dialect=self.dialect)
+            table_name, modifications = parse_modify_native(
+                raw_sql, dialect=self.dialect
+            )
         except (ValueError, AttributeError) as e:
             log.warning(f"Native MODIFY parse failed: {e} — falling back to regex")
             return self._alter_modify_regex(raw_sql, version)
@@ -659,10 +1127,10 @@ class Reconstructor:
                 table.modified_in.append(version)
 
             act = MigrationAction(
-                action='MODIFY_COLUMN',
-                object_type='COLUMN',
-                object_name=f'{table_name}.{col_name}',
-                version=version
+                action="MODIFY_COLUMN",
+                object_type="COLUMN",
+                object_name=f"{table_name}.{col_name}",
+                version=version,
             )
             acts.append(act)
             table.actions.append(act)
@@ -670,17 +1138,20 @@ class Reconstructor:
         return acts
 
     # ── Regex fallback MODIFY parser ────────────────────────────────────────
-    def _alter_rename_column_regex(self, raw_sql: str, version: str) -> list[MigrationAction]:
+    def _alter_rename_column_regex(
+        self, raw_sql: str, version: str
+    ) -> list[MigrationAction]:
         m = re.match(
             r'^ALTER\s+TABLE\s+"?(\w+(?:\.\w+)?)"?\s+RENAME\s+COLUMN\s+"?(\w+)"?\s+TO\s+"?(\w+)"?',
-            raw_sql.strip(), re.I
+            raw_sql.strip(),
+            re.I,
         )
         if not m:
             return []
-        full     = m.group(1).replace('"', '').upper()
+        full = m.group(1).replace('"', "").upper()
         old_name = m.group(2).upper()
         new_name = m.group(3).upper()
-        table    = self.tables.get(full)
+        table = self.tables.get(full)
         if not table:
             return []
         for col in table.columns:
@@ -692,8 +1163,12 @@ class Reconstructor:
             con.columns = [new_name if c == old_name else c for c in con.columns]
         if version not in table.modified_in:
             table.modified_in.append(version)
-        act = MigrationAction(action='RENAME_COLUMN', object_type='COLUMN',
-                              object_name=f'{full}.{old_name} → {new_name}', version=version)
+        act = MigrationAction(
+            action="RENAME_COLUMN",
+            object_type="COLUMN",
+            object_name=f"{full}.{old_name} → {new_name}",
+            version=version,
+        )
         table.actions.append(act)
         return [act]
 
@@ -704,19 +1179,21 @@ class Reconstructor:
         seen: set[str] = set()
         for t in self.tables.values():
             for c in t.constraints:
-                if c.type == 'foreign_key' and c.references:
-                    eid = f'{t.full}→{c.references["table"]}:{c.name}'
+                if c.type == "foreign_key" and c.references:
+                    eid = f"{t.full}→{c.references['table']}:{c.name}"
                     if eid not in seen:
                         seen.add(eid)
-                        edges.append(Edge(
-                            id=eid,
-                            from_table=t.full,
-                            from_cols=c.columns,
-                            to_table=c.references['table'],
-                            to_cols=c.references['columns'],
-                            constraint_name=c.name,
-                            on_delete=c.references.get('on_delete'),
-                        ))
+                        edges.append(
+                            Edge(
+                                id=eid,
+                                from_table=t.full,
+                                from_cols=c.columns,
+                                to_table=c.references["table"],
+                                to_cols=c.references["columns"],
+                                constraint_name=c.name,
+                                on_delete=c.references.get("on_delete"),
+                            )
+                        )
         return edges
 
 
@@ -724,7 +1201,8 @@ class Reconstructor:
 # CONVENIENCE FUNCTIONS  (backward-compat wrappers)
 # ─────────────────────────────────────────────
 
-def reconstruct(files: list[dict], dialect: str = 'oracle') -> SchemaGraph:
+
+def reconstruct(files: list[dict], dialect: str = "oracle") -> SchemaGraph:
     """
     Reconstruct the final schema state from a list of { filename, sql } dicts.
     Thin wrapper around Reconstructor — preserves the apply_migrations() contract.
@@ -732,7 +1210,9 @@ def reconstruct(files: list[dict], dialect: str = 'oracle') -> SchemaGraph:
     return Reconstructor(dialect=dialect).apply_all(files)
 
 
-def reconstruct_at(files: list[dict], version: str, dialect: str = 'oracle') -> SchemaGraph:
+def reconstruct_at(
+    files: list[dict], version: str, dialect: str = "oracle"
+) -> SchemaGraph:
     """
     Reconstruct the schema state as it was at a specific Flyway version.
 

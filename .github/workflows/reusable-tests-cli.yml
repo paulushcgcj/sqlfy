@@ -6,6 +6,30 @@ on:
 permissions: {}
 
 jobs:
+  lint-cli:
+    name: CLI Lint & Type Check
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --all-extras --group dev
+        working-directory: cli
+
+      - name: Run Ruff
+        run: uv run ruff check src/ tests/
+        working-directory: cli
+
   tests-cli:
     name: CLI Unit Tests
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
