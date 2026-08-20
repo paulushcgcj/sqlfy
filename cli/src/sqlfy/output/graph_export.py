@@ -423,6 +423,26 @@ def _render_html_template(
       font-size: 12px;
     }}
     .focus-btn:hover {{ background: #6d28d9; }}
+    .toggle-card {{
+      background: rgba(124, 58, 237, 0.12);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }}
+    .toggle-card:hover {{
+      background: rgba(124, 58, 237, 0.22);
+      border-color: rgba(124, 58, 237, 0.6);
+    }}
+    .toggle-card.active {{
+      background: rgba(124, 58, 237, 0.3);
+      border-color: #7c3aed;
+    }}
   </style>
 </head>
 <body>
@@ -434,6 +454,11 @@ def _render_html_template(
     </div>
 
     <div class="section">
+      <div class="toggle-card" id="toggle-rest-btn" onclick="toggleRest(event)">
+        <input type="checkbox" id="rest-chk" style="margin-right: 8px; cursor: pointer;" />
+        <span style="font-size: 12px; font-weight: 600; color: #f1f5f9;">Hide The Rest</span>
+      </div>
+
       <div class="section-title">Object Types</div>
       <div id="type-legend"></div>
 
@@ -500,13 +525,28 @@ def _render_html_template(
 
     const hiddenTypes = new Set();
     const hiddenCommunities = new Set();
+    let hideRest = false;
+
+    function toggleRest(e) {{
+      const chk = document.getElementById('rest-chk');
+      if (e && e.target === chk) {{
+        hideRest = chk.checked;
+      }} else {{
+        chk.checked = !chk.checked;
+        hideRest = chk.checked;
+      }}
+      const btn = document.getElementById('toggle-rest-btn');
+      if (hideRest) btn.classList.add('active'); else btn.classList.remove('active');
+      updateVisibility();
+    }}
 
     function updateVisibility() {{
       const updates = [];
       nodesData.forEach(n => {{
         const isTypeHidden = hiddenTypes.has(n.type);
         const isCommHidden = hiddenCommunities.has(n.community);
-        updates.push({{ id: n.id, hidden: isTypeHidden || isCommHidden }});
+        const isRestHidden = hideRest && restCommunityIds.has(n.community);
+        updates.push({{ id: n.id, hidden: isTypeHidden || isCommHidden || isRestHidden }});
       }});
       nodes.update(updates);
     }}
@@ -541,6 +581,8 @@ def _render_html_template(
     // Render Top Communities (limit to top 15 in legend sidebar)
     const legendEl = document.getElementById('legend');
     const topLegend = legendData.slice(0, 15);
+    const restLegend = legendData.slice(15);
+    const restCommunityIds = new Set(restLegend.map(c => c.cid));
 
     topLegend.forEach(c => {{
       const item = document.createElement('div');
