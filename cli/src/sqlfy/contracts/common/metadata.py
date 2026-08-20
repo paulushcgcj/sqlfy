@@ -20,7 +20,7 @@ class BuildInfo:
     """ISO-8601 UTC timestamp of schema generation."""
 
     sqlfy_version: str
-    """Version string from ``importlib.metadata`` for the ``sqlfy`` package."""
+    """Version string from ``importlib.metadata`` for the ``sqlfy-cli`` package."""
 
     python_version: str
     """``sys.version`` string of the interpreter that ran the build."""
@@ -40,7 +40,7 @@ class BuildInfo:
         try:
             from importlib.metadata import version as _version
 
-            sqlfy_ver = _version("sqlfy")
+            sqlfy_ver = _version("sqlfy-cli")
         except Exception:
             sqlfy_ver = "unknown"
 

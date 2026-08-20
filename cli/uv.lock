@@ -1099,7 +1099,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sqlfy"
+name = "sqlfy-cli"
 version = "0.20.0"
 source = { editable = "." }
 dependencies = [
