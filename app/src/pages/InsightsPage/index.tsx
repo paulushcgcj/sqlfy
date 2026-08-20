@@ -1,5 +1,5 @@
 import InsightsPanel from '@/components/schema/InsightsPanel';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Insights page — schema analysis and anti-pattern detection.
