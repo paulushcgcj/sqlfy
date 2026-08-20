@@ -1,5 +1,5 @@
 import DiffPanel from '@/components/schema/DiffPanel';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Diff page — compare schema versions and migration versions.

@@ -1,5 +1,5 @@
 import LlmTab from '@/components/schema/LlmTab';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Chunks page — LLM-ready vector chunks for RAG pipelines.

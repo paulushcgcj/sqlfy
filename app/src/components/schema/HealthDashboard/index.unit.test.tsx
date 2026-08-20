@@ -9,7 +9,7 @@ import * as cliModule from '@/bridge/cli';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockRunHealth = vi.fn();
+const { mockRunHealth } = vi.hoisted(() => ({ mockRunHealth: vi.fn() }));
 vi.mock('@/bridge/cli', () => ({
   CLI_AVAILABLE: true,
   CLI_MODE_LABEL: '⚡ CLI (Tauri)',
@@ -91,6 +91,7 @@ const mockHealthResult: HealthResult = {
 describe('HealthDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(cliModule).CLI_AVAILABLE = true;
   });
 
   it('renders the run button and hint', () => {
@@ -122,7 +123,7 @@ describe('HealthDashboard', () => {
     });
 
     // Check that score is displayed
-    expect(screen.getByText('60')).toBeDefined();
+    expect(screen.getByText('60', { selector: 'text' })).toBeDefined();
   });
 
   it('displays summary stats after running health check', async () => {
@@ -133,9 +134,15 @@ describe('HealthDashboard', () => {
     fireEvent.click(screen.getByText(/Run Health Check/i));
 
     await waitFor(() => {
-      expect(screen.getByText('8')).toBeDefined(); // total migrations
-      expect(screen.getByText('6')).toBeDefined(); // safe migrations
-      expect(screen.getByText('1')).toBeDefined(); // unsafe migrations
+      expect(
+        screen.getByText('8', { selector: '[data-stat="total"] .hd__summary-value' }),
+      ).toBeDefined();
+      expect(
+        screen.getByText('6', { selector: '[data-stat="safe"] .hd__summary-value' }),
+      ).toBeDefined();
+      expect(
+        screen.getByText('1', { selector: '[data-stat="unsafe"] .hd__summary-value' }),
+      ).toBeDefined();
     });
   });
 

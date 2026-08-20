@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $Repo       = "paulushcgcj/sqlfy"
-$Binary     = "sqlfy"
+$Binary     = "sqlfy-cli"
 $InstallDir = "$env:LOCALAPPDATA\Programs\$Binary"
 
 $release = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest"
