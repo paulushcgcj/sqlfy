@@ -25,6 +25,7 @@ lint  = ["sqlfluff>=3.0.0"]   # SQL linter — optional, used by the lint comman
 
 [project.scripts]
 sqlfy = "sqlfy.main:main"
+sqlfy-cli = "sqlfy.main:main"
 sqlfy-ng = "sqlfy.cli:app"
 
 [tool.setuptools.packages.find]
