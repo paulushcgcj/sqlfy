@@ -1,5 +1,5 @@
 import GraphTab from '@/components/schema/GraphTab';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Graph page — interactive schema graph visualization.

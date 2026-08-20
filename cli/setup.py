@@ -99,7 +99,9 @@ class CustomBuildPy(build_py):
         _bootstrap_contracts_import(src_path)
 
         try:
-            from sqlfy.contract_gen.generate_contracts import generate_all  # type: ignore[import]
+            from sqlfy.contract_gen.generate_contracts import (  # type: ignore[import]
+                generate_all,
+            )
 
             generate_all()
         except Exception as exc:

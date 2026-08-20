@@ -1,5 +1,5 @@
 import SchemaTab from '@/components/schema/SchemaTab';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Schema State page — schema dump and state analysis.

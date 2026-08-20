@@ -1,5 +1,5 @@
 import MigrationsTab from '@/components/schema/MigrationsTab';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Migrations page — displays loaded migration files.

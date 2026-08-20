@@ -1,5 +1,5 @@
 import AskPanel from '@/components/schema/AskPanel';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Ask page — natural language Q&A with Claude.

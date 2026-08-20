@@ -2,7 +2,7 @@ import { useNavigate } from '@tanstack/react-router';
 
 import { parse } from '@/bridge/cli';
 import { pickFolder, readMigrations, folderLabel } from '@/bridge/folder';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 import { SAMPLE_MIGRATIONS } from '@/data/samples';
 import './index.scss';
 

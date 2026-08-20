@@ -1,5 +1,5 @@
 import GraphExportPanel from '@/components/schema/GraphExportPanel';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext/context';
 
 /**
  * Graph Export page — export schema in multiple formats (Mermaid, DOT, Excalidraw, Draw.io).
