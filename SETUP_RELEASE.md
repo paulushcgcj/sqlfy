@@ -13,7 +13,7 @@
 |---|---|
 | PyPI account + 2FA | Required to own and publish the `sqlfy-cli` package |
 | PyPI Trusted Publishing | Lets GitHub Actions publish to PyPI without any stored API key or password |
-| GitHub Actions Environment | Scopes the PyPI publish workflow and lets you add human approval gates |
+| GitHub Actions Environment | Scopes the PyPI publish job and lets you add human approval gates |
 | (Optional) TestPyPI account | Lets you do a full end-to-end dry run against a safe sandbox before touching production PyPI |
 | (Optional) Tag protection rule | Prevents accidental tag pushes from anyone other than maintainers |
 
@@ -71,7 +71,7 @@ touching production PyPI.
 ## Step 4 — Configure PyPI Trusted Publishing
 
 This is the most important step. It tells PyPI: "Trust GitHub Actions when it
-runs the `publish-pypi.yml` workflow in the `paulushcgcj/sqlfy` repository."
+runs the `release.yml` workflow in the `paulushcgcj/sqlfy` repository."
 
 ### 4a — For a brand-new project (package does not exist on PyPI yet)
 
@@ -91,7 +91,7 @@ your first publish, so the first automated run just works.
    | PyPI Project Name | `sqlfy-cli` |
    | Owner | `paulushcgcj` |
    | Repository name | `sqlfy` |
-   | Workflow name | `publish-pypi.yml` |
+   | Workflow name | `release.yml` |
    | Environment name | `pypi` |
 
 6. Click **Add**.
@@ -108,13 +108,13 @@ your first publish, so the first automated run just works.
    |---|---|
    | Owner | `paulushcgcj` |
    | Repository name | `sqlfy` |
-   | Workflow name | `publish-pypi.yml` |
+   | Workflow name | `release.yml` |
    | Environment name | `pypi` |
 
 5. Click **Add**.
 
 > ⚠️ **The values above must match the workflow file exactly.**
-> If you rename `.github/workflows/publish-pypi.yml` or the GitHub Environment,
+> If you rename `.github/workflows/release.yml` or the GitHub Environment,
 > you must update the Trusted Publisher entry on PyPI to match.
 
 ---
@@ -126,15 +126,16 @@ dry-run publishing to the sandbox.
 
 Use the same field values as Step 4, but:
 - Log in to **test.pypi.org**, not pypi.org.
-- If you add a TestPyPI workflow, its filename goes in the **Workflow name** field
-  (e.g. `publish-testpypi.yml`).
+- If you add a TestPyPI publish job to `release.yml`, its environment name goes in
+  the **Environment name** field (e.g. `test-pypi`); the **Workflow name** stays
+  `release.yml`.
 
 ---
 
 ## Step 6 — Create the GitHub Actions Environment
 
-The `publish-pypi.yml` workflow references an environment named **`pypi`**.
-GitHub will refuse to run that workflow until this environment exists.
+The `publish-pypi` job inside `release.yml` references an environment named
+**`pypi`**. GitHub will refuse to run that job until this environment exists.
 
 1. Open your repository on GitHub: [https://github.com/paulushcgcj/sqlfy](https://github.com/paulushcgcj/sqlfy).
 2. Click **Settings** (top navigation bar, requires repo admin permissions).
@@ -247,8 +248,8 @@ git push origin v0.20.1
 After the push, go to **GitHub → Actions** and watch:
 
 1. **Release** workflow — builds binaries and creates the GitHub Release (3–8 min).
-2. Once you (or your reviewer) publish the GitHub Release, the
-   **Publish to PyPI** workflow fires automatically (~1 min).
+2. The **Publish to PyPI** job runs automatically after the GitHub Release
+   (~1 min).
 
 The package will then be live at:
 `https://pypi.org/project/sqlfy-cli/`
@@ -270,7 +271,7 @@ uv tool install sqlfy-cli
 **Cause:** The Trusted Publisher entry on PyPI does not match the workflow.  
 **Fix:** Double-check that the **Owner**, **Repository name**, **Workflow name**,
 and **Environment name** in the PyPI Trusted Publishing settings are identical
-to what is in `.github/workflows/publish-pypi.yml` — including capitalisation.
+to what is in `.github/workflows/release.yml` — including capitalisation.
 
 ### "Environment 'pypi' not found"
 
@@ -280,9 +281,10 @@ named exactly `pypi`.
 
 ### Workflow triggers but nothing publishes
 
-**Cause:** The `publish-pypi.yml` workflow triggers on `release: published`.
-If you left the GitHub Release as a **draft**, the trigger does not fire.  
-**Fix:** Open the draft release on GitHub and click **Publish release**.
+**Cause:** The `release.yml` workflow runs the `publish-pypi` job only after the
+GitHub Release is created. If you left the GitHub Release as a **draft**, the
+`create-release` job never completes and the publish job never runs.
+**Fix:** Check the **Release** workflow and its `create-release` job.
 
 ### `check-wheel-contents` reports missing files
 

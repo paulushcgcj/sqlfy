@@ -65,7 +65,7 @@ uv tool install git-cliff
    - Publisher: GitHub Actions
    - Owner: `paulushcgcj`
    - Repository: `sqlfy`
-   - Workflow filename: `publish-pypi.yml`
+   - Workflow filename: `release.yml`
    - Environment name: `pypi`
 3. In GitHub, create an Actions **Environment** named `pypi` under
    **Settings → Environments**.
@@ -120,12 +120,15 @@ git push origin v1.2.0
 
 Pushing the tag triggers `release.yml`, which will:
 
+- Update the package version to match the release tag
 - Generate the changelog from conventional commits between the previous tag
   and `v1.2.0`
 - Build standalone binaries for Linux, macOS, and Windows via PyInstaller
 - Build the Python wheel and source distribution via `uv build`
+- Validate the wheel contents and verify its installed version matches the tag
 - Create a GitHub Release, populate the body with the changelog, and attach
   all artifacts
+- Publish the verified wheel and source distribution to PyPI via OIDC
 
 ### Step 6 — Monitor the Release workflow
 
@@ -147,11 +150,11 @@ If you want to **review before publishing**, change `draft: false` to
 
 ### Step 8 — Automatic PyPI publish
 
-Publishing the GitHub Release triggers `publish-pypi.yml`.
-The workflow builds the package fresh with `uv build` and publishes via OIDC —
-no tokens required.
+The `release.yml` workflow publishes the **verified** Python artifacts after
+creating the GitHub Release. It downloads the `python-dist` artifact and
+publishes it via OIDC — no tokens required.
 
-Monitor progress at **Actions → Publish to PyPI**.
+Monitor progress at **Actions → Release → publish-pypi job**.
 
 Once complete, the new version will be live at:
 `https://pypi.org/project/sqlfy-cli/`
