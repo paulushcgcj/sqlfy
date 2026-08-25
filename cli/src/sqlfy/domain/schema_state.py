@@ -45,6 +45,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from ..version import get_version
 from .models import SchemaGraph
 from .utils import type_str
 
@@ -198,7 +199,7 @@ class SchemaState:
             fingerprint=self.fingerprint,
             dialect=self.dialect,
             generated_at=self.generated_at,
-            sqlfy_version="0.3.0",  # TODO: get from package metadata
+            sqlfy_version=get_version(),
             node_count=self.stats.get("table_count", 0) + self.stats.get("sequence_count", 0),
             edge_count=self.stats.get("relationship_count", 0),
             table_count=self.stats.get("table_count", 0),
