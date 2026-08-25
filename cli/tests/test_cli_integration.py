@@ -17,6 +17,16 @@ def run_cli(*args):
     return result.stdout, result.stderr, result.returncode
 
 
+def run_legacy_ng(*args):
+    """Run the installed compatibility script beside the active interpreter."""
+    result = subprocess.run(
+        [str(Path(sys.executable).with_name("sqlfy-ng")), *args],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout, result.stderr, result.returncode
+
+
 def write_migrations(directory: Path) -> None:
     """Write a small Flyway fixture for subprocess-level CLI tests."""
     (directory / "V1__create_users.sql").write_text(
@@ -98,6 +108,16 @@ def test_legacy_mode_no_args():
     stdout, stderr, code = run_cli()
     # Should fail with missing migrations_dir
     assert code != 0
+
+
+def test_sqlfy_ng_is_a_deprecated_alias_for_the_canonical_cli():
+    """The compatibility command must not maintain a second command tree."""
+    stdout, stderr, code = run_legacy_ng("--help")
+
+    assert code == 0
+    assert "Warning: 'sqlfy-ng' is deprecated" in stderr
+    assert "diff-versions" in stdout
+    assert "intelligence" not in stdout
 
 
 def test_dump_json_executes_full_cli_pipeline(tmp_path):
