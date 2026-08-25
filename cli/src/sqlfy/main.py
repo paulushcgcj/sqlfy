@@ -486,6 +486,10 @@ def _legacy_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     argv = sys.argv[1:]
+    if not argv:
+        _subcommand_parser().print_help(sys.stderr)
+        sys.exit(2)
+
     first_positional = next((a for a in argv if not a.startswith("-")), None)
 
     if first_positional in KNOWN_SUBCOMMANDS or "--help" in argv or "-h" in argv:

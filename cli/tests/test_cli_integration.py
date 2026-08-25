@@ -104,10 +104,11 @@ def test_cache_info():
 
 
 def test_legacy_mode_no_args():
-    """Legacy mode with no args shows error."""
+    """No-argument invocation guides users to the canonical command surface."""
     stdout, stderr, code = run_cli()
-    # Should fail with missing migrations_dir
-    assert code != 0
+    assert code == 2
+    assert "usage: sqlfy" in stderr
+    assert "diff-versions" in stderr
 
 
 def test_sqlfy_ng_is_a_deprecated_alias_for_the_canonical_cli():
