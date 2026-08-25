@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from sqlfy.version import get_version
+
 
 def run_cli(*args):
     """Run sqlfy CLI and return (stdout, stderr, returncode)."""
@@ -109,6 +111,14 @@ def test_legacy_mode_no_args():
     assert code == 2
     assert "usage: sqlfy" in stderr
     assert "diff-versions" in stderr
+
+
+def test_version_reports_installed_package_version():
+    """The CLI version must agree with the version in generated metadata."""
+    stdout, stderr, code = run_cli("--version")
+
+    assert code == 0, stderr
+    assert stdout.strip() == f"sqlfy {get_version()}"
 
 
 def test_sqlfy_ng_is_a_deprecated_alias_for_the_canonical_cli():

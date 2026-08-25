@@ -1,4 +1,5 @@
 """Tests for PII column scanner (Feature #23)."""
+
 from __future__ import annotations
 
 import json
@@ -47,7 +48,12 @@ def _build_test_schema():
         full_name="APP.CUSTOMER",
         columns=[
             _make_col("ID", "NUMBER", nullable=False, is_pk=True),
-            _make_col("EMAIL", "VARCHAR(255)", nullable=False, comment="Customer email address"),
+            _make_col(
+                "EMAIL",
+                "VARCHAR(255)",
+                nullable=False,
+                comment="Customer email address",
+            ),
             _make_col("PHONE_NUMBER", "VARCHAR(20)", nullable=True),
             _make_col("FIRST_NAME", "VARCHAR(100)", nullable=True),
             _make_col("LAST_NAME", "VARCHAR(100)", nullable=True),
@@ -92,8 +98,18 @@ def _build_test_schema():
         full_name="APP.ADDRESS",
         columns=[
             _make_col("ID", "NUMBER", nullable=False, is_pk=True),
-            _make_col("ADDR_LINE1", "VARCHAR(255)", nullable=True, comment="Street address line 1"),
-            _make_col("ADDR_LINE2", "VARCHAR(255)", nullable=True, comment="Street address line 2"),
+            _make_col(
+                "ADDR_LINE1",
+                "VARCHAR(255)",
+                nullable=True,
+                comment="Street address line 1",
+            ),
+            _make_col(
+                "ADDR_LINE2",
+                "VARCHAR(255)",
+                nullable=True,
+                comment="Street address line 2",
+            ),
             _make_col("CITY", "VARCHAR(100)", nullable=True),
             _make_col("POSTAL_CODE", "VARCHAR(20)", nullable=True),
             _make_col("STATE", "VARCHAR(50)", nullable=True),
@@ -120,6 +136,7 @@ def _build_test_schema():
         generated_at="2024-01-01T00:00:00Z",
         fingerprint="test_fingerprint",
         dialect="oracle",
+        sqlfy_version="test",
         tables=tables,
         sequences={},
         relationships=[],
@@ -142,7 +159,9 @@ class TestPiiScanner:
         assert len(customer_pii) >= 6
 
         # Should find EMAIL with high confidence
-        email_finding = next((f for f in customer_pii if f.column_name == "EMAIL"), None)
+        email_finding = next(
+            (f for f in customer_pii if f.column_name == "EMAIL"), None
+        )
         assert email_finding is not None
         assert "email" in email_finding.pii_categories
         assert email_finding.confidence == 1.0
@@ -152,7 +171,9 @@ class TestPiiScanner:
         state = _build_test_schema()
         result = scan_pii(state)
 
-        email_finding = next((f for f in result.findings if f.column_name == "EMAIL"), None)
+        email_finding = next(
+            (f for f in result.findings if f.column_name == "EMAIL"), None
+        )
         assert email_finding is not None
         assert email_finding.confidence == 1.0
 
@@ -161,7 +182,9 @@ class TestPiiScanner:
         state = _build_test_schema()
         result = scan_pii(state)
 
-        audit_columns = [f for f in result.findings if f.column_name in ["CREATED_AT", "UPDATED_AT"]]
+        audit_columns = [
+            f for f in result.findings if f.column_name in ["CREATED_AT", "UPDATED_AT"]
+        ]
         assert len(audit_columns) == 0
 
     def test_order_table_no_pii(self):
@@ -180,7 +203,9 @@ class TestPiiScanner:
         address_pii = [f for f in result.findings if f.table_name == "ADDRESS"]
         assert len(address_pii) >= 5
 
-        addr_line1 = next((f for f in address_pii if f.column_name == "ADDR_LINE1"), None)
+        addr_line1 = next(
+            (f for f in address_pii if f.column_name == "ADDR_LINE1"), None
+        )
         assert addr_line1 is not None
         assert "address" in addr_line1.pii_categories
 
@@ -189,7 +214,9 @@ class TestPiiScanner:
         state = _build_test_schema()
         result = scan_pii(state)
 
-        email_finding = next((f for f in result.findings if f.column_name == "EMAIL"), None)
+        email_finding = next(
+            (f for f in result.findings if f.column_name == "EMAIL"), None
+        )
         assert email_finding is not None
         assert "email" in email_finding.pii_categories
 
@@ -199,7 +226,9 @@ class TestPiiScanner:
         extra_patterns = {"custom_id": [r"customer.*id", r"vip.*number"]}
         result = scan_pii(state, extra_patterns)
 
-        custom_findings = [f for f in result.findings if "custom_id" in f.pii_categories]
+        custom_findings = [
+            f for f in result.findings if "custom_id" in f.pii_categories
+        ]
         assert len(custom_findings) >= 1
 
     def test_min_confidence_filtering(self):
@@ -230,6 +259,7 @@ class TestPiiScanner:
             generated_at="2024-01-01T00:00:00Z",
             fingerprint="empty_fingerprint",
             dialect="oracle",
+            sqlfy_version="test",
             tables={},
             sequences={},
             relationships=[],
@@ -265,6 +295,7 @@ class TestPiiScanner:
             generated_at="2024-01-01T00:00:00Z",
             fingerprint="test",
             dialect="oracle",
+            sqlfy_version="test",
             tables={"APP.TEST": table},
             sequences={},
             relationships=[],
@@ -273,7 +304,9 @@ class TestPiiScanner:
             source_files=[],
         )
         result = scan_pii(state)
-        cust_email = next((f for f in result.findings if f.column_name == "CUST_EMAIL"), None)
+        cust_email = next(
+            (f for f in result.findings if f.column_name == "CUST_EMAIL"), None
+        )
         assert cust_email is not None
         assert "email" in cust_email.pii_categories
         assert cust_email.confidence == 0.8
@@ -299,6 +332,7 @@ class TestPiiScanner:
             generated_at="2024-01-01T00:00:00Z",
             fingerprint="test",
             dialect="oracle",
+            sqlfy_version="test",
             tables={"APP.TEST": table},
             sequences={},
             relationships=[],
@@ -307,7 +341,9 @@ class TestPiiScanner:
             source_files=[],
         )
         result = scan_pii(state)
-        addr_line1 = next((f for f in result.findings if f.column_name == "ADDR_LINE1"), None)
+        addr_line1 = next(
+            (f for f in result.findings if f.column_name == "ADDR_LINE1"), None
+        )
         assert addr_line1 is not None
         assert "address" in addr_line1.pii_categories
         assert addr_line1.confidence >= 0.6

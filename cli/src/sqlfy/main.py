@@ -45,6 +45,7 @@ from .commands import (
     cmd_watch,
     legacy_main,
 )
+from .version import get_version
 
 KNOWN_SUBCOMMANDS = {
     "dump", "manifest", "chunks", "diff", "diff-versions", "graph", "graph-migrations", "build-graph",
@@ -60,6 +61,7 @@ KNOWN_SUBCOMMANDS = {
 
 def _subcommand_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sqlfy")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {get_version()}")
     sub = parser.add_subparsers(dest="subcommand", required=True)
 
     def shared(p):
@@ -492,7 +494,7 @@ def main() -> None:
 
     first_positional = next((a for a in argv if not a.startswith("-")), None)
 
-    if first_positional in KNOWN_SUBCOMMANDS or "--help" in argv or "-h" in argv:
+    if first_positional in KNOWN_SUBCOMMANDS or "--help" in argv or "-h" in argv or "--version" in argv:
         args = _subcommand_parser().parse_args(argv)
         _meta = frozenset({'func', 'subcommand'})
         kw = {k: v for k, v in vars(args).items() if k not in _meta}

@@ -1,4 +1,5 @@
 """Tests for manifest/metadata generation."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,7 @@ def test_to_manifest_basic():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="abc123",
         dialect="oracle",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
@@ -58,6 +60,7 @@ def test_to_manifest_includes_migration_history():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="xyz789",
         dialect="postgres",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
@@ -79,8 +82,14 @@ def test_to_manifest_includes_migration_history():
     manifest = json.loads(state.to_manifest())
 
     assert len(manifest["migrationHistory"]) == 2
-    assert manifest["migrationHistory"][0] == {"version": "1", "description": "create users"}
-    assert manifest["migrationHistory"][1] == {"version": "2", "description": "add email"}
+    assert manifest["migrationHistory"][0] == {
+        "version": "1",
+        "description": "create users",
+    }
+    assert manifest["migrationHistory"][1] == {
+        "version": "2",
+        "description": "add email",
+    }
 
 
 def test_to_manifest_empty_state():
@@ -90,6 +99,7 @@ def test_to_manifest_empty_state():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="",
         dialect="oracle",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
@@ -115,6 +125,7 @@ def test_to_manifest_structure():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="test",
         dialect="oracle",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
