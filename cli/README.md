@@ -138,15 +138,19 @@ sqlfy lineage APP.USERS.EMAIL
 ### Natural Language Q&A
 
 ```bash
-# Set API key
-export ANTHROPIC_API_KEY="sk-..."
-
-# Ask a question
+# Ask a question (uses local BM25 retrieval, no API key needed)
 sqlfy ask migrations/ "Which tables have no primary key?"
 
-# Interactive chat
+# Interactive chat (uses local BM25 retrieval, no API key needed)
 sqlfy chat migrations/
+
+# With vector embeddings (experimental) — requires VOYAGE_API_KEY
+export VOYAGE_API_KEY="..."
+sqlfy ask migrations/ "What happens when I delete a user?" --embed
+sqlfy chat migrations/ --embed
 ```
+
+> **Note:** Text generation (Claude) requires `ANTHROPIC_API_KEY`. Vector embeddings (Voyage AI) require `VOYAGE_API_KEY`. These are separate services with separate credentials. The `--embed` flag is experimental.
 
 ## Configuration
 
@@ -154,8 +158,11 @@ sqlfy chat migrations/
 
 The project is configured via `pyproject.toml`:
 
-- **Dependencies**: Core runtime deps (sqlglot, networkx, sqllineage)
-- **Optional dependencies**: `yaml` (PyYAML), `dev` (pytest)
+- **Dependencies**: Core runtime deps (sqlglot, networkx, sqllineage, typer, rich, pydantic, watchdog)
+- **Optional dependencies**:
+  - `yaml` (PyYAML) — for YAML output in `dump` command
+  - `lint` (sqlfluff) — for `lint` command; install with `pip install 'sqlfy-cli[lint]'`
+  - `dev` (pytest, ruff, pyright, etc.) — for development
 - **Entry point**: `sqlfy` command → `sqlfy.main:main`
 
 ### uv.lock
@@ -178,9 +185,9 @@ cli/
 │   ├── core.py          # Schema parsing engine
 │   ├── reconstructor.py # Migration reconstruction
 │   └── main.py          # CLI entry point
-├── tests/               # Test suite (655 tests)
+├── tests/               # Test suite (910 tests)
 ├── pyproject.toml       # Project metadata and dependencies
-├── uv.lock              # Lockfile (148KB, 28 packages)
+├── uv.lock              # Lockfile
 └── README.md            # This file
 ```
 
@@ -188,9 +195,9 @@ cli/
 
 Tests use pytest with comprehensive coverage:
 
-- **655 passing tests, 6 skipped**
+- **910 passing tests, 6 skipped**
 - Coverage: Core parsing, reconstruction, analysis, export, CLI commands
-- Run time: ~2.5s
+- Run time: ~3s
 
 ### Add a new test
 

@@ -114,45 +114,61 @@ sqlfy insights ./sqlite-migrations --dialect sqlite
 
 ## 🛠️ CLI Reference
 
-SQLfy exposes **34 top-level subcommands** (plus `hooks` actions). Start with
-schema reconstruction, inspection, visualization, and change analysis; the
-workflow and experimental commands are available when you need them.
+SQLfy exposes **34 top-level subcommands** (plus `hooks` actions) organized into tiers:
 
+### Core — Schema Reconstruction & Export
 | Subcommand | Description |
 |:---|:---|
 | `dump` | Output the Schema State Dictionary (JSON / YAML) |
 | `manifest` | Output graph manifest/metadata with high-level summary |
 | `chunks` | Output LLM vector context chunks |
-| `diff` | Compare two Schema State Dictionaries or migration directories |
-| `diff-versions` | Compare two version snapshots from the same migration set |
 | `graph` | Graph representation (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML) |
 | `graph-migrations` | Visualize migration timeline and dependency graph |
 | `build-graph` | Build complete `graphify-out/` directory (unified all-in-one) |
-| `rollback-analysis` | Analyze rollback feasibility and generate rollback scripts |
-| `lint` | Lint migration SQL for quality and style using sqlfluff |
+| `query` | Deterministic graph queries (tables, columns, FK paths, cycles) |
+| `export` | Export schema as self-contained HTML documentation |
+
+### Analysis — Schema Quality & Change Impact
+| Subcommand | Description |
+|:---|:---|
 | `insights` | Analyse schema and report findings (orphan tables, missing PKs) |
 | `health` | Generate migration folder health report with quality score |
 | `simulate` | Simulate schema evolution with hypothetical migrations |
 | `integrity` | Check migration file integrity using SHA256 hashes |
 | `provenance` | Collect git provenance for migration files |
-| `cache` | Manage file-based caching system |
-| `ask` | Ask a natural language question about the schema (RAG) |
-| `chat` | Interactive multi-turn schema chat session |
-| `export` | Export schema as self-contained HTML documentation |
-| `query` | Deterministic graph queries (tables, columns, FK paths, cycles) |
-| `impact` | Analyze impact of schema object changes using graph traversal |
+| `rollback-analysis` | Analyze rollback feasibility and generate rollback scripts |
+| `cost` | Estimate migration execution cost and category |
 | `lineage` | Column-level lineage and data flow analysis |
 | `domains` | Detect semantic business domains using community detection |
 | `stability` | Calculate schema stability metrics and churn rates |
+| `classify` | Classify migrations by semantic category |
+| `safety` | Score migrations by safety level (SAFE / HIGH_RISK / DANGEROUS) |
+| `pii-scan` | Scan schema columns for PII patterns (GDPR/CCPA compliance) |
+| `impact` | Analyze impact of schema object changes using graph traversal |
+
+### Migration Management — Validation & Maintenance
+| Subcommand | Description |
+|:---|:---|
 | `validate` | Validate migration ordering and detect issues |
 | `deps` | Analyze migration dependencies and detect circular dependencies |
 | `drift` | Detect schema drift between folders and generate repair SQL |
-| `classify` | Classify migrations by semantic category |
 | `naming` | Enforce migration filename naming conventions |
-| `cost` | Estimate migration execution cost and category |
-| `safety` | Score migrations by safety level (SAFE / HIGH_RISK / DANGEROUS) |
-| `pii-scan` | Scan schema columns for PII patterns (GDPR/CCPA compliance) |
+| `lint` | Lint migration SQL for quality and style using sqlfluff |
+
+### Workflow — Caching & Automation
+| Subcommand | Description |
+|:---|:---|
+| `diff` | Compare two Schema State Dictionaries or migration directories |
+| `diff-versions` | Compare two version snapshots from the same migration set |
+| `cache` | Manage file-based caching system |
 | `watch` | Auto-rebuild analysis when migration files change |
+| `hooks` | Manage git pre-commit hooks for SQL linting and safety checks |
+
+### Experimental — LLM-Powered Q&A
+| Subcommand | Description |
+|:---|:---|
+| `ask` | Ask a natural language question about the schema (RAG) |
+| `chat` | Interactive multi-turn schema chat session |
 
 > Use `sqlfy <subcommand> --help` for detailed usage and flags.
 
@@ -161,8 +177,10 @@ workflow and experimental commands are available when you need them.
 ## 🤖 LLM Usage & RAG Chunks
 
 > [!IMPORTANT]
-> **Vector embeddings require an API key.**
-> The `ask` and `chat` subcommands support a `--embed` flag switching from local BM25 to dense vector search via [Voyage AI](https://voyageai.com) (`voyage-3`, via Anthropic API). Set `ANTHROPIC_API_KEY` in your environment. Without `--embed`, retrieval uses zero-config local BM25.
+> **Vector embeddings require an API key (experimental).**
+> The `ask` and `chat` subcommands support a `--embed` flag switching from local BM25 to dense vector search via [Voyage AI](https://voyageai.com) (`voyage-3` model). This feature is experimental and currently requires a `VOYAGE_API_KEY` environment variable (not `ANTHROPIC_API_KEY`). Without `--embed`, retrieval uses zero-config local BM25 which works offline with no API key.
+>
+> **Text generation** (Claude via Anthropic) requires `ANTHROPIC_API_KEY`. **Embeddings** (Voyage AI) require `VOYAGE_API_KEY`. These are separate services with separate credentials.
 
 ### Sample Table Chunk Output
 ```
