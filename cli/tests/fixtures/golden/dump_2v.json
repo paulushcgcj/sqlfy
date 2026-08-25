@@ -1,0 +1,168 @@
+{
+  "version": "2",
+  "generatedAt": "2026-08-25T23:49:21.786352Z",
+  "fingerprint": "7d7484379730105f",
+  "dialect": "oracle",
+  "sqlfyVersion": "0.20.0",
+  "tables": {
+    "APP.USERS": {
+      "schema": "APP",
+      "name": "USERS",
+      "fullName": "APP.USERS",
+      "columns": [
+        {
+          "name": "ID",
+          "dataType": "NUMBER",
+          "rawType": "NUMBER",
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "isPk": true,
+          "isFk": false,
+          "isUnique": false,
+          "comment": null
+        },
+        {
+          "name": "EMAIL",
+          "dataType": "VARCHAR(255)",
+          "rawType": "VARCHAR",
+          "precision": 255,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "isPk": false,
+          "isFk": false,
+          "isUnique": false,
+          "comment": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "PK_USERS",
+          "type": "primary_key",
+          "columns": [
+            "ID"
+          ],
+          "refTable": null,
+          "refColumns": null,
+          "onDelete": null,
+          "checkExpr": null
+        }
+      ],
+      "indexes": [],
+      "comment": null,
+      "createdIn": "1",
+      "modifiedIn": [],
+      "columnCount": 2,
+      "hasPk": true,
+      "pkColumns": [
+        "ID"
+      ]
+    },
+    "APP.ORDERS": {
+      "schema": "APP",
+      "name": "ORDERS",
+      "fullName": "APP.ORDERS",
+      "columns": [
+        {
+          "name": "ID",
+          "dataType": "NUMBER",
+          "rawType": "NUMBER",
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "isPk": true,
+          "isFk": false,
+          "isUnique": false,
+          "comment": null
+        },
+        {
+          "name": "USER_ID",
+          "dataType": "NUMBER",
+          "rawType": "NUMBER",
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "isPk": false,
+          "isFk": true,
+          "isUnique": false,
+          "comment": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "PK_ORDERS",
+          "type": "primary_key",
+          "columns": [
+            "ID"
+          ],
+          "refTable": null,
+          "refColumns": null,
+          "onDelete": null,
+          "checkExpr": null
+        },
+        {
+          "name": "FK_ORDERS_USER",
+          "type": "foreign_key",
+          "columns": [
+            "USER_ID"
+          ],
+          "refTable": "APP.USERS",
+          "refColumns": [
+            "ID"
+          ],
+          "onDelete": null,
+          "checkExpr": null
+        }
+      ],
+      "indexes": [],
+      "comment": null,
+      "createdIn": "2",
+      "modifiedIn": [],
+      "columnCount": 2,
+      "hasPk": true,
+      "pkColumns": [
+        "ID"
+      ]
+    }
+  },
+  "sequences": {},
+  "relationships": [
+    {
+      "id": "APP.ORDERS→APP.USERS:FK_ORDERS_USER",
+      "fromTable": "APP.ORDERS",
+      "fromColumns": [
+        "USER_ID"
+      ],
+      "toTable": "APP.USERS",
+      "toColumns": [
+        "ID"
+      ],
+      "constraintName": "FK_ORDERS_USER",
+      "onDelete": null,
+      "cardinality": "many_to_one"
+    }
+  ],
+  "migrationHistory": [
+    {
+      "version": "1",
+      "description": "create users"
+    },
+    {
+      "version": "2",
+      "description": "create orders"
+    }
+  ],
+  "stats": {
+    "table_count": 2,
+    "column_count": 4,
+    "sequence_count": 0,
+    "relationship_count": 1,
+    "index_count": 0,
+    "tables_without_pk": 0,
+    "migration_count": 2
+  }
+}

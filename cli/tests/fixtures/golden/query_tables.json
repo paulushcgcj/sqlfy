@@ -1,0 +1,42 @@
+{
+  "query": "SELECT tables WHERE ALL",
+  "count": 2,
+  "columns": [
+    "table",
+    "schema",
+    "columns",
+    "has_pk",
+    "fk_out",
+    "fk_in",
+    "is_orphan",
+    "created_in",
+    "comment"
+  ],
+  "rows": [
+    {
+      "table": "APP.USERS",
+      "schema": "APP",
+      "columns": 2,
+      "has_pk": "✓",
+      "fk_out": 0,
+      "fk_in": 1,
+      "is_orphan": "",
+      "created_in": "V1",
+      "modified_in": "",
+      "comment": ""
+    },
+    {
+      "table": "APP.ORDERS",
+      "schema": "APP",
+      "columns": 2,
+      "has_pk": "✓",
+      "fk_out": 1,
+      "fk_in": 0,
+      "is_orphan": "",
+      "created_in": "V2",
+      "modified_in": "",
+      "comment": ""
+    }
+  ],
+  "meta": {}
+}
