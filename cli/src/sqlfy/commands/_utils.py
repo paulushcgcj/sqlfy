@@ -1,10 +1,13 @@
 """Shared utilities for sqlfy CLI commands."""
+
 from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
 
+from ..contracts import get_contract
+from ..contracts.registry import CONTRACTS
 from ..domain.models import SchemaGraph, VectorChunk
 from ..domain.schema_state import type_str
 from ..migrations.loader import load_files as _migrations_load_files
@@ -17,7 +20,6 @@ def load_files(
 ) -> list[dict]:
     """Load migration files. Delegates to sqlfy.migrations.loader."""
     return _migrations_load_files(migrations_dir, json_input, use_cache=use_cache)
-
 
 
 def write_output(content: str, out: str | None) -> None:
@@ -60,7 +62,9 @@ def format_human_graph(graph: SchemaGraph) -> str:
         if out_e:
             a("  │  References:")
             for e in out_e:
-                a(f"  │    {','.join(e.from_cols)} → {e.to_table}({','.join(e.to_cols)})")
+                a(
+                    f"  │    {','.join(e.from_cols)} → {e.to_table}({','.join(e.to_cols)})"
+                )
         if in_e:
             a("  │  Referenced by:")
             for e in in_e:
@@ -73,7 +77,9 @@ def format_human_graph(graph: SchemaGraph) -> str:
     a(f"\nRelationships ({len(graph.edges)}):")
     for e in graph.edges:
         od = f"  [ON DELETE {e.on_delete}]" if e.on_delete else ""
-        a(f"  {e.from_table}.{','.join(e.from_cols)}  →  {e.to_table}.{','.join(e.to_cols)}{od}")
+        a(
+            f"  {e.from_table}.{','.join(e.from_cols)}  →  {e.to_table}.{','.join(e.to_cols)}{od}"
+        )
     a("")
     return "\n".join(lines)
 
@@ -98,9 +104,15 @@ def format_human_chunks(chunks: list[VectorChunk]) -> str:
 def graph_to_dict(graph: SchemaGraph) -> dict:
     def col_d(c):
         return {
-            "name": c.name, "type": c.type, "precision": c.precision,
-            "scale": c.scale, "nullable": c.nullable, "default": c.default,
-            "primary_key": c.primary_key, "unique": c.unique, "references": c.references,
+            "name": c.name,
+            "type": c.type,
+            "precision": c.precision,
+            "scale": c.scale,
+            "nullable": c.nullable,
+            "default": c.default,
+            "primary_key": c.primary_key,
+            "unique": c.unique,
+            "references": c.references,
         }
 
     def con_d(c):
@@ -112,14 +124,24 @@ def graph_to_dict(graph: SchemaGraph) -> dict:
         return d
 
     return {
-        "migration_history": [{"version": m.version, "description": m.description} for m in graph.mig_hist],
+        "migration_history": [
+            {"version": m.version, "description": m.description} for m in graph.mig_hist
+        ],
         "tables": {
             k: {
-                "id": t.id, "schema": t.schema, "name": t.name, "full": t.full,
+                "id": t.id,
+                "schema": t.schema,
+                "name": t.name,
+                "full": t.full,
                 "columns": [col_d(c) for c in t.columns],
                 "constraints": [con_d(c) for c in t.constraints],
                 "indexes": [
-                    {"name": i.name, "columns": i.columns, "unique": i.unique, "created_in": i.created_in}
+                    {
+                        "name": i.name,
+                        "columns": i.columns,
+                        "unique": i.unique,
+                        "created_in": i.created_in,
+                    }
                     for i in t.indexes
                 ],
                 "comments": t.comments,
@@ -130,16 +152,24 @@ def graph_to_dict(graph: SchemaGraph) -> dict:
         },
         "sequences": {
             k: {
-                "name": s.name, "schema": s.schema, "full": s.full,
-                "start_with": s.start_with, "increment_by": s.increment_by, "created_in": s.created_in,
+                "name": s.name,
+                "schema": s.schema,
+                "full": s.full,
+                "start_with": s.start_with,
+                "increment_by": s.increment_by,
+                "created_in": s.created_in,
             }
             for k, s in graph.seqs.items()
         },
         "edges": [
             {
-                "id": e.id, "from_table": e.from_table, "from_cols": e.from_cols,
-                "to_table": e.to_table, "to_cols": e.to_cols,
-                "constraint_name": e.constraint_name, "on_delete": e.on_delete,
+                "id": e.id,
+                "from_table": e.from_table,
+                "from_cols": e.from_cols,
+                "to_table": e.to_table,
+                "to_cols": e.to_cols,
+                "constraint_name": e.constraint_name,
+                "on_delete": e.on_delete,
             }
             for e in graph.edges
         ],
@@ -148,11 +178,18 @@ def graph_to_dict(graph: SchemaGraph) -> dict:
 
 def chunks_to_list(chunks: list[VectorChunk]) -> list[dict]:
     from ..models import VectorChunk as _VectorChunk
+
     return [
-        json.loads(_VectorChunk(
-            id=c.id, type=c.type, title=c.title,
-            content=c.content, metadata=c.meta, hint=c.hint,
-        ).model_dump_json(by_alias=True))
+        json.loads(
+            _VectorChunk(
+                id=c.id,
+                type=c.type,
+                title=c.title,
+                content=c.content,
+                metadata=c.meta,
+                hint=c.hint,
+            ).model_dump_json(by_alias=True)
+        )
         for c in chunks
     ]
 
@@ -209,7 +246,9 @@ def format_state_summary(state) -> str:
     a(f"\n  Relationships ({len(state.relationships)}):")
     for r in state.relationships:
         od = f"  ON DELETE {r.on_delete}" if r.on_delete else ""
-        a(f"    {r.from_table}.{r.from_columns} → {r.to_table}.{r.to_columns}  [{r.cardinality}]{od}")
+        a(
+            f"    {r.from_table}.{r.from_columns} → {r.to_table}.{r.to_columns}  [{r.cardinality}]{od}"
+        )
     orphans = state.orphan_tables()
     no_pk = state.tables_without_pk()
     if orphans or no_pk:
@@ -228,3 +267,34 @@ def parse_bool(val: object) -> bool | None:
     if isinstance(val, bool):
         return val
     return str(val).lower() in ("1", "true", "yes")
+
+
+def validate_json_output(command: str, json_str: str) -> tuple[bool, str | None]:
+    """Validate JSON output against the registered contract for a command.
+
+    Returns (is_valid, error_message). If no contract is registered for the
+    command, returns (True, None) to allow unvalidated output.
+    """
+    # Find the contract for this command
+    entries = [e for e in CONTRACTS.values() if e.command == command]
+    if not entries:
+        return True, None  # No contract registered, skip validation
+
+    # Use the latest (non-deprecated) version
+    latest = entries[0]
+    for e in entries:
+        if (not e.deprecated and latest.deprecated) or (
+            e.deprecated == latest.deprecated and e.version > latest.version
+        ):
+            latest = e
+
+    try:
+        # Parse the JSON
+        data = json.loads(json_str)
+        # Validate against the contract model
+        latest.model_class.model_validate(data)
+        return True, None
+    except json.JSONDecodeError as e:
+        return False, f"Invalid JSON: {e}"
+    except Exception as e:
+        return False, f"Contract validation failed for {latest.key}: {e}"

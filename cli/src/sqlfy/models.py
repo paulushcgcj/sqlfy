@@ -111,6 +111,21 @@ class Findings(BaseModel):
     info: list[InsightFinding] = Field(..., description='Info findings.')
 
 
+class Diagnostics(BaseModel):
+    """
+    Reconstruction diagnostics summary.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+        populate_by_name=True,
+    )
+    total: int = Field(..., description='Total diagnostic count.')
+    errors: int = Field(..., description='Error diagnostic count.')
+    warnings: int = Field(..., description='Warning diagnostic count.')
+    infos: int = Field(..., description='Info diagnostic count.')
+
+
 class GodTableFinding(BaseModel):
     """
     A table with abnormally high FK degree (god table).
@@ -897,4 +912,7 @@ class InsightsResult(BaseModel):
         None,
         alias='surprisingJoins',
         description='Cross-community FK edges sorted by surprise score descending.',
+    )
+    diagnostics: Diagnostics | None = Field(
+        None, description='Reconstruction diagnostics summary.'
     )

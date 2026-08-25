@@ -94,6 +94,19 @@
           "type": "array",
           "items": { "$ref": "#/$defs/SurprisingJoinFinding" },
           "readOnly": true
+        },
+        "diagnostics": {
+          "description": "Reconstruction diagnostics summary.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "errors", "warnings", "infos"],
+          "properties": {
+            "total":   { "description": "Total diagnostic count.", "type": "integer", "readOnly": true },
+            "errors":  { "description": "Error diagnostic count.", "type": "integer", "readOnly": true },
+            "warnings": { "description": "Warning diagnostic count.", "type": "integer", "readOnly": true },
+            "infos":   { "description": "Info diagnostic count.", "type": "integer", "readOnly": true }
+          },
+          "readOnly": true
         }
       }
     },
