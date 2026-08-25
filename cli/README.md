@@ -177,7 +177,7 @@ cli/
 │   ├── output/          # Export and visualization
 │   ├── core.py          # Schema parsing engine
 │   ├── reconstructor.py # Migration reconstruction
-│   └── main.py          # CLI entry point (302 lines)
+│   └── main.py          # CLI entry point
 ├── tests/               # Test suite (655 tests)
 ├── pyproject.toml       # Project metadata and dependencies
 ├── uv.lock              # Lockfile (148KB, 28 packages)

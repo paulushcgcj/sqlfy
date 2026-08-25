@@ -114,7 +114,9 @@ sqlfy insights ./sqlite-migrations --dialect sqlite
 
 ## 🛠️ CLI Reference
 
-SQLfy features **33 powerful subcommands** covering schema analysis, graph queries, linting, RAG Q&A, and safety audits:
+SQLfy exposes **34 top-level subcommands** (plus `hooks` actions). Start with
+schema reconstruction, inspection, visualization, and change analysis; the
+workflow and experimental commands are available when you need them.
 
 | Subcommand | Description |
 |:---|:---|
@@ -225,4 +227,4 @@ python -m sqlfy ./samples # run directly without installation
 
 ## 📜 License
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+Distributed under the **GNU GPL v3.0 License**. See [LICENSE](LICENSE) for details.
