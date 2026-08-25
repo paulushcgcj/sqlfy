@@ -1,8 +1,10 @@
 """Integration tests for CLI command modules."""
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
+from pathlib import Path
 
 
 def run_cli(*args):
@@ -13,6 +15,25 @@ def run_cli(*args):
         text=True,
     )
     return result.stdout, result.stderr, result.returncode
+
+
+def write_migrations(directory: Path) -> None:
+    """Write a small Flyway fixture for subprocess-level CLI tests."""
+    (directory / "V1__create_users.sql").write_text(
+        """CREATE TABLE app.users (
+            id NUMBER PRIMARY KEY,
+            email VARCHAR2(255) NOT NULL UNIQUE
+        );""",
+        encoding="utf-8",
+    )
+    (directory / "V2__create_orders.sql").write_text(
+        """CREATE TABLE app.orders (
+            id NUMBER PRIMARY KEY,
+            user_id NUMBER NOT NULL,
+            CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES app.users(id)
+        );""",
+        encoding="utf-8",
+    )
 
 
 def test_dump_help():
@@ -77,3 +98,45 @@ def test_legacy_mode_no_args():
     stdout, stderr, code = run_cli()
     # Should fail with missing migrations_dir
     assert code != 0
+
+
+def test_dump_json_executes_full_cli_pipeline(tmp_path):
+    """dump must execute parsing/reconstruction and emit machine-readable JSON."""
+    write_migrations(tmp_path)
+
+    stdout, stderr, code = run_cli("dump", str(tmp_path), "--format", "json")
+
+    assert code == 0, stderr
+    state = json.loads(stdout)
+    assert set(state["tables"]) == {"APP.USERS", "APP.ORDERS"}
+    assert state["stats"]["table_count"] == 2
+
+
+def test_manifest_and_query_execute_full_cli_pipeline(tmp_path):
+    """Core discovery commands must work through the public parser entry point."""
+    write_migrations(tmp_path)
+
+    stdout, stderr, code = run_cli("manifest", str(tmp_path), "--format", "json")
+    assert code == 0, stderr
+    assert json.loads(stdout)["tableCount"] == 2
+
+    stdout, stderr, code = run_cli(
+        "query", str(tmp_path), "fk-path", "--from-table", "APP.ORDERS",
+        "--to-table", "APP.USERS", "--format", "json",
+    )
+    assert code == 0, stderr
+    assert json.loads(stdout)["meta"]["length"] == 1
+
+
+def test_diff_versions_executes_full_cli_pipeline(tmp_path):
+    """Version comparison must use the same public CLI path as users."""
+    write_migrations(tmp_path)
+
+    stdout, stderr, code = run_cli(
+        "diff-versions", str(tmp_path), "--from", "1", "--to", "2", "--format", "json",
+    )
+
+    assert code == 0, stderr
+    diff = json.loads(stdout)
+    assert diff["stats"]["tablesAdded"] == 1
+    assert diff["tableChanges"][0]["fullName"] == "APP.ORDERS"

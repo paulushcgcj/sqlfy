@@ -104,7 +104,11 @@ def _subcommand_parser() -> argparse.ArgumentParser:
 
     # diff-versions
     p = sub.add_parser("diff-versions", help="Compare two version snapshots from one migration set")
-    shared(p)
+    p.add_argument("migrations_dir", nargs="?")
+    p.add_argument("--json-input", metavar="FILE")
+    p.add_argument("--out", metavar="FILE")
+    p.add_argument("--dialect", default="oracle",
+                   help="SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)")
     p.add_argument("--from", dest="from_version", metavar="VERSION", help="Base version (default: latest)")
     p.add_argument("--to", dest="to_version", metavar="VERSION", help="Target version (default: latest)")
     p.add_argument("--format", choices=["json", "text"], default="json")
