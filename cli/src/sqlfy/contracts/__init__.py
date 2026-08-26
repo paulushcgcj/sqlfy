@@ -23,6 +23,7 @@ convenience.  Domain sub-packages are also importable directly:
 
 from __future__ import annotations
 
+from .analysis.pii_v1 import PiiScanV1
 from .analysis.v1 import HealthV1, InsightsV1
 from .chunks.v1 import ChunksV1
 from .common.base import ContractBase
@@ -51,6 +52,7 @@ __all__ = [
     # Analysis
     "InsightsV1",
     "HealthV1",
+    "PiiScanV1",
     # Chunks
     "ChunksV1",
     # Impact
