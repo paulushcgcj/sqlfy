@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/readme/hero.svg" alt="SQLfy Schema Graph Engine Hero" width="100%" />
+<img src="https://raw.githubusercontent.com/paulushcgcj/sqlfy/HEAD/assets/readme/hero.svg" alt="SQLfy Schema Graph Engine Hero" width="100%" />
 
 # SQLfy
 
@@ -10,14 +10,29 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/sqlfy-cli.svg)](https://pypi.org/project/sqlfy-cli/)
 [![CI](https://github.com/paulushcgcj/sqlfy/actions/workflows/ci.yml/badge.svg)](https://github.com/paulushcgcj/sqlfy/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
-[![React 19 & Tauri 2](https://img.shields.io/badge/desktop-React%2019%20%2B%20Tauri%202-cyan)](app/)
+[![Desktop: React 19 + Tauri 2](https://img.shields.io/badge/desktop-React%2019%20%2B%20Tauri%202-cyan)](app/)
 [![Tests](https://img.shields.io/badge/tests-140%2B%20pytest-success)](cli/tests/)
 
 </div>
 
 ---
 
-## ⚡ What is SQLfy?
+## Table of Contents
+
+- [What is SQLfy?](#what-is-sqlfy)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [How It Works](#how-it-works)
+- [Multi-Dialect Support](#multi-dialect-support)
+- [CLI Reference](#cli-reference)
+- [LLM Usage & RAG Chunks](#llm-usage--rag-chunks)
+- [Repository Structure](#repository-structure)
+- [Development](#development)
+- [License](#license)
+
+---
+
+## What is SQLfy?
 
 SQLfy reads a set of Flyway migration files in version order (`V1__`, `V2__`, …), parses each DDL statement into an abstract syntax tree via **SQLGlot**, and reconstructs the **final state** of your database schema. From that state, it provides:
 
@@ -28,7 +43,14 @@ SQLfy reads a set of Flyway migration files in version order (`V1__`, `V2__`, �
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
+
+The fastest path is the Python CLI — install it and point it at a folder of migrations:
+
+```bash
+pip install sqlfy-cli
+sqlfy-cli ./samples      # human-readable schema summary from the bundled samples
+```
 
 ### Desktop App (React + Vite + Tauri)
 
@@ -39,19 +61,11 @@ npm run dev          # Vite dev server (browser)
 npx tauri dev        # Tauri desktop window
 ```
 
-The app comes pre-loaded with sample Oracle DDL. Drop your own Flyway migration files or add them via **+ Add Migration File**, then click **▶ Parse →**.
-
-### Python CLI
-
-```bash
-cd cli
-pip install .        # install package
-sqlfy-cli ./samples  # run human-readable schema summary
-```
+The app ships pre-loaded with sample Oracle DDL. Drop your own Flyway migration files or add them via **+ Add Migration File**, then click **▶ Parse →**.
 
 ---
 
-## 📥 Installation
+## Installation
 
 **Mac / Linux**
 ```bash
@@ -76,23 +90,17 @@ uv tool install sqlfy-cli
 
 ---
 
-## 🔄 How It Works
+## How It Works
 
-<div align="center">
-<img src="assets/readme/architecture.gif" alt="SQLfy Architecture & Processing Pipeline" width="100%" />
-</div>
-
-```
-Flyway SQL files  →  sqlglot AST  →  Reconstructor  →  Schema Graph State  →  LLM Chunks / ERDs
-```
+<img src="https://raw.githubusercontent.com/paulushcgcj/sqlfy/HEAD/assets/readme/pipeline.svg" alt="SQLfy processing pipeline: Flyway SQL, sqlglot AST, Reconstructor, Schema Graph State, and LLM/ERD exports" width="100%" />
 
 1. **Parsing:** DDL statements are parsed using [sqlglot](https://github.com/tobymao/sqlglot) for robust multi-dialect AST fidelity.
-2. **Reconstruction:** Incremental state engine applies creates, alters drops, and renames in exact version order.
+2. **Reconstruction:** An incremental state engine applies creates, alters, drops, and renames in exact version order.
 3. **Analysis & Export:** Builds a serializable `SchemaState` snapshot powering the UI, CLI tools, insights engine, and RAG context generator.
 
 ---
 
-## 🌐 Multi-Dialect Support
+## Multi-Dialect Support
 
 SQLfy supports multiple SQL dialects with automatic type normalization:
 
@@ -112,9 +120,20 @@ sqlfy insights ./sqlite-migrations --dialect sqlite
 
 ---
 
-## 🛠️ CLI Reference
+## CLI Reference
 
-SQLfy exposes **34 top-level subcommands** (plus `hooks` actions) organized into tiers:
+SQLfy exposes **34 top-level subcommands** (plus `hooks` actions). The commands you'll reach for most often:
+
+| Command | What it does |
+|:---|:---|
+| `sqlfy dump <dir>` | Output the Schema State Dictionary (JSON / YAML) |
+| `sqlfy graph <dir> --format mermaid` | Render an ERD / graph |
+| `sqlfy chunks <dir>` | Emit LLM-ready RAG context chunks |
+| `sqlfy insights <dir>` | Report orphan tables, missing PKs, safety score |
+| `sqlfy validate <dir>` | Validate migration ordering and detect issues |
+
+<details>
+<summary><strong>Full command reference (34 subcommands)</strong></summary>
 
 ### Core — Schema Reconstruction & Export
 | Subcommand | Description |
@@ -174,9 +193,11 @@ SQLfy exposes **34 top-level subcommands** (plus `hooks` actions) organized into
 
 > Use `sqlfy <subcommand> --help` for detailed usage and flags.
 
+</details>
+
 ---
 
-## 🤖 LLM Usage & RAG Chunks
+## LLM Usage & RAG Chunks
 
 > [!IMPORTANT]
 > **Vector embeddings require an API key (experimental).**
@@ -205,7 +226,7 @@ INDEXES:
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 sqlfy/
@@ -223,7 +244,7 @@ sqlfy/
 
 ---
 
-## 🏗️ Development
+## Development
 
 ### Desktop App
 ```bash
@@ -245,6 +266,6 @@ python -m sqlfy ./samples # run directly without installation
 
 ---
 
-## 📜 License
+## License
 
 Distributed under the **GNU GPL v3.0 License**. See [LICENSE](LICENSE) for details.
