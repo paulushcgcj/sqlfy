@@ -94,6 +94,19 @@
           "type": "array",
           "items": { "$ref": "#/$defs/SurprisingJoinFinding" },
           "readOnly": true
+        },
+        "diagnostics": {
+          "description": "Reconstruction diagnostics summary.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "errors", "warnings", "infos"],
+          "properties": {
+            "total":   { "description": "Total diagnostic count.", "type": "integer", "readOnly": true },
+            "errors":  { "description": "Error diagnostic count.", "type": "integer", "readOnly": true },
+            "warnings": { "description": "Warning diagnostic count.", "type": "integer", "readOnly": true },
+            "infos":   { "description": "Info diagnostic count.", "type": "integer", "readOnly": true }
+          },
+          "readOnly": true
         }
       }
     },
@@ -537,12 +550,13 @@
       "description": "Full response from sqlfy dump --format json.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["version","generatedAt","fingerprint","dialect","tables","sequences","relationships","migrationHistory","stats"],
+      "required": ["version","generatedAt","fingerprint","dialect","sqlfyVersion","tables","sequences","relationships","migrationHistory","stats"],
       "properties": {
         "version":          { "description": "Latest migration version.",            "type": "string", "readOnly": true },
         "generatedAt":      { "description": "ISO-8601 generation timestamp.",       "type": "string", "readOnly": true },
         "fingerprint":      { "description": "SHA-256 fingerprint.",                 "type": "string", "readOnly": true },
         "dialect":          { "description": "SQL dialect.",                         "type": "string", "readOnly": true },
+        "sqlfyVersion":     { "description": "sqlfy tool version.",                  "type": "string", "readOnly": true },
         "tables":           { "description": "Tables keyed by full name.", "type": "object", "additionalProperties": { "$ref": "#/$defs/TableState" }, "readOnly": true },
         "sequences":        { "description": "Sequences keyed by full name.", "type": "object", "additionalProperties": { "$ref": "#/$defs/SequenceState" }, "readOnly": true },
         "relationships":    { "description": "All FK relationships.", "type": "array", "items": { "$ref": "#/$defs/RelationshipState" }, "readOnly": true },

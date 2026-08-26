@@ -1,9 +1,11 @@
 """Tests for manifest/metadata generation."""
+
 from __future__ import annotations
 
 import json
 
 from sqlfy.domain.schema_state import MigrationStep, SchemaState
+from sqlfy.version import get_version
 
 
 def test_to_manifest_basic():
@@ -13,6 +15,7 @@ def test_to_manifest_basic():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="abc123",
         dialect="oracle",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
@@ -38,7 +41,7 @@ def test_to_manifest_basic():
     assert manifest["fingerprint"] == "abc123"
     assert manifest["dialect"] == "oracle"
     assert manifest["generatedAt"] == "2026-05-26T10:00:00Z"
-    assert "sqlfyVersion" in manifest
+    assert manifest["sqlfyVersion"] == get_version()
     assert manifest["nodeCount"] == 7  # tables + sequences
     assert manifest["edgeCount"] == 8  # relationships
     assert manifest["tableCount"] == 5
@@ -57,6 +60,7 @@ def test_to_manifest_includes_migration_history():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="xyz789",
         dialect="postgres",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
@@ -78,8 +82,14 @@ def test_to_manifest_includes_migration_history():
     manifest = json.loads(state.to_manifest())
 
     assert len(manifest["migrationHistory"]) == 2
-    assert manifest["migrationHistory"][0] == {"version": "1", "description": "create users"}
-    assert manifest["migrationHistory"][1] == {"version": "2", "description": "add email"}
+    assert manifest["migrationHistory"][0] == {
+        "version": "1",
+        "description": "create users",
+    }
+    assert manifest["migrationHistory"][1] == {
+        "version": "2",
+        "description": "add email",
+    }
 
 
 def test_to_manifest_empty_state():
@@ -89,6 +99,7 @@ def test_to_manifest_empty_state():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="",
         dialect="oracle",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],
@@ -114,6 +125,7 @@ def test_to_manifest_structure():
         generated_at="2026-05-26T10:00:00Z",
         fingerprint="test",
         dialect="oracle",
+        sqlfy_version="test",
         tables={},
         sequences={},
         relationships=[],

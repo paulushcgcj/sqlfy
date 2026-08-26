@@ -1,6 +1,11 @@
-"""sqlfy.contracts.graph — graph command public contracts."""
+"""
+sqlfy.contracts.graph
+======================
+Graph contracts package.
+"""
+
 from __future__ import annotations
 
-from .v1 import GraphManifestV1
+from .v1 import GraphManifestV1, GraphOutputV1
 
-__all__ = ["GraphManifestV1"]
+__all__ = ["GraphManifestV1", "GraphOutputV1"]

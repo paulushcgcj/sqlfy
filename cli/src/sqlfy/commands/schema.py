@@ -1,4 +1,5 @@
 """Schema state, chunks, and export commands."""
+
 from __future__ import annotations
 
 import json
@@ -8,13 +9,19 @@ from ..analysis.insights import InsightsEngine
 from ..domain.schema_state import SchemaStateBuilder
 from ..output.chunker import build_chunks
 from ..output.exporter import Exporter
-from ..reconstructor import reconstruct, reconstruct_at
+from ..reconstructor import (
+    ReconstructionError,
+    Reconstructor,
+    reconstruct,
+    reconstruct_at,
+)
 from ._utils import (
     chunks_to_list,
     format_human_chunks,
     format_state_summary,
     graph_to_dict,
     load_files,
+    validate_json_output,
     write_output,
 )
 
@@ -27,24 +34,38 @@ def cmd_dump(
     at: str | None = None,
     format: str = "json",
     out: str | None = None,
+    strict: bool = False,
 ) -> None:
     """Output the Schema State Dictionary as JSON, YAML, or human summary."""
     files = load_files(migrations_dir, json_input)
-    graph = (
-        reconstruct_at(files, version=at, dialect=dialect)
-        if at
-        else reconstruct(files, dialect=dialect)
-    )
+    try:
+        reconstructor = Reconstructor(dialect=dialect, strict=strict)
+        graph = (
+            reconstructor.apply_up_to(files, at)
+            if at
+            else reconstructor.apply_all(files)
+        )
+    except ReconstructionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     state = SchemaStateBuilder.from_graph(graph)
     fmt = (format or "json").lower()
     if fmt == "yaml":
         output = state.to_yaml()
     elif fmt == "json":
         output = state.to_json()
+        # Validate against contract before output
+        valid, err = validate_json_output("dump", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
     elif fmt == "summary":
         output = format_state_summary(state)
     else:
-        print(f'Error: unknown format "{fmt}". Choose json, yaml, or summary.', file=sys.stderr)
+        print(
+            f'Error: unknown format "{fmt}". Choose json, yaml, or summary.',
+            file=sys.stderr,
+        )
         sys.exit(1)
     write_output(output, out)
 
@@ -57,18 +78,25 @@ def cmd_manifest(
     at: str | None = None,
     format: str = "json",
     out: str | None = None,
+    strict: bool = False,
 ) -> None:
     """Output graph manifest with high-level metadata."""
     files = load_files(migrations_dir, json_input)
-    graph = (
-        reconstruct_at(files, version=at, dialect=dialect)
-        if at
-        else reconstruct(files, dialect=dialect)
-    )
+    try:
+        reconstructor = Reconstructor(dialect=dialect, strict=strict)
+        graph = (
+            reconstructor.apply_up_to(files, at)
+            if at
+            else reconstructor.apply_all(files)
+        )
+    except ReconstructionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     state = SchemaStateBuilder.from_graph(graph)
     fmt = (format or "json").lower()
     if fmt == "text":
         import json as _json
+
         data = _json.loads(state.to_manifest())
         lines = [
             f"Schema Version  : {data.get('schemaVersion', '-')}",
@@ -86,6 +114,11 @@ def cmd_manifest(
         output = "\n".join(lines)
     else:
         output = state.to_manifest()
+        # Validate against contract before output
+        valid, err = validate_json_output("manifest", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
     write_output(output, out)
 
 
@@ -97,18 +130,29 @@ def cmd_chunks(
     at: str | None = None,
     format: str = "json",
     out: str | None = None,
+    strict: bool = False,
 ) -> None:
     """Output LLM vector chunks from the schema."""
     files = load_files(migrations_dir, json_input)
-    graph = (
-        reconstruct_at(files, at, dialect=dialect)
-        if at
-        else reconstruct(files, dialect=dialect)
-    )
+    try:
+        reconstructor = Reconstructor(dialect=dialect, strict=strict)
+        graph = (
+            reconstructor.apply_up_to(files, at)
+            if at
+            else reconstructor.apply_all(files)
+        )
+    except ReconstructionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     chunks = build_chunks(graph)
     fmt = (format or "json").lower()
     if fmt == "json":
         output = json.dumps(chunks_to_list(chunks), indent=2, ensure_ascii=False)
+        # Validate against contract before output
+        valid, err = validate_json_output("chunks", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
     else:
         output = format_human_chunks(chunks)
     write_output(output, out)
@@ -173,6 +217,7 @@ def legacy_main(
         )
     else:
         from ._utils import format_human_graph
+
         graph = reconstruct(files, dialect=dialect)
         output = (
             json.dumps(graph_to_dict(graph), indent=2, ensure_ascii=False)

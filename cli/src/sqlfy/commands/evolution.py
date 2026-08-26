@@ -1,4 +1,5 @@
 """Schema evolution commands: diff, rollback-analysis, simulate, drift, integrity."""
+
 from __future__ import annotations
 
 import contextlib
@@ -8,8 +9,12 @@ from pathlib import Path
 
 from ..analysis.differ import SchemaDiffer, diff_files
 from ..domain.schema_state import SchemaStateBuilder
-from ..reconstructor import reconstruct, reconstruct_at
-from ._utils import load_files, write_output
+from ..reconstructor import (
+    ReconstructionError,
+    Reconstructor,
+    reconstruct,
+)
+from ._utils import load_files, validate_json_output, write_output
 
 
 def cmd_diff(
@@ -29,23 +34,42 @@ def cmd_diff(
     if is_json_file(state_a) and is_json_file(state_b):
         result = diff_files(state_a, state_b)
     else:
+
         def load_dir(path: str):
             p = Path(path)
             if not p.is_dir():
-                print(f'Error: "{path}" is not a directory or .json state file.', file=sys.stderr)
+                print(
+                    f'Error: "{path}" is not a directory or .json state file.',
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             sql_files = sorted(
                 (f for f in p.rglob("*") if f.is_file() and f.suffix.lower() == ".sql"),
                 key=lambda mp: (mp.name, str(mp.relative_to(p))),
             )
-            files = [{"filename": str(f.relative_to(p)), "sql": f.read_text(encoding="utf-8")} for f in sql_files]
+            files = [
+                {
+                    "filename": str(f.relative_to(p)),
+                    "sql": f.read_text(encoding="utf-8"),
+                }
+                for f in sql_files
+            ]
             print(f"Loaded {len(files)} migration(s) from {path}", file=sys.stderr)
             return SchemaStateBuilder.from_graph(reconstruct(files, dialect=dialect))
 
         result = SchemaDiffer.diff(load_dir(state_a), load_dir(state_b))
 
     fmt = (format or "text").lower()
-    write_output(result.to_json() if fmt == "json" else result.to_text(), out)
+    if fmt == "json":
+        output = result.to_json()
+        # Validate against contract before output
+        valid, err = validate_json_output("diff", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = result.to_text()
+    write_output(output, out)
 
 
 def cmd_diff_versions(
@@ -57,20 +81,40 @@ def cmd_diff_versions(
     to_version: str | None = None,
     format: str = "json",
     out: str | None = None,
+    strict: bool = False,
 ) -> None:
     """Compare two version snapshots from the same migration set."""
     files = load_files(migrations_dir, json_input)
-
-    state_a = SchemaStateBuilder.from_graph(
-        reconstruct_at(files, from_version, dialect=dialect) if from_version else reconstruct(files, dialect=dialect)
-    )
-    state_b = SchemaStateBuilder.from_graph(
-        reconstruct_at(files, to_version, dialect=dialect) if to_version else reconstruct(files, dialect=dialect)
-    )
+    try:
+        # Use separate Reconstructor instances to avoid state contamination
+        reconstructor_a = Reconstructor(dialect=dialect, strict=strict)
+        state_a = SchemaStateBuilder.from_graph(
+            reconstructor_a.apply_up_to(files, from_version)
+            if from_version
+            else reconstructor_a.apply_all(files)
+        )
+        reconstructor_b = Reconstructor(dialect=dialect, strict=strict)
+        state_b = SchemaStateBuilder.from_graph(
+            reconstructor_b.apply_up_to(files, to_version)
+            if to_version
+            else reconstructor_b.apply_all(files)
+        )
+    except ReconstructionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     result = SchemaDiffer.diff(state_a, state_b)
     fmt = (format or "json").lower()
-    write_output(result.to_json() if fmt == "json" else result.to_text(), out)
+    if fmt == "json":
+        output = result.to_json()
+        # Validate against contract before output
+        valid, err = validate_json_output("diff", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = result.to_text()
+    write_output(output, out)
 
 
 def cmd_rollback_analysis(
@@ -93,13 +137,25 @@ def cmd_rollback_analysis(
 
     results = analyze_migrations(files)
     fmt = (format or "text").lower()
-    write_output(format_rollback_json(results) if fmt == "json" else format_rollback_text(results), out)
+    if fmt == "json":
+        output = format_rollback_json(results)
+        # Validate against contract before output
+        valid, err = validate_json_output("rollback", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = format_rollback_text(results)
+    write_output(output, out)
 
     reversible = sum(1 for r in results if r.feasibility == "reversible")
     partial = sum(1 for r in results if r.feasibility == "partial")
     irreversible = sum(1 for r in results if r.feasibility == "irreversible")
     print(f"  {len(results)} migrations analyzed", file=sys.stderr)
-    print(f"  ✓ {reversible} reversible, ⚠️  {partial} partial, ✗ {irreversible} irreversible", file=sys.stderr)
+    print(
+        f"  ✓ {reversible} reversible, ⚠️  {partial} partial, ✗ {irreversible} irreversible",
+        file=sys.stderr,
+    )
 
 
 def cmd_simulate(
@@ -130,7 +186,16 @@ def cmd_simulate(
         sys.exit(1)
 
     fmt = (format or "text").lower()
-    write_output(result.to_json() if fmt == "json" else result.to_text(), out)
+    if fmt == "json":
+        output = result.to_json()
+        # Validate against contract before output
+        valid, err = validate_json_output("simulate", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = result.to_text()
+    write_output(output, out)
 
     if diff:
         print("\n" + "=" * 60 + "\nDIFF:\n" + "=" * 60)
@@ -168,13 +233,17 @@ def cmd_integrity(
     report = check_integrity(migrations_dir_path)
 
     if fmt == "json":
-        output = json.dumps({
-            "status": report.status,
-            "totalMigrations": report.total_migrations,
-            "modified": report.modified,
-            "missing": report.missing,
-            "new": report.new,
-        }, indent=2, ensure_ascii=False)
+        output = json.dumps(
+            {
+                "status": report.status,
+                "totalMigrations": report.total_migrations,
+                "modified": report.modified,
+                "missing": report.missing,
+                "new": report.new,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
         write_output(output, out)
         if strict and report.modified:
             sys.exit(1)
@@ -228,15 +297,27 @@ def cmd_drift(
     base_label = Path(base_migrations).name if base_migrations else "Base"
     target_label = Path(target_migrations).name if target_migrations else "Target"
 
-    report = analyze_drift(base_graph, target_graph, base_label=base_label, target_label=target_label)
+    report = analyze_drift(
+        base_graph, target_graph, base_label=base_label, target_label=target_label
+    )
     fmt = (format or "text").lower()
-    write_output(report.to_json() if fmt == "json" else report.to_text(), out)
+    if fmt == "json":
+        output = report.to_json()
+        # Validate against contract before output
+        valid, err = validate_json_output("diff", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = report.to_text()
+    write_output(output, out)
 
     if generate_migration and not report.is_clean:
         if next_version:
             version = next_version
         else:
             from ..analysis.ordering import parse_migration_filename
+
             versions = []
             for file_dict in target_files:
                 parsed = parse_migration_filename(file_dict["filename"])
@@ -254,4 +335,7 @@ def cmd_drift(
         print("  No drift detected", file=sys.stderr)
     else:
         print(f"  {report.total_drift_count} drift finding(s)", file=sys.stderr)
-        print(f"  {len(report.errors())} error(s), {len(report.warnings())} warning(s)", file=sys.stderr)
+        print(
+            f"  {len(report.errors())} error(s), {len(report.warnings())} warning(s)",
+            file=sys.stderr,
+        )

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """sqlfy CLI entry point — subcommand and legacy modes."""
+
 from __future__ import annotations
 
 import argparse
@@ -45,21 +46,51 @@ from .commands import (
     cmd_watch,
     legacy_main,
 )
+from .version import get_version
 
 KNOWN_SUBCOMMANDS = {
-    "dump", "manifest", "chunks", "diff", "diff-versions", "graph", "graph-migrations", "build-graph",
-    "rollback-analysis", "insights", "health", "simulate", "integrity",
-    "cache", "ask", "chat", "export", "query", "impact", "lint",
-    "provenance", "cost", "watch",
+    "dump",
+    "manifest",
+    "chunks",
+    "diff",
+    "diff-versions",
+    "graph",
+    "graph-migrations",
+    "build-graph",
+    "rollback-analysis",
+    "insights",
+    "health",
+    "simulate",
+    "integrity",
+    "cache",
+    "ask",
+    "chat",
+    "export",
+    "query",
+    "impact",
+    "lint",
+    "provenance",
+    "cost",
+    "watch",
     "naming",
-    "domains", "stability", "validate", "deps", "lineage", "drift",
-    "classify", "safety", "pii-scan",
+    "domains",
+    "stability",
+    "validate",
+    "deps",
+    "lineage",
+    "drift",
+    "classify",
+    "safety",
+    "pii-scan",
     "hooks",
 }
 
 
 def _subcommand_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sqlfy")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {get_version()}"
+    )
     sub = parser.add_subparsers(dest="subcommand", required=True)
 
     def shared(p):
@@ -67,8 +98,11 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         p.add_argument("--json-input", metavar="FILE")
         p.add_argument("--at", metavar="VERSION")
         p.add_argument("--out", metavar="FILE")
-        p.add_argument("--dialect", default="oracle",
-                       help="SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)")
+        p.add_argument(
+            "--dialect",
+            default="oracle",
+            help="SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)",
+        )
 
     def rag_shared(p):
         shared(p)
@@ -80,18 +114,33 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dump", help="Output the Schema State Dictionary")
     shared(p)
     p.add_argument("--format", choices=["json", "yaml", "summary"], default="json")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if reconstruction produces error diagnostics",
+    )
     p.set_defaults(func=cmd_dump)
 
     # manifest
     p = sub.add_parser("manifest", help="Output graph manifest/metadata summary")
     shared(p)
     p.add_argument("--format", choices=["json", "text"], default="json")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if reconstruction produces error diagnostics",
+    )
     p.set_defaults(func=cmd_manifest)
 
     # chunks
     p = sub.add_parser("chunks", help="Output LLM vector chunks")
     shared(p)
     p.add_argument("--format", choices=["json", "text"], default="json")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if reconstruction produces error diagnostics",
+    )
     p.set_defaults(func=cmd_chunks)
 
     # diff
@@ -103,39 +152,134 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_diff)
 
     # diff-versions
-    p = sub.add_parser("diff-versions", help="Compare two version snapshots from one migration set")
-    shared(p)
-    p.add_argument("--from", dest="from_version", metavar="VERSION", help="Base version (default: latest)")
-    p.add_argument("--to", dest="to_version", metavar="VERSION", help="Target version (default: latest)")
+    p = sub.add_parser(
+        "diff-versions", help="Compare two version snapshots from one migration set"
+    )
+    p.add_argument("migrations_dir", nargs="?")
+    p.add_argument("--json-input", metavar="FILE")
+    p.add_argument("--out", metavar="FILE")
+    p.add_argument(
+        "--dialect",
+        default="oracle",
+        help="SQL dialect: oracle, postgres, mysql, sqlite (default: oracle)",
+    )
+    p.add_argument(
+        "--from",
+        dest="from_version",
+        metavar="VERSION",
+        help="Base version (default: latest)",
+    )
+    p.add_argument(
+        "--to",
+        dest="to_version",
+        metavar="VERSION",
+        help="Target version (default: latest)",
+    )
     p.add_argument("--format", choices=["json", "text"], default="json")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if reconstruction produces error diagnostics",
+    )
     p.set_defaults(func=cmd_diff_versions)
 
     # graph
-    p = sub.add_parser("graph", help="Output schema graph (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report)")
+    p = sub.add_parser(
+        "graph",
+        help="Output schema graph (DOT, Mermaid, Excalidraw, Draw.io, JSON, HTML, report)",
+    )
     shared(p)
-    p.add_argument("--format", choices=["dot", "mermaid", "excalidraw", "drawio", "summary", "json", "html", "report", "all"], default="dot")
+    p.add_argument(
+        "--format",
+        choices=[
+            "dot",
+            "mermaid",
+            "excalidraw",
+            "drawio",
+            "summary",
+            "json",
+            "html",
+            "report",
+            "all",
+        ],
+        default="dot",
+    )
     p.add_argument("--title", metavar="TEXT")
-    p.add_argument("--output-dir", metavar="PATH", help="Output directory for json/html/report (default: sqlfy-out)")
-    p.add_argument("--resolution", type=float, default=1.0, metavar="FLOAT",
-                   help="Community detection resolution (default: 1.0)")
-    p.add_argument("--min-cohesion", type=float, default=0.1, metavar="FLOAT",
-                   help="Minimum cohesion score to keep a community (default: 0.1)")
-    p.add_argument("--no-split", action="store_true", help="Disable oversized community splitting")
+    p.add_argument(
+        "--output-dir",
+        metavar="PATH",
+        help="Output directory for json/html/report (default: sqlfy-out)",
+    )
+    p.add_argument(
+        "--resolution",
+        type=float,
+        default=1.0,
+        metavar="FLOAT",
+        help="Community detection resolution (default: 1.0)",
+    )
+    p.add_argument(
+        "--min-cohesion",
+        type=float,
+        default=0.1,
+        metavar="FLOAT",
+        help="Minimum cohesion score to keep a community (default: 0.1)",
+    )
+    p.add_argument(
+        "--no-split", action="store_true", help="Disable oversized community splitting"
+    )
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if reconstruction produces error diagnostics",
+    )
     p.set_defaults(func=cmd_graph)
 
     # build-graph (unified knowledge graph builder)
-    p = sub.add_parser("build-graph", help="Build complete schema knowledge graph (unified graphify-style output)")
+    p = sub.add_parser(
+        "build-graph",
+        help="Build complete schema knowledge graph (unified graphify-style output)",
+    )
     shared(p)
-    p.add_argument("--output-dir", metavar="PATH", help="Output directory (default: graphify-out)")
-    p.add_argument("--resolution", type=float, default=1.0, metavar="FLOAT",
-                   help="Community detection resolution (default: 1.0)")
-    p.add_argument("--min-cohesion", type=float, default=0.5, metavar="FLOAT",
-                   help="Minimum cohesion score to keep a community (default: 0.5)")
-    p.add_argument("--no-split", action="store_true", help="Disable oversized community splitting")
-    p.add_argument("--min-refs", type=int, default=20, metavar="N",
-                   help="Minimum references to classify as god node (default: 20)")
-    p.add_argument("--no-queries", action="store_true", help="Skip pre-computed query results")
-    p.add_argument("--no-viz", action="store_true", help="Skip visualization formats (mermaid/dot/excalidraw/drawio)")
+    p.add_argument(
+        "--output-dir", metavar="PATH", help="Output directory (default: graphify-out)"
+    )
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if reconstruction produces error diagnostics",
+    )
+    p.add_argument(
+        "--resolution",
+        type=float,
+        default=1.0,
+        metavar="FLOAT",
+        help="Community detection resolution (default: 1.0)",
+    )
+    p.add_argument(
+        "--min-cohesion",
+        type=float,
+        default=0.5,
+        metavar="FLOAT",
+        help="Minimum cohesion score to keep a community (default: 0.5)",
+    )
+    p.add_argument(
+        "--no-split", action="store_true", help="Disable oversized community splitting"
+    )
+    p.add_argument(
+        "--min-refs",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Minimum references to classify as god node (default: 20)",
+    )
+    p.add_argument(
+        "--no-queries", action="store_true", help="Skip pre-computed query results"
+    )
+    p.add_argument(
+        "--no-viz",
+        action="store_true",
+        help="Skip visualization formats (mermaid/dot/excalidraw/drawio)",
+    )
     p.set_defaults(func=cmd_build_graph)
 
     # insights
@@ -150,39 +294,75 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("health", help="Generate migration folder health report")
     shared(p)
     p.add_argument("--format", choices=["text", "json"], default="text")
-    p.add_argument("--strict", action="store_true",
-                   help="Exit with error code if health score is critical")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error code if health score is critical",
+    )
     p.set_defaults(func=cmd_health)
 
     # simulate
-    p = sub.add_parser("simulate", help="Simulate schema evolution with hypothetical SQL")
+    p = sub.add_parser(
+        "simulate", help="Simulate schema evolution with hypothetical SQL"
+    )
     shared(p)
     p.add_argument("--sql", metavar="SQL", help="Inline SQL to simulate")
     p.add_argument("--file", metavar="PATH", help="Path to SQL file to simulate")
     p.add_argument("--format", choices=["text", "json"], default="text")
-    p.add_argument("--diff", action="store_true", help="Show diff between base and simulated state")
-    p.add_argument("--strict", action="store_true", help="Exit with error if simulation is unsafe")
+    p.add_argument(
+        "--diff", action="store_true", help="Show diff between base and simulated state"
+    )
+    p.add_argument(
+        "--strict", action="store_true", help="Exit with error if simulation is unsafe"
+    )
     p.set_defaults(func=cmd_simulate)
 
     # integrity
-    p = sub.add_parser("integrity", help="Check migration file integrity using SHA256 hashes")
+    p = sub.add_parser(
+        "integrity", help="Check migration file integrity using SHA256 hashes"
+    )
     p.add_argument("migrations_dir", help="Path to migrations directory")
-    p.add_argument("--strict", action="store_true",
-                   help="Exit with error if modified migrations detected")
-    p.add_argument("--update-manifest", action="store_true",
-                   help="Accept modifications and update manifest")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with error if modified migrations detected",
+    )
+    p.add_argument(
+        "--update-manifest",
+        action="store_true",
+        help="Accept modifications and update manifest",
+    )
     p.add_argument("--format", choices=["text", "json"], default="text")
     p.set_defaults(func=cmd_integrity)
 
     # provenance
-    p = sub.add_parser("provenance", help="Collect git provenance for migrations (author, commit, branches, PR)")
+    p = sub.add_parser(
+        "provenance",
+        help="Collect git provenance for migrations (author, commit, branches, PR)",
+    )
     p.add_argument("migrations_dir", help="Path to migrations directory")
     p.add_argument("--format", choices=["text", "json"], default="text")
-    p.add_argument("--record", action="store_true", help="Write provenance manifest to disk (defaults to <migrations_dir>/provenance.json)")
-    p.add_argument("--out", metavar="FILE", help="Write output to file (JSON when --format=json)")
-    p.add_argument("--verify", metavar="MANIFEST", help="Verify current provenance against existing manifest JSON file")
-    p.add_argument("--no-recursive", action="store_true", help="Do not recurse into subdirectories")
-    p.add_argument("--include-untracked", action="store_true", help="Include untracked files when collecting provenance (default: only tracked files)")
+    p.add_argument(
+        "--record",
+        action="store_true",
+        help="Write provenance manifest to disk (defaults to <migrations_dir>/provenance.json)",
+    )
+    p.add_argument(
+        "--out", metavar="FILE", help="Write output to file (JSON when --format=json)"
+    )
+    p.add_argument(
+        "--verify",
+        metavar="MANIFEST",
+        help="Verify current provenance against existing manifest JSON file",
+    )
+    p.add_argument(
+        "--no-recursive", action="store_true", help="Do not recurse into subdirectories"
+    )
+    p.add_argument(
+        "--include-untracked",
+        action="store_true",
+        help="Include untracked files when collecting provenance (default: only tracked files)",
+    )
     p.set_defaults(func=cmd_provenance)
 
     # cost
@@ -190,19 +370,41 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("migrations_dir", help="Path to migrations directory")
     p.add_argument("--format", choices=["text", "json"], default="text")
     p.add_argument("--dialect", default="oracle")
-    p.add_argument("--no-recursive", action="store_true", help="Do not recurse into subdirectories")
-    p.add_argument("--verbose", action="store_true", help="Show per-statement operation weights")
-    p.add_argument("--out", metavar="FILE", help="Write output to file (JSON when --format=json)")
-    p.add_argument("--table-stats", metavar="FILE", help="Path to JSON file with table stats (table -> {rows:int, avg_row_size:int})")
-    p.add_argument("--throughput", type=float, metavar="MBPS", help="Assumed IO throughput in MB/s (default: 100)")
-    p.add_argument("--weight-profile", choices=["default", "plsql", "data-migration"], default="default",
-                   help="Scoring profile: 'default' (conservative), 'plsql' (reduce PL/SQL noise), 'data-migration' (amplify bulk DML)")
+    p.add_argument(
+        "--no-recursive", action="store_true", help="Do not recurse into subdirectories"
+    )
+    p.add_argument(
+        "--verbose", action="store_true", help="Show per-statement operation weights"
+    )
+    p.add_argument(
+        "--out", metavar="FILE", help="Write output to file (JSON when --format=json)"
+    )
+    p.add_argument(
+        "--table-stats",
+        metavar="FILE",
+        help="Path to JSON file with table stats (table -> {rows:int, avg_row_size:int})",
+    )
+    p.add_argument(
+        "--throughput",
+        type=float,
+        metavar="MBPS",
+        help="Assumed IO throughput in MB/s (default: 100)",
+    )
+    p.add_argument(
+        "--weight-profile",
+        choices=["default", "plsql", "data-migration"],
+        default="default",
+        help="Scoring profile: 'default' (conservative), 'plsql' (reduce PL/SQL noise), 'data-migration' (amplify bulk DML)",
+    )
     p.set_defaults(func=cmd_cost)
 
     # cache
     p = sub.add_parser("cache", help="Manage file-based caching system")
-    p.add_argument("cache_action", choices=["clear", "info"],
-                   help="Action: clear (delete all) or info (show stats)")
+    p.add_argument(
+        "cache_action",
+        choices=["clear", "info"],
+        help="Action: clear (delete all) or info (show stats)",
+    )
     p.set_defaults(func=cmd_cache)
 
     # ask
@@ -211,8 +413,11 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.add_argument("question", nargs="+")
     p.add_argument("--format", choices=["text", "json"], default="text")
     p.add_argument("--no-sources", action="store_true")
-    p.add_argument("--no-cache", action="store_true",
-                   help="Skip chunk cache (rebuild chunks from scratch)")
+    p.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Skip chunk cache (rebuild chunks from scratch)",
+    )
     p.set_defaults(func=cmd_ask)
 
     # chat
@@ -230,25 +435,31 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     # query
     p = sub.add_parser("query", help="Deterministic graph queries (no LLM)")
     shared(p)
-    p.add_argument("query_type", choices=_QUERY_TYPES, metavar="TYPE",
-                   help="Query type: " + " | ".join(_QUERY_TYPES))
+    p.add_argument(
+        "query_type",
+        choices=_QUERY_TYPES,
+        metavar="TYPE",
+        help="Query type: " + " | ".join(_QUERY_TYPES),
+    )
     p.add_argument("--format", choices=["text", "json", "csv"], default="text")
-    p.add_argument("--pattern",    metavar="REGEX",  help="Name regex filter")
-    p.add_argument("--schema",     metavar="NAME",   help="Schema filter")
-    p.add_argument("--table",      metavar="TABLE",  help="Table name (full)")
-    p.add_argument("--type-like",  metavar="TYPE",   help="Column type substring")
-    p.add_argument("--from-table", metavar="TABLE",  help="fk-path: source table")
-    p.add_argument("--to-table",   metavar="TABLE",  help="fk-path: target table")
-    p.add_argument("--direction",  choices=["in", "out", "both"], default="both")
-    p.add_argument("--has-pk",     metavar="BOOL",   help="Filter by PK presence (true/false)")
-    p.add_argument("--is-orphan",  metavar="BOOL")
-    p.add_argument("--is-pk",      metavar="BOOL")
-    p.add_argument("--is-fk",      metavar="BOOL")
-    p.add_argument("--is-unique",  metavar="BOOL")
-    p.add_argument("--nullable",   metavar="BOOL")
+    p.add_argument("--pattern", metavar="REGEX", help="Name regex filter")
+    p.add_argument("--schema", metavar="NAME", help="Schema filter")
+    p.add_argument("--table", metavar="TABLE", help="Table name (full)")
+    p.add_argument("--type-like", metavar="TYPE", help="Column type substring")
+    p.add_argument("--from-table", metavar="TABLE", help="fk-path: source table")
+    p.add_argument("--to-table", metavar="TABLE", help="fk-path: target table")
+    p.add_argument("--direction", choices=["in", "out", "both"], default="both")
+    p.add_argument(
+        "--has-pk", metavar="BOOL", help="Filter by PK presence (true/false)"
+    )
+    p.add_argument("--is-orphan", metavar="BOOL")
+    p.add_argument("--is-pk", metavar="BOOL")
+    p.add_argument("--is-fk", metavar="BOOL")
+    p.add_argument("--is-unique", metavar="BOOL")
+    p.add_argument("--nullable", metavar="BOOL")
     p.add_argument("--has-default", metavar="BOOL")
-    p.add_argument("--min-cols",   type=int)
-    p.add_argument("--max-cols",   type=int)
+    p.add_argument("--min-cols", type=int)
+    p.add_argument("--max-cols", type=int)
     p.add_argument("--created-in", metavar="VER")
     p.add_argument("--unique-only", action="store_true")
     p.set_defaults(func=cmd_query)
@@ -256,40 +467,73 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     # impact
     p = sub.add_parser("impact", help="Analyze impact of schema object changes")
     shared(p)
-    p.add_argument("object", metavar="OBJECT_ID", nargs="?",
-                   help="Schema object to analyze (e.g., APP.USERS). Optional when --from-diff is used.")
-    p.add_argument("--table", action="append", metavar="TABLE",
-                   help="Additional table to analyze (repeatable).")
-    p.add_argument("--from-diff", nargs="?", const="staged", metavar="GIT_REF",
-                   help="Analyze tables from changes in a git diff. "
-                        "If no ref is given, uses staged changes.")
+    p.add_argument(
+        "object",
+        metavar="OBJECT_ID",
+        nargs="?",
+        help="Schema object to analyze (e.g., APP.USERS). Optional when --from-diff is used.",
+    )
+    p.add_argument(
+        "--table",
+        action="append",
+        metavar="TABLE",
+        help="Additional table to analyze (repeatable).",
+    )
+    p.add_argument(
+        "--from-diff",
+        nargs="?",
+        const="staged",
+        metavar="GIT_REF",
+        help="Analyze tables from changes in a git diff. "
+        "If no ref is given, uses staged changes.",
+    )
     p.add_argument("--depth", type=int, default=5, metavar="N")
     p.add_argument("--direction", choices=["in", "out"], default="out")
     p.add_argument("--format", choices=["text", "json"], default="text")
     p.set_defaults(func=cmd_impact)
 
     # graph-migrations
-    p = sub.add_parser("graph-migrations", help="Visualize migration timeline and dependencies")
+    p = sub.add_parser(
+        "graph-migrations", help="Visualize migration timeline and dependencies"
+    )
     shared(p)
-    p.add_argument("--format", choices=["dot", "html", "timeline", "json"], default="timeline")
+    p.add_argument(
+        "--format", choices=["dot", "html", "timeline", "json"], default="timeline"
+    )
     p.set_defaults(func=cmd_graph_migrations)
 
     # rollback-analysis
-    p = sub.add_parser("rollback-analysis", help="Analyze migration rollback feasibility")
+    p = sub.add_parser(
+        "rollback-analysis", help="Analyze migration rollback feasibility"
+    )
     shared(p)
     p.add_argument("--format", choices=["text", "json"], default="text")
-    p.add_argument("--generate", action="store_true",
-                   help="Generate rollback scripts for reversible migrations")
+    p.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate rollback scripts for reversible migrations",
+    )
     p.set_defaults(func=cmd_rollback_analysis)
 
     # lint
-    p = sub.add_parser("lint", help="Lint migration SQL files for quality and style (sqlfluff)")
+    p = sub.add_parser(
+        "lint", help="Lint migration SQL files for quality and style (sqlfluff)"
+    )
     p.add_argument("path", metavar="PATH", help="Path to SQL file or directory")
     p.add_argument("--format", choices=["text", "json"], default="text")
-    p.add_argument("--min-score", type=int, default=0, metavar="N",
-                   help="Fail if score < N (default: 0)")
+    p.add_argument(
+        "--min-score",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Fail if score < N (default: 0)",
+    )
     p.add_argument("--config", metavar="FILE", help="Path to .sqlfluff config file")
-    p.add_argument("--fix", action="store_true", help="Apply automatic fixes (in-place). BACKUPs created as .bak files")
+    p.add_argument(
+        "--fix",
+        action="store_true",
+        help="Apply automatic fixes (in-place). BACKUPs created as .bak files",
+    )
     p.add_argument("--dialect", default="oracle")
     p.add_argument("--no-recursive", action="store_true")
     p.add_argument("--out", metavar="FILE")
@@ -317,7 +561,9 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_domains)
 
     # stability
-    p = sub.add_parser("stability", help="Calculate schema stability metrics and churn rates")
+    p = sub.add_parser(
+        "stability", help="Calculate schema stability metrics and churn rates"
+    )
     shared(p)
     p.add_argument("--format", choices=["text", "json"], default="text")
     p.add_argument("--show-all", action="store_true")
@@ -327,7 +573,9 @@ def _subcommand_parser() -> argparse.ArgumentParser:
 
     # validate
     p = sub.add_parser("validate", help="Validate migration ordering and detect issues")
-    p.add_argument("migrations_dir", help="Path to directory containing migration files")
+    p.add_argument(
+        "migrations_dir", help="Path to directory containing migration files"
+    )
     p.add_argument("--format", choices=["text", "json"], default="text")
     p.add_argument("--strict", action="store_true")
     p.add_argument("--fix-numbering", action="store_true")
@@ -336,18 +584,30 @@ def _subcommand_parser() -> argparse.ArgumentParser:
 
     # naming
     p = sub.add_parser("naming", help="Enforce migration naming conventions")
-    p.add_argument("migrations_dir", help="Path to directory containing migration files")
+    p.add_argument(
+        "migrations_dir", help="Path to directory containing migration files"
+    )
     p.add_argument("--format", choices=["text", "json"], default="text")
-    p.add_argument("--pattern", metavar="REGEX", default=r"^[a-z0-9_]+$",
-                   help="Regex for description (default: lower-case, digits, underscores)")
-    p.add_argument("--max-len", type=int, default=120, help="Maximum allowed filename length")
-    p.add_argument("--strict", action="store_true", help="Exit 1 if any warnings are found")
+    p.add_argument(
+        "--pattern",
+        metavar="REGEX",
+        default=r"^[a-z0-9_]+$",
+        help="Regex for description (default: lower-case, digits, underscores)",
+    )
+    p.add_argument(
+        "--max-len", type=int, default=120, help="Maximum allowed filename length"
+    )
+    p.add_argument(
+        "--strict", action="store_true", help="Exit 1 if any warnings are found"
+    )
     p.add_argument("--out", metavar="FILE")
     p.set_defaults(func=cmd_naming)
 
     # deps
     p = sub.add_parser("deps", help="Analyze migration dependencies and detect issues")
-    p.add_argument("migrations_dir", help="Path to directory containing migration files")
+    p.add_argument(
+        "migrations_dir", help="Path to directory containing migration files"
+    )
     p.add_argument("--format", choices=["text", "json", "dot"], default="text")
     p.add_argument("--validate", action="store_true")
     p.add_argument("--strict", action="store_true")
@@ -373,7 +633,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "classify",
         help="Classify migrations by semantic category "
-             "(table_creation, data_migration, cleanup, …)",
+        "(table_creation, data_migration, cleanup, …)",
     )
     shared(p)
     p.add_argument("--format", choices=["text", "json"], default="text")
@@ -381,9 +641,16 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         "--category",
         metavar="CAT",
         choices=[
-            "table_creation", "column_addition", "column_removal",
-            "constraint_modification", "index_management", "data_migration",
-            "cleanup", "refactor", "view_trigger_procedure", "mixed",
+            "table_creation",
+            "column_addition",
+            "column_removal",
+            "constraint_modification",
+            "index_management",
+            "data_migration",
+            "cleanup",
+            "refactor",
+            "view_trigger_procedure",
+            "mixed",
         ],
         help="Filter by primary category",
     )
@@ -404,7 +671,7 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "safety",
         help="Score migrations by safety level "
-             "(SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS)",
+        "(SAFE / MEDIUM_RISK / HIGH_RISK / DANGEROUS)",
     )
     shared(p)
     p.add_argument("--format", choices=["text", "json"], default="text")
@@ -415,7 +682,8 @@ def _subcommand_parser() -> argparse.ArgumentParser:
         help="Exit 1 if any migration is at or above this level",
     )
     p.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show per-statement breakdown for each migration",
     )
@@ -425,43 +693,79 @@ def _subcommand_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("pii-scan", help="Scan schema columns for PII patterns")
     shared(p)
     p.add_argument("--format", choices=["json", "text"], default="text")
-    p.add_argument("--min-confidence", type=float, default=0.6, metavar="FLOAT",
-                   help="Filter findings below this confidence (default: 0.6)")
-    p.add_argument("--extra-patterns", metavar="FILE",
-                   help="JSON file with additional patterns: {\"category\": [\"regex\", ...]}")
+    p.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.6,
+        metavar="FLOAT",
+        help="Filter findings below this confidence (default: 0.6)",
+    )
+    p.add_argument(
+        "--extra-patterns",
+        metavar="FILE",
+        help='JSON file with additional patterns: {"category": ["regex", ...]}',
+    )
     p.set_defaults(func=cmd_pii_scan)
 
     # watch
-    p = sub.add_parser("watch", help="Auto-rebuild analysis when migration files change")
+    p = sub.add_parser(
+        "watch", help="Auto-rebuild analysis when migration files change"
+    )
     shared(p)
-    p.add_argument("--debounce", type=float, default=2.0, metavar="SECONDS",
-                   help="Debounce time in seconds (default: 2.0)")
-    p.add_argument("--run", default="lint,safety,insights", metavar="COMMANDS",
-                   help="Comma-separated list of commands to run (default: lint,safety,insights)")
-    p.add_argument("--force", action="store_true",
-                   help="Force rebuild even if shrink-safety gate is triggered")
+    p.add_argument(
+        "--debounce",
+        type=float,
+        default=2.0,
+        metavar="SECONDS",
+        help="Debounce time in seconds (default: 2.0)",
+    )
+    p.add_argument(
+        "--run",
+        default="lint,safety,insights",
+        metavar="COMMANDS",
+        help="Comma-separated list of commands to run (default: lint,safety,insights)",
+    )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="Force rebuild even if shrink-safety gate is triggered",
+    )
     p.set_defaults(func=cmd_watch)
 
     # hooks
-    p_hooks = sub.add_parser("hooks", help="Manage git pre-commit hooks for SQL linting and safety checks")
+    p_hooks = sub.add_parser(
+        "hooks", help="Manage git pre-commit hooks for SQL linting and safety checks"
+    )
     hooks_sub = p_hooks.add_subparsers(dest="hooks_action", required=True)
-    
+
     # hooks install
     p_install = hooks_sub.add_parser("install", help="Install sqlfy pre-commit hook")
-    p_install.add_argument("--path", default=".", metavar="DIR",
-                           help="Path to git repository (default: current directory)")
+    p_install.add_argument(
+        "--path",
+        default=".",
+        metavar="DIR",
+        help="Path to git repository (default: current directory)",
+    )
     p_install.set_defaults(func=cmd_hooks_install)
-    
+
     # hooks uninstall
     p_uninstall = hooks_sub.add_parser("uninstall", help="Remove sqlfy pre-commit hook")
-    p_uninstall.add_argument("--path", default=".", metavar="DIR",
-                             help="Path to git repository (default: current directory)")
+    p_uninstall.add_argument(
+        "--path",
+        default=".",
+        metavar="DIR",
+        help="Path to git repository (default: current directory)",
+    )
     p_uninstall.set_defaults(func=cmd_hooks_uninstall)
-    
+
     # hooks status
     p_status = hooks_sub.add_parser("status", help="Check if sqlfy hooks are installed")
-    p_status.add_argument("--path", default=".", metavar="DIR",
-                          help="Path to git repository (default: current directory)")
+    p_status.add_argument(
+        "--path",
+        default=".",
+        metavar="DIR",
+        help="Path to git repository (default: current directory)",
+    )
     p_status.set_defaults(func=cmd_hooks_status)
 
     return parser
@@ -472,21 +776,30 @@ def _legacy_parser() -> argparse.ArgumentParser:
     parser.add_argument("migrations_dir", nargs="?")
     parser.add_argument("--json-input", metavar="FILE")
     parser.add_argument("--chunks", action="store_true")
-    parser.add_argument("--all",    action="store_true")
-    parser.add_argument("--json",   action="store_true")
-    parser.add_argument("--out",    metavar="FILE")
-    parser.add_argument("--at",     metavar="VERSION")
+    parser.add_argument("--all", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--out", metavar="FILE")
+    parser.add_argument("--at", metavar="VERSION")
     parser.add_argument("--dialect", default="oracle")
     return parser
 
 
 def main() -> None:
     argv = sys.argv[1:]
+    if not argv:
+        _subcommand_parser().print_help(sys.stderr)
+        sys.exit(2)
+
     first_positional = next((a for a in argv if not a.startswith("-")), None)
 
-    if first_positional in KNOWN_SUBCOMMANDS or "--help" in argv or "-h" in argv:
+    if (
+        first_positional in KNOWN_SUBCOMMANDS
+        or "--help" in argv
+        or "-h" in argv
+        or "--version" in argv
+    ):
         args = _subcommand_parser().parse_args(argv)
-        _meta = frozenset({'func', 'subcommand'})
+        _meta = frozenset({"func", "subcommand"})
         kw = {k: v for k, v in vars(args).items() if k not in _meta}
         result = args.func(**kw)
         if isinstance(result, int):
@@ -497,8 +810,8 @@ def main() -> None:
             args.json = True
         legacy_main(
             migrations_dir=args.migrations_dir,
-            json_input=getattr(args, 'json_input', None),
-            dialect=getattr(args, 'dialect', 'oracle'),
+            json_input=getattr(args, "json_input", None),
+            dialect=getattr(args, "dialect", "oracle"),
             all=args.all,
             chunks=args.chunks,
             as_json=args.json,

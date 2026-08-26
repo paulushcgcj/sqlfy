@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "2",
+  "fingerprint": "7d7484379730105f",
+  "dialect": "oracle",
+  "generatedAt": "2026-08-25T23:49:36.474918Z",
+  "sqlfyVersion": "0.20.0",
+  "nodeCount": 2,
+  "edgeCount": 1,
+  "tableCount": 2,
+  "columnCount": 4,
+  "sequenceCount": 0,
+  "relationshipCount": 1,
+  "indexCount": 0,
+  "tablesWithoutPk": 0,
+  "migrationCount": 2,
+  "migrationHistory": [
+    {
+      "version": "1",
+      "description": "create users"
+    },
+    {
+      "version": "2",
+      "description": "create orders"
+    }
+  ]
+}

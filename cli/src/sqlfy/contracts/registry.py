@@ -30,9 +30,12 @@ from pydantic import BaseModel
 
 from .analysis.pii_v1 import PiiScanV1
 from .analysis.v1 import HealthV1, InsightsV1
+from .chunks.v1 import ChunksV1
 from .evolution.v1 import DiffV1, RollbackV1, SimulateV1
-from .graph.v1 import GraphManifestV1
+from .graph.v1 import GraphManifestV1, GraphOutputV1
 from .impact.v1 import ImpactV1
+from .query.v1 import QueryResultV1
+from .schema.v1 import SchemaStateV1
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ContractEntry
@@ -165,6 +168,49 @@ _RAW: list[ContractEntry] = [
             "Includes node/edge counts, table/column counts, and graph fingerprint."
         ),
         model_class=GraphManifestV1,
+    ),
+    ContractEntry(
+        name="graph_output",
+        version="v1",
+        command="graph",
+        description=(
+            "Complete schema graph structure produced by the graph command. "
+            "Includes nodes, edges, communities, god nodes, and metadata."
+        ),
+        model_class=GraphOutputV1,
+    ),
+    # ── Schema ──────────────────────────────────────────────────────────────
+    ContractEntry(
+        name="schema_state",
+        version="v1",
+        command="dump",
+        description=(
+            "Complete schema state dictionary produced by the dump command. "
+            "Includes tables, sequences, relationships, migration history, and stats."
+        ),
+        model_class=SchemaStateV1,
+    ),
+    # ── Query ───────────────────────────────────────────────────────────────
+    ContractEntry(
+        name="query_result",
+        version="v1",
+        command="query",
+        description=(
+            "Deterministic graph query results produced by the query command. "
+            "Includes query description, row count, columns, rows, and metadata."
+        ),
+        model_class=QueryResultV1,
+    ),
+    # ── Chunks ──────────────────────────────────────────────────────────────
+    ContractEntry(
+        name="chunks",
+        version="v1",
+        command="chunks",
+        description=(
+            "LLM vector chunks produced by the chunks command. "
+            "Includes chunk content, metadata, and retrieval hints."
+        ),
+        model_class=ChunksV1,
     ),
 ]
 

@@ -1,0 +1,1 @@
+{"dialect": "oracle", "expected_tables": ["USERS", "ORDERS"], "expected_columns": {"USERS": ["ID", "EMAIL", "CREATED_AT"], "ORDERS": ["ID", "USER_ID", "AMOUNT"]}, "expected_constraints": ["PK_USERS", "FK_ORDERS_USER"]}

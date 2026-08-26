@@ -1,12 +1,18 @@
 """Analysis commands: insights, health, domains, stability."""
+
 from __future__ import annotations
 
 import sys
 
 from ..analysis.insights import InsightsEngine
 from ..domain.schema_state import SchemaStateBuilder
-from ..reconstructor import reconstruct, reconstruct_at
-from ._utils import load_files, write_output
+from ..reconstructor import (
+    ReconstructionError,
+    Reconstructor,
+    reconstruct,
+    reconstruct_at,
+)
+from ._utils import load_files, validate_json_output, write_output
 
 
 def cmd_insights(
@@ -24,11 +30,17 @@ def cmd_insights(
 ) -> None:
     """Analyse the schema and report insights (orphans, missing PKs, circular FKs, etc.)."""
     files = load_files(migrations_dir, json_input)
-    graph = (
-        reconstruct_at(files, at, dialect=dialect)
-        if at
-        else reconstruct(files, dialect=dialect)
-    )
+    try:
+        reconstructor = Reconstructor(dialect=dialect, strict=strict)
+        graph = (
+            reconstructor.apply_up_to(files, at)
+            if at
+            else reconstructor.apply_all(files)
+        )
+    except ReconstructionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
     state = SchemaStateBuilder.from_graph(graph, source_files=files)
 
     # Optionally detect communities for god-table & surprising-join analysis
@@ -36,6 +48,7 @@ def cmd_insights(
     if detect_domains:
         from ..clustering import detect_communities
         from ..graph.builder import build_networkx_graph
+
         nx_graph = build_networkx_graph(graph, directed=False)
         comm_result = detect_communities(
             nx_graph,
@@ -52,7 +65,32 @@ def cmd_insights(
         report.findings = [f for f in report.findings if f.severity == sev]
 
     fmt = (format or "text").lower()
-    write_output(report.to_json() if fmt == "json" else report.to_text(), out)
+    if fmt == "json":
+        # Include diagnostic totals in JSON output
+        import json
+
+        report_dict = json.loads(report.to_json())
+        report_dict["diagnostics"] = {
+            "total": len(reconstructor._all_diagnostics),
+            "errors": len(
+                [d for d in reconstructor._all_diagnostics if d.severity == "error"]
+            ),
+            "warnings": len(
+                [d for d in reconstructor._all_diagnostics if d.severity == "warning"]
+            ),
+            "infos": len(
+                [d for d in reconstructor._all_diagnostics if d.severity == "info"]
+            ),
+        }
+        # Validate against contract before output
+        output = json.dumps(report_dict, indent=2, ensure_ascii=False)
+        valid, err = validate_json_output("insights", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = report.to_text()
+    write_output(output, out)
 
     if strict and report.errors():
         sys.exit(1)
@@ -82,7 +120,16 @@ def cmd_health(
     health_report = HealthAnalyzer.analyze(state, report, migrations_dir or ".")
 
     fmt = (format or "text").lower()
-    write_output(health_report.to_json() if fmt == "json" else health_report.to_text(), out)
+    if fmt == "json":
+        output = health_report.to_json()
+        # Validate against contract before output
+        valid, err = validate_json_output("health", output)
+        if not valid:
+            print(f"Error: JSON output validation failed: {err}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        output = health_report.to_text()
+    write_output(output, out)
 
     if strict and health_report.health_score.grade == "critical":
         sys.exit(1)
@@ -148,4 +195,9 @@ def cmd_stability(
         stable_threshold=stable_threshold,
     )
     fmt = (format or "text").lower()
-    write_output(format_json(report) if fmt == "json" else format_text(report, show_all=show_all), out)
+    write_output(
+        format_json(report)
+        if fmt == "json"
+        else format_text(report, show_all=show_all),
+        out,
+    )

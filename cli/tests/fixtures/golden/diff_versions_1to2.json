@@ -1,0 +1,44 @@
+{
+  "versionA": "1",
+  "versionB": "2",
+  "fingerprintA": "3a98dccd4eecfcbe",
+  "fingerprintB": "7d7484379730105f",
+  "stats": {
+    "tablesAdded": 1,
+    "tablesRemoved": 0,
+    "tablesModified": 0,
+    "columnsAdded": 0,
+    "columnsRemoved": 0,
+    "columnsModified": 0,
+    "sequencesAdded": 0,
+    "sequencesRemoved": 0,
+    "relationshipsAdded": 1,
+    "relationshipsRemoved": 0,
+    "isBreaking": false
+  },
+  "tableChanges": [
+    {
+      "fullName": "APP.ORDERS",
+      "change": "added",
+      "breaking": false,
+      "columnChanges": null,
+      "constraintChanges": null,
+      "indexChanges": null
+    }
+  ],
+  "sequenceChanges": [],
+  "relationshipChanges": [
+    {
+      "change": "added",
+      "from": "APP.ORDERS",
+      "fromCols": [
+        "USER_ID"
+      ],
+      "to": "APP.USERS",
+      "toCols": [
+        "ID"
+      ],
+      "onDelete": null
+    }
+  ]
+}

@@ -23,6 +23,7 @@ import logging
 import re
 from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import Literal
 
 import sqlglot
 import sqlglot.expressions as exp
@@ -54,6 +55,69 @@ from .parsing.extractors import get_extractor
 from .semantic.operations import AnyOperation, OperationProvenance
 
 log = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────
+# DIAGNOSTICS
+# ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Diagnostic:
+    """A typed diagnostic attached to reconstruction results."""
+
+    severity: Literal["info", "warning", "error"]
+    code: str
+    message: str
+    filename: str
+    statement_index: int | None
+    dialect: str
+    source_excerpt: str | None = None
+
+
+def _make_diagnostic(
+    severity: Literal["info", "warning", "error"],
+    code: str,
+    message: str,
+    filename: str,
+    statement_index: int | None,
+    dialect: str,
+    source_excerpt: str | None = None,
+) -> Diagnostic:
+    """Factory for creating diagnostics."""
+    return Diagnostic(
+        severity=severity,
+        code=code,
+        message=message,
+        filename=filename,
+        statement_index=statement_index,
+        dialect=dialect,
+        source_excerpt=source_excerpt,
+    )
+
+
+class ReconstructionError(Exception):
+    """Raised when reconstruction fails in strict mode."""
+
+    pass
+
+
+def _add_fallback_diagnostic(
+    filename: str,
+    statement_index: int | None,
+    dialect: str,
+    fallback_type: str,
+    details: str,
+) -> Diagnostic:
+    """Create a diagnostic for a SQLGlot compatibility fallback."""
+    return _make_diagnostic(
+        severity="warning",
+        code=f"FALLBACK_{fallback_type.upper()}",
+        message=f"SQLGlot compatibility fallback used: {fallback_type} — {details}",
+        filename=filename,
+        statement_index=statement_index,
+        dialect=dialect,
+    )
 
 
 def _split_top_level(text: str, sep: str = ",") -> list[str]:
@@ -91,6 +155,7 @@ class MigrationResult:
     filename: str
     actions: list[MigrationAction] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    diagnostics: list[Diagnostic] = field(default_factory=list)
     skipped: bool = False  # True if already applied
 
 
@@ -118,14 +183,16 @@ class Reconstructor:
         graph_at_v2 = Reconstructor().apply_up_to(files, version='2')
     """
 
-    def __init__(self, dialect: str = "oracle") -> None:
+    def __init__(self, dialect: str = "oracle", strict: bool = False) -> None:
         self.dialect = dialect
+        self.strict = strict
         self.tables: dict[str, Table] = {}
         self.seqs: dict[str, Sequence] = {}
         self.mig_hist: list[MigrationHistory] = []
         self.actions: list[MigrationAction] = []
         self._applied: set[str] = set()  # filenames already applied
         self.semantic_ops: list[AnyOperation] = []  # semantic operations (Phase 9)
+        self._all_diagnostics: list[Diagnostic] = []  # accumulate all diagnostics
 
         # Log sqlglot capabilities on first instantiation
         if not hasattr(Reconstructor, "_logged_capabilities"):
@@ -180,21 +247,42 @@ class Reconstructor:
             sql, dialect=self.dialect, error_level=sqlglot.ErrorLevel.WARN
         )
 
-        for stmt in stmts:
+        for stmt_idx, stmt in enumerate(stmts):
             if stmt is None:
                 continue
             if not isinstance(stmt, exp.Expression):
                 continue
             try:
-                acts = self._dispatch(stmt, vsn)
+                acts = self._dispatch(stmt, vsn, result, filename, stmt_idx)
                 result.actions.extend(acts)
                 self.actions.extend(acts)
             except Exception as exc:
                 msg = f"V{vsn}: error processing statement — {exc}"
                 log.warning(msg)
                 result.errors.append(msg)
+                # Add diagnostic for parse/processing error
+                result.diagnostics.append(
+                    _make_diagnostic(
+                        severity="error",
+                        code="STATEMENT_PROCESSING_ERROR",
+                        message=msg,
+                        filename=filename,
+                        statement_index=stmt_idx,
+                        dialect=self.dialect,
+                        source_excerpt=stmt.sql(dialect=self.dialect)[:200]
+                        if stmt
+                        else None,
+                    )
+                )
 
         self._applied.add(filename)
+        # Accumulate diagnostics for strict mode checking
+        self._all_diagnostics.extend(result.diagnostics)
+        # Check strict mode after each file
+        if self.strict and any(d.severity == "error" for d in result.diagnostics):
+            raise ReconstructionError(
+                f"Reconstruction failed with {len([d for d in result.diagnostics if d.severity == 'error'])} error(s) in {filename}"
+            )
         return result
 
     def snapshot(self) -> SchemaGraph:
@@ -219,7 +307,14 @@ class Reconstructor:
 
     # ── Statement dispatcher ────────────────────────────────────────────────
 
-    def _dispatch(self, stmt: exp.Expression, version: str) -> list[MigrationAction]:
+    def _dispatch(
+        self,
+        stmt: exp.Expression,
+        version: str,
+        result: MigrationResult,
+        filename: str,
+        stmt_idx: int,
+    ) -> list[MigrationAction]:
         """Route a parsed statement to the appropriate handler."""
         acts: list[MigrationAction] = []
 
@@ -264,9 +359,30 @@ class Reconstructor:
             self._apply_comment(stmt)
 
         elif isinstance(stmt, exp.Command):
-            acts += self._command_fallback(stmt, version)
+            acts += self._command_fallback(stmt, version, result, filename, stmt_idx)
 
         return acts
+
+    # ── Diagnostic helpers ────────────────────────────────────────────────────
+
+    def _add_fallback_to_result(
+        self,
+        result: MigrationResult,
+        filename: str,
+        statement_index: int | None,
+        fallback_type: str,
+        details: str,
+    ) -> None:
+        """Add a SQLGlot compatibility fallback diagnostic to a MigrationResult."""
+        diag = _make_diagnostic(
+            severity="warning",
+            code=f"FALLBACK_{fallback_type.upper()}",
+            message=f"SQLGlot compatibility fallback used: {fallback_type} — {details}",
+            filename=filename,
+            statement_index=statement_index,
+            dialect=self.dialect,
+        )
+        result.diagnostics.append(diag)
 
     # ── CREATE TABLE ────────────────────────────────────────────────────────
 
@@ -627,7 +743,12 @@ class Reconstructor:
     # ── COMMAND FALLBACK ────────────────────────────────────────────────────
 
     def _command_fallback(
-        self, stmt: exp.Command, version: str
+        self,
+        stmt: exp.Command,
+        version: str,
+        result: MigrationResult,
+        filename: str,
+        stmt_idx: int,
     ) -> list[MigrationAction]:
         """
         Handle statements sqlglot cannot fully parse — CREATE INDEX, ALTER MODIFY,
@@ -653,20 +774,43 @@ class Reconstructor:
         # CREATE [UNIQUE] INDEX
         if cmd_name == "CREATE" and re.match(r"^(?:UNIQUE\s+)?INDEX\b", expr_up):
             acts += self._create_index_regex(f"CREATE {raw_expr}", version)
+            self._add_fallback_to_result(
+                result,
+                filename,
+                stmt_idx,
+                "CREATE_INDEX_REGEX",
+                "CREATE INDEX parsed via regex fallback",
+            )
 
         # CREATE TABLE ... ( ... ) — sqlglot often falls back to Command on
         # Oracle DDL with storage clauses (NO INMEMORY, ENABLE STORAGE IN ROW)
         elif cmd_name == "CREATE" and re.match(r"^TABLE\b", expr_up):
             acts += self._create_table_regex(f"CREATE {raw_expr}", version)
+            self._add_fallback_to_result(
+                result,
+                filename,
+                stmt_idx,
+                "CREATE_TABLE_REGEX",
+                "CREATE TABLE parsed via regex fallback",
+            )
 
         # ALTER TABLE ... MODIFY (col TYPE ...)
         elif (
             cmd_name == "ALTER" and expr_up.startswith("TABLE") and "MODIFY" in expr_up
         ):
             if SQLGLOT_HAS_MODIFY:
-                acts += self._alter_modify_native(f"ALTER {raw_expr}", version)
+                acts += self._alter_modify_native(
+                    f"ALTER {raw_expr}", version, result, filename, stmt_idx
+                )
             else:
                 acts += self._alter_modify_regex(f"ALTER {raw_expr}", version)
+                self._add_fallback_to_result(
+                    result,
+                    filename,
+                    stmt_idx,
+                    "ALTER_MODIFY_REGEX",
+                    "ALTER TABLE MODIFY parsed via regex fallback",
+                )
 
         # ALTER TABLE ... RENAME COLUMN old TO new
         elif (
@@ -676,6 +820,13 @@ class Reconstructor:
             and "COLUMN" in expr_up
         ):
             acts += self._alter_rename_column_regex(f"ALTER {raw_expr}", version)
+            self._add_fallback_to_result(
+                result,
+                filename,
+                stmt_idx,
+                "RENAME_COLUMN_REGEX",
+                "RENAME COLUMN parsed via regex fallback",
+            )
 
         # ALTER TABLE ... ADD CONSTRAINT ... (FOREIGN KEY | PRIMARY KEY | UNIQUE | CHECK)
         elif (
@@ -684,6 +835,13 @@ class Reconstructor:
             and "ADD CONSTRAINT" in expr_up
         ):
             acts += self._alter_add_constraint_regex(f"ALTER {raw_expr}", version)
+            self._add_fallback_to_result(
+                result,
+                filename,
+                stmt_idx,
+                "ADD_CONSTRAINT_REGEX",
+                "ADD CONSTRAINT parsed via regex fallback",
+            )
 
         return acts
 
@@ -1077,7 +1235,14 @@ class Reconstructor:
 
     # ── Native sqlglot MODIFY parser ────────────────────────────────────────
 
-    def _alter_modify_native(self, raw_sql: str, version: str) -> list[MigrationAction]:
+    def _alter_modify_native(
+        self,
+        raw_sql: str,
+        version: str,
+        result: MigrationResult | None = None,
+        filename: str | None = None,
+        stmt_idx: int | None = None,
+    ) -> list[MigrationAction]:
         """
         Parse ALTER TABLE MODIFY using native sqlglot AST (when supported).
 
@@ -1092,6 +1257,14 @@ class Reconstructor:
             )
         except (ValueError, AttributeError) as e:
             log.warning(f"Native MODIFY parse failed: {e} — falling back to regex")
+            if result and filename is not None:
+                self._add_fallback_to_result(
+                    result,
+                    filename,
+                    stmt_idx,
+                    "ALTER_MODIFY_NATIVE_TO_REGEX",
+                    f"Native MODIFY parse failed: {e}",
+                )
             return self._alter_modify_regex(raw_sql, version)
 
         table = self.tables.get(table_name)

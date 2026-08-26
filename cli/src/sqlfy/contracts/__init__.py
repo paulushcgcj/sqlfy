@@ -20,15 +20,19 @@ convenience.  Domain sub-packages are also importable directly:
     from sqlfy.contracts.analysis.v1 import InsightsV1
     from sqlfy.contracts.impact.v1   import ImpactV1
 """
+
 from __future__ import annotations
 
+from .analysis.pii_v1 import PiiScanV1
 from .analysis.v1 import HealthV1, InsightsV1
+from .chunks.v1 import ChunksV1
 from .common.base import ContractBase
 from .common.envelope import ResponseEnvelope
 from .common.metadata import BuildInfo
 from .evolution.v1 import DiffV1, RollbackV1, SimulateV1
-from .graph.v1 import GraphManifestV1
+from .graph.v1 import GraphManifestV1, GraphOutputV1
 from .impact.v1 import ImpactV1
+from .query.v1 import QueryResultV1
 from .registry import (
     CONTRACTS,
     ContractEntry,
@@ -38,6 +42,7 @@ from .registry import (
     get_contract,
     latest_contracts,
 )
+from .schema.v1 import SchemaStateV1
 
 __all__ = [
     # Base
@@ -47,6 +52,9 @@ __all__ = [
     # Analysis
     "InsightsV1",
     "HealthV1",
+    "PiiScanV1",
+    # Chunks
+    "ChunksV1",
     # Impact
     "ImpactV1",
     # Evolution
@@ -55,6 +63,11 @@ __all__ = [
     "RollbackV1",
     # Graph
     "GraphManifestV1",
+    "GraphOutputV1",
+    # Query
+    "QueryResultV1",
+    # Schema
+    "SchemaStateV1",
     # Registry
     "CONTRACTS",
     "ContractEntry",

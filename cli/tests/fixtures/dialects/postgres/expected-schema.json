@@ -1,0 +1,1 @@
+{"dialect":"$d","expected_tables":["users","orders"],"expected_columns":{"users":["id","email","created_at"],"orders":["id","user_id","amount"]},"expected_constraints":["pk_users","fk_orders_user"]}

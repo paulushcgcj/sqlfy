@@ -13,6 +13,7 @@ Example::
     from sqlfy.contracts.common.base import ContractBase
     from sqlfy.models import InsightsResult
 
+
     class InsightsV1(ContractBase, InsightsResult):
         CONTRACT_NAME: ClassVar[str] = "insights"
         CONTRACT_VERSION: ClassVar[str] = "v1"
@@ -24,18 +25,23 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ContractBase(BaseModel):
     """Mixin base for all SQLFY public contract models.
 
     Subclasses must set the four ``CONTRACT_*`` class variables.
-    No Pydantic fields are defined here; the mixin purely carries
-    metadata consumed by the registry and the build generator.
+    The ``contract_version`` field is included in JSON output for version tracking.
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    contract_version: str = Field(
+        default="v1",
+        alias="contractVersion",
+        description="Contract schema version. Immutable once published.",
+    )
 
     CONTRACT_NAME: ClassVar[str] = ""
     """Stable contract identifier, e.g. ``"insights"``.  Immutable once published."""
