@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="100%" height="100%" role="img" aria-label="SQLfy processing pipeline: Flyway SQL files, sqlglot AST, Reconstructor, Schema Graph State, and LLM/RAG or ERD exports">
+  <title>SQLfy Processing Pipeline</title>
+  <defs>
+    <linearGradient id="p-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="p-blue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+    <linearGradient id="p-emerald" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <marker id="p-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+    </marker>
+  </defs>
+
+  <rect width="1200" height="320" rx="16" fill="url(#p-bg)" />
+
+  <!-- Section label -->
+  <text x="40" y="52" fill="#94a3b8" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" letter-spacing="2">PROCESSING PIPELINE</text>
+
+  <!-- Connector lines -->
+  <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#p-arrow)">
+    <line x1="232" y1="170" x2="268" y2="170" />
+    <line x1="464" y1="170" x2="500" y2="170" />
+    <line x1="696" y1="170" x2="732" y2="170" />
+    <line x1="928" y1="170" x2="964" y2="170" />
+  </g>
+
+  <!-- Node 1: Flyway SQL -->
+  <g transform="translate(40,125)">
+    <rect width="192" height="92" rx="12" fill="#111c33" stroke="#334155" stroke-width="1.5" />
+    <rect width="192" height="26" rx="12" fill="#1e293b" />
+    <text x="16" y="18" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">INPUT</text>
+    <text x="16" y="56" fill="#f8fafc" font-family="ui-monospace, monospace" font-size="14" font-weight="700">Flyway SQL</text>
+    <text x="16" y="78" fill="#64748b" font-family="ui-monospace, monospace" font-size="11">V1__ · V2__ · V3__ …</text>
+  </g>
+
+  <!-- Node 2: sqlglot AST -->
+  <g transform="translate(272,125)">
+    <rect width="192" height="92" rx="12" fill="#0f1d3a" stroke="#3b82f6" stroke-width="1.5" />
+    <rect width="192" height="26" rx="12" fill="url(#p-blue)" />
+    <text x="16" y="18" fill="#ffffff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">PARSE</text>
+    <text x="16" y="56" fill="#f8fafc" font-family="ui-monospace, monospace" font-size="14" font-weight="700">sqlglot AST</text>
+    <text x="16" y="78" fill="#93c5fd" font-family="ui-monospace, monospace" font-size="11">multi-dialect</text>
+  </g>
+
+  <!-- Node 3: Reconstructor -->
+  <g transform="translate(504,125)">
+    <rect width="192" height="92" rx="12" fill="#0f1d3a" stroke="#3b82f6" stroke-width="1.5" />
+    <rect width="192" height="26" rx="12" fill="url(#p-blue)" />
+    <text x="16" y="18" fill="#ffffff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">RECONSTRUCT</text>
+    <text x="16" y="56" fill="#f8fafc" font-family="ui-monospace, monospace" font-size="14" font-weight="700">Reconstructor</text>
+    <text x="16" y="78" fill="#93c5fd" font-family="ui-monospace, monospace" font-size="11">CREATE/ALTER/DROP</text>
+  </g>
+
+  <!-- Node 4: Schema Graph State -->
+  <g transform="translate(736,125)">
+    <rect width="192" height="92" rx="12" fill="#06281f" stroke="#10b981" stroke-width="1.5" />
+    <rect width="192" height="26" rx="12" fill="url(#p-emerald)" />
+    <text x="16" y="18" fill="#ffffff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">STATE</text>
+    <text x="16" y="56" fill="#f8fafc" font-family="ui-monospace, monospace" font-size="14" font-weight="700">Schema Graph</text>
+    <text x="16" y="78" fill="#6ee7b7" font-family="ui-monospace, monospace" font-size="11">serializable snapshot</text>
+  </g>
+
+  <!-- Node 5: Exports -->
+  <g transform="translate(968,125)">
+    <rect width="192" height="92" rx="12" fill="#1c1430" stroke="#a855f7" stroke-width="1.5" />
+    <rect width="192" height="26" rx="12" fill="#7c3aed" />
+    <text x="16" y="18" fill="#ffffff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">EXPORT</text>
+    <text x="16" y="56" fill="#f8fafc" font-family="ui-monospace, monospace" font-size="14" font-weight="700">LLM · ERD</text>
+    <text x="16" y="78" fill="#d8b4fe" font-family="ui-monospace, monospace" font-size="11">RAG chunks / graphs</text>
+  </g>
+
+  <!-- Caption -->
+  <text x="40" y="268" fill="#64748b" font-family="ui-monospace, monospace" font-size="12">sqlfy dump ./migrations → SchemaState → sqlfy chunks / graph / insights</text>
+</svg>
