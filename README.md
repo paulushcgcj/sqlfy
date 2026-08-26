@@ -170,6 +170,8 @@ SQLfy exposes **34 top-level subcommands** (plus `hooks` actions) organized into
 | `ask` | Ask a natural language question about the schema (RAG) |
 | `chat` | Interactive multi-turn schema chat session |
 
+> **Experimental notes:** `ask`/`chat` and `--embed` are experimental. Costs are incurred per API call to Anthropic/Voyage AI, data sent to external providers is subject to their privacy policies, and results may vary in reliability. Use local BM25 by default for offline, zero-cost retrieval.
+
 > Use `sqlfy <subcommand> --help` for detailed usage and flags.
 
 ---
