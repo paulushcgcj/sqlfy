@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from sqlfy.contracts import CONTRACTS, get_contract
+from sqlfy.contracts import get_contract
 from sqlfy.contracts.impact.v1 import ImpactV1
 
 

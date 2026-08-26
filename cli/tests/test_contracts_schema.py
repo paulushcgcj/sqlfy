@@ -5,12 +5,10 @@ Validates that JSON outputs match the registered Pydantic contracts.
 
 from __future__ import annotations
 
-import pytest
-
-from sqlfy.contracts import CONTRACTS, get_contract
-from sqlfy.contracts.schema.v1 import SchemaStateV1
-from sqlfy.contracts.query.v1 import QueryResultV1
+from sqlfy.contracts import get_contract
 from sqlfy.contracts.chunks.v1 import ChunksV1
+from sqlfy.contracts.query.v1 import QueryResultV1
+from sqlfy.contracts.schema.v1 import SchemaStateV1
 from sqlfy.models import VectorChunk
 
 

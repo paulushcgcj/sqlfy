@@ -6,7 +6,6 @@ import json
 import sys
 from pathlib import Path
 
-from ..contracts import get_contract
 from ..contracts.registry import CONTRACTS
 from ..domain.models import SchemaGraph, VectorChunk
 from ..domain.schema_state import type_str

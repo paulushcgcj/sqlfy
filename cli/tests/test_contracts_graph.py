@@ -5,9 +5,7 @@ Validates that JSON outputs match the registered Pydantic contracts.
 
 from __future__ import annotations
 
-import pytest
-
-from sqlfy.contracts import CONTRACTS, get_contract
+from sqlfy.contracts import get_contract
 from sqlfy.contracts.graph.v1 import GraphManifestV1, GraphOutputV1
 
 

@@ -13,7 +13,6 @@ from pathlib import Path
 
 from sqlfy.version import get_version
 
-
 WRITE_MIGRATIONS_SQL = """CREATE TABLE app.users (
     id NUMBER PRIMARY KEY,
     email VARCHAR2(255) NOT NULL UNIQUE

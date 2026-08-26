@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from sqlfy.contracts import CONTRACTS, get_contract
+from sqlfy.contracts import get_contract
 from sqlfy.contracts.evolution.v1 import DiffV1, RollbackV1, SimulateV1
 
 

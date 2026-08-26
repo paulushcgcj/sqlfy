@@ -5,13 +5,11 @@ Validates that JSON outputs match the registered Pydantic contracts.
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from sqlfy.contracts import CONTRACTS, get_contract
-from sqlfy.contracts.analysis.v1 import HealthV1, InsightsV1
 from sqlfy.contracts.analysis.pii_v1 import PiiScanV1
+from sqlfy.contracts.analysis.v1 import HealthV1, InsightsV1
 
 
 class TestContractRegistry:

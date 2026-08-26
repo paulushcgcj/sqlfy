@@ -7,8 +7,8 @@ import sys
 from ..analysis.insights import InsightsEngine
 from ..domain.schema_state import SchemaStateBuilder
 from ..reconstructor import (
-    Reconstructor,
     ReconstructionError,
+    Reconstructor,
     reconstruct,
     reconstruct_at,
 )
