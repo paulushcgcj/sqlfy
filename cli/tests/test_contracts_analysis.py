@@ -167,7 +167,7 @@ class TestInsightsContract:
             # missing summary
             "findings": {"error": [], "warning": [], "info": []},
         }
-        with pytest.raises(Exception):  # Pydantic validation error
+        with pytest.raises(ValueError):  # Pydantic validation error
             InsightsV1.model_validate(data)
 
     def test_insights_extra_field_fails(self):
@@ -185,7 +185,7 @@ class TestInsightsContract:
             "findings": {"error": [], "warning": [], "info": []},
             "extra_field": "not allowed",
         }
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             InsightsV1.model_validate(data)
 
     def test_insights_contract_version_serializes(self):

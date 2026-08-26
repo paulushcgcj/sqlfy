@@ -92,7 +92,7 @@ class TestImpactContract:
             "objectId": "APP.USERS",
             # missing direct, transitive, depthMap, byType, criticalPaths, maxDepth, totalCount
         }
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ImpactV1.model_validate(data)
 
     def test_impact_extra_field_fails(self):
@@ -107,7 +107,7 @@ class TestImpactContract:
             "totalCount": 0,
             "extra_field": "not allowed",
         }
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ImpactV1.model_validate(data)
 
     def test_impact_contract_version_serializes(self):

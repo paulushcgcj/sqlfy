@@ -167,7 +167,7 @@ class TestDiffContract:
             "versionB": "2",
             # missing fingerprintA, fingerprintB, stats, tableChanges, etc.
         }
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             DiffV1.model_validate(data)
 
     def test_diff_extra_field_fails(self):
@@ -194,7 +194,7 @@ class TestDiffContract:
             "relationshipChanges": [],
             "extra_field": "not allowed",
         }
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             DiffV1.model_validate(data)
 
     def test_diff_contract_version_serializes(self):
