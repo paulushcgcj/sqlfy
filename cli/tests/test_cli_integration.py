@@ -1,4 +1,5 @@
 """Integration tests for CLI command modules."""
+
 from __future__ import annotations
 
 import json
@@ -13,16 +14,6 @@ def run_cli(*args):
     """Run sqlfy CLI and return (stdout, stderr, returncode)."""
     result = subprocess.run(
         [sys.executable, "-m", "sqlfy.main", *args],
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout, result.stderr, result.returncode
-
-
-def run_legacy_ng(*args):
-    """Run the installed compatibility script beside the active interpreter."""
-    result = subprocess.run(
-        [str(Path(sys.executable).with_name("sqlfy-ng")), *args],
         capture_output=True,
         text=True,
     )
@@ -121,16 +112,6 @@ def test_version_reports_installed_package_version():
     assert stdout.strip() == f"sqlfy {get_version()}"
 
 
-def test_sqlfy_ng_is_a_deprecated_alias_for_the_canonical_cli():
-    """The compatibility command must not maintain a second command tree."""
-    stdout, stderr, code = run_legacy_ng("--help")
-
-    assert code == 0
-    assert "Warning: 'sqlfy-ng' is deprecated" in stderr
-    assert "diff-versions" in stdout
-    assert "intelligence" not in stdout
-
-
 def test_dump_json_executes_full_cli_pipeline(tmp_path):
     """dump must execute parsing/reconstruction and emit machine-readable JSON."""
     write_migrations(tmp_path)
@@ -152,8 +133,15 @@ def test_manifest_and_query_execute_full_cli_pipeline(tmp_path):
     assert json.loads(stdout)["tableCount"] == 2
 
     stdout, stderr, code = run_cli(
-        "query", str(tmp_path), "fk-path", "--from-table", "APP.ORDERS",
-        "--to-table", "APP.USERS", "--format", "json",
+        "query",
+        str(tmp_path),
+        "fk-path",
+        "--from-table",
+        "APP.ORDERS",
+        "--to-table",
+        "APP.USERS",
+        "--format",
+        "json",
     )
     assert code == 0, stderr
     assert json.loads(stdout)["meta"]["length"] == 1
@@ -164,7 +152,14 @@ def test_diff_versions_executes_full_cli_pipeline(tmp_path):
     write_migrations(tmp_path)
 
     stdout, stderr, code = run_cli(
-        "diff-versions", str(tmp_path), "--from", "1", "--to", "2", "--format", "json",
+        "diff-versions",
+        str(tmp_path),
+        "--from",
+        "1",
+        "--to",
+        "2",
+        "--format",
+        "json",
     )
 
     assert code == 0, stderr
